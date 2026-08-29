@@ -1,0 +1,25 @@
+{
+  "date": "2026-08-29",
+  "generatedAt": "20260829T123147Z",
+  "sourceMode": "oracle",
+  "truth": {
+    "keep": 2,
+    "measuring": 17,
+    "dropped": 113,
+    "profit": "Lab board"
+  },
+  "pnlTotal": 444.02,
+  "liveMoney": {
+    "live_on": false,
+    "place_on": false,
+    "n_live_orders": 0
+  },
+  "boardUx": {
+    "n_solid": 0,
+    "hero_u": null,
+    "fuse": "Real betting: OFF"
+  },
+  "paperLive": {
+    "day_u": null
+  }
+}

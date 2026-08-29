@@ -1,0 +1,37 @@
+{
+  "board": {
+    "day": "2026-08-29",
+    "stamp": "Score — · Solids 0 · Real betting: OFF · 20260829T123147Z",
+    "fuse": "off",
+    "invent": "invent on · invent (densify)",
+    "keep": 2,
+    "kill": 113,
+    "measuring": 17,
+    "keepPaper": 444.02,
+    "keepLiveEnv": 22.67,
+    "ops": "AMBER"
+  },
+  "history": [
+    { "day": "2026-08-27", "stamp": "Score — · Solids 1 · Real betting: OFF · 20260827T234911Z", "keep": 1, "kill": 98, "measuring": 15, "keepPaper": 558.27 },
+    { "day": "2026-08-28", "stamp": "Score +2.33u · Solids 0 · Real betting: OFF · 20260828T234601Z", "keep": 0, "kill": 111, "measuring": 24, "keepPaper": 444.02 },
+    { "day": "2026-08-29", "stamp": "Score — · Solids 0 · Real betting: OFF · 20260829T123147Z", "keep": 2, "kill": 113, "measuring": 17, "keepPaper": 444.02 }
+  ],
+  "staff": [
+    { "seat": "Igor", "status": "GREEN", "watching": "Measuring n=17" },
+    { "seat": "Bauron", "status": "GREEN", "watching": "invent on · invent (densify) · hunter Lens · pitched=2 · proving=16 · closed=2 · certified=0 · scaling=0 · passed=3566" },
+    { "seat": "Hyde", "status": "GREEN", "watching": "n_applied 0" },
+    { "seat": "Virchow", "status": "AMBER", "watching": "n_schools 13" },
+    { "seat": "Mercator", "status": "GREEN", "watching": "next hole: NZ|late_pre|WIN" },
+    { "seat": "Clerk", "status": "AMBER", "watching": "mirror_candidate_not_booked: Paper↔live mirror has 17 candidate(s) not booked" },
+    { "seat": "Foreman", "status": "GREEN", "watching": "tick · KEEP=2 measuring=17" },
+    { "seat": "Curator", "status": "GREEN", "watching": null }
+  ],
+  "hunters": [
+    { "seat": "Card", "status": "GREEN", "watching": "FLOWING · proving=4 · conv 0.0% · queue FR|near_off|PLACE" },
+    { "seat": "Steam", "status": "GREEN", "watching": "FLOWING · no open deals" },
+    { "seat": "Residual", "status": "GREEN", "watching": "FLOWING · pitched=1 · proving=4 · conv 0.0% · queue NZ|near_off|WIN" },
+    { "seat": "Geo", "status": "GREEN", "watching": "FLOWING · pitched=1 · proving=8 · closed=2 · conv 18.2% · queue NZ|in_play|WIN" },
+    { "seat": "Doc Brown", "status": "GREEN", "watching": "FLOWING · no open deals · queue NZ|morning|PLACE" },
+    { "seat": "Lens", "status": "GREEN", "watching": "FLOWING · no open deals · active hour" }
+  ]
+}
