@@ -1,14 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { EmptyState } from "@/components/empty-state";
 import { useStamp } from "@/components/plant-context";
+import { moveTone } from "@/lib/lab/desk";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/moves")({ component: Moves });
-
-function toneFor(to: string) {
-  if (to === "Dead" || to === "Stuck") return "bad" as const;
-  if (to === "Research keep" || to === "Pass") return "ok" as const;
-  return "mute" as const;
-}
 
 export function Moves() {
   const stamp = useStamp();
@@ -21,11 +17,11 @@ export function Moves() {
         </p>
       </header>
       {stamp.moves.length === 0 ? (
-        <p className="text-sm text-subtle">No moves on this stamp.</p>
+        <EmptyState />
       ) : (
         <ol className="space-y-5">
           {stamp.moves.map((m) => {
-            const tone = toneFor(m.to);
+            const tone = moveTone(m.to);
             return (
               <li key={m.at + m.recipe} className="log-in">
                 <div className="mb-2 flex items-baseline justify-between gap-3">
@@ -41,10 +37,8 @@ export function Moves() {
                   </span>
                   <span
                     className={cn(
-                      "min-w-0 flex-1 truncate rounded-sm px-3 py-2 font-mono text-xs",
-                      tone === "bad" && "bg-elev text-bad",
-                      tone === "ok" && "bg-elev text-up",
-                      tone === "mute" && "bg-elev text-fg",
+                      "min-w-0 flex-1 truncate rounded-sm bg-elev px-3 py-2 font-mono text-xs",
+                      tone === "bad" ? "text-bad" : "text-fg",
                     )}
                   >
                     {m.to}

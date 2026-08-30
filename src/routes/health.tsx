@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { LiveDot } from "@/components/live-dot";
 import { useStamp } from "@/components/plant-context";
+import { healthLine } from "@/lib/lab/desk";
 import type { LiveStamp } from "@/lib/lab/from-digest";
 import { cn } from "@/lib/utils";
 
@@ -11,30 +12,18 @@ export function Health() {
   const red = stamp.kpis.filter((k) => k.status === "RED");
   const amber = stamp.kpis.filter((k) => k.status === "AMBER");
   const green = stamp.kpis.filter((k) => k.status === "GREEN");
+  const line = healthLine({
+    plantHealth: stamp.plantHealth,
+    plantLine: stamp.plantLine,
+    kpis: stamp.kpis,
+  });
 
   return (
     <div className="space-y-8">
       <header>
         <h1 className="text-2xl">Health</h1>
-        <p className="mt-1 text-sm text-muted">
-          Lab tick vs office. Color is the state. Nothing blinks.
-        </p>
+        <p className="mt-2 text-lg">{line}</p>
       </header>
-
-      <p className="flex flex-wrap gap-4 font-mono text-xs">
-        <span className="inline-flex items-center gap-1.5 text-bad">
-          <LiveDot tone="bad" />
-          {red.length} red
-        </span>
-        <span className="inline-flex items-center gap-1.5 text-warn">
-          <LiveDot tone="warn" />
-          {amber.length} amber
-        </span>
-        <span className="inline-flex items-center gap-1.5 text-up">
-          <LiveDot tone="ok" />
-          {green.length} green
-        </span>
-      </p>
 
       <Group title="Off" items={red} tone="bad" />
       <Group title="Watch" items={amber} tone="warn" />
@@ -68,7 +57,7 @@ function Group({
             <span
               className={cn(
                 "inline-flex items-center gap-1.5 font-mono text-xs",
-                tone === "ok" && "text-up",
+                tone === "ok" && "text-subtle",
                 tone === "warn" && "text-warn",
                 tone === "bad" && "text-bad",
               )}

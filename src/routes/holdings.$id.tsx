@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { DetailShell } from "@/components/detail-shell";
+import { EmptyState } from "@/components/empty-state";
 import { useStamp } from "@/components/plant-context";
 import { cn } from "@/lib/utils";
 
@@ -12,7 +13,7 @@ function Holding() {
   if (!r) {
     return (
       <DetailShell backTo="/" backLabel="Floor">
-        <p className="text-sm text-subtle">No holding on this stamp for that id.</p>
+        <EmptyState />
       </DetailShell>
     );
   }
@@ -28,7 +29,7 @@ function Holding() {
         <Row
           k="ROI"
           v={`${r.roi >= 0 ? "+" : ""}${r.roi.toFixed(1)}%`}
-          tone={r.roi >= 0 ? "up" : "bad"}
+          tone={r.badge === "Solid" ? (r.roi >= 0 ? "up" : "bad") : undefined}
         />
       </dl>
       <p className="text-sm">{r.why}</p>

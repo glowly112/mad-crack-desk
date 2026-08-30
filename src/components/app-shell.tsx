@@ -1,4 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
+import { BettingStrip } from "@/components/betting-strip";
+import { JobChrome } from "@/components/job-chrome";
 import { LabMark, MarkSettings, NAV_MARKS } from "@/components/marks";
 import { LiveDot } from "@/components/live-dot";
 import { usePlantSource, useStamp } from "@/components/plant-context";
@@ -25,64 +27,63 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const settingsOn = pathActive(pathname, "/settings");
   const stamp = useStamp();
   const plant = usePlantSource();
+  const floor = pathname === "/";
+  const showJob = !floor && !pathActive(pathname, "/settings");
 
   return (
-    <div className="min-h-dvh bg-bg text-fg md:flex">
-      <aside className="hidden w-52 shrink-0 flex-col border-r border-border md:flex">
-        <div className="flex items-center gap-2 px-4 py-4">
-          <LabMark className="size-6 text-fg" />
-          <div>
-            <p className="text-sm font-medium tracking-tight">Mad Crack Lab</p>
-            <p className="font-mono text-xs text-subtle">
-              {plant.source === "oracle" ? `${stamp.day} · oracle` : plant.detail}
-            </p>
-          </div>
-        </div>
-        <nav className="flex flex-1 flex-col gap-0.5 px-2">
-          {NAV.map((item) => (
-            <NavLink key={item.to} {...item} active={pathActive(pathname, item.to)} />
-          ))}
-        </nav>
-        <div className="space-y-2 border-t border-border px-2 py-3">
-          <Link
-            to="/settings"
-            preload="intent"
-            className={cn(
-              "flex min-h-11 items-center gap-2 rounded-sm px-2 text-sm",
-              settingsOn ? "bg-elev text-fg" : "text-muted hover:text-fg",
-            )}
-          >
-            <MarkSettings className="size-4" />
-            Settings
-          </Link>
-          <p
-            className={cn(
-              "flex items-center gap-2 px-2 font-mono text-xs",
-              stamp.fuse_on ? "text-up" : "text-warn",
-            )}
-          >
-            <LiveDot tone={stamp.fuse_on ? "ok" : "warn"} />
-            <span>{stamp.fuse}</span>
-          </p>
-        </div>
-      </aside>
-
-      <div className="min-w-0 flex-1">
-        <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 md:hidden">
-          <div className="flex min-w-0 items-center gap-2">
-            <LabMark className="size-5 shrink-0 text-fg" />
-            <div className="min-w-0">
-              <p className="text-sm font-medium">Mad Crack Lab</p>
-              <p className="truncate font-mono text-xs text-subtle">
+    <div className="min-h-dvh bg-bg text-fg">
+      <BettingStrip />
+      <div className="md:flex">
+        <aside className="hidden w-52 shrink-0 flex-col border-r border-border md:flex">
+          <div className="flex items-center gap-2 px-4 py-4">
+            <LabMark className="size-6 text-fg" />
+            <div>
+              <p className="text-sm font-medium tracking-tight">Mad Crack Lab</p>
+              <p className="font-mono text-xs text-subtle">
                 {plant.source === "oracle" ? `${stamp.day} · oracle` : plant.detail}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className={cn("inline-flex items-center gap-1.5 font-mono text-xs", stamp.fuse_on ? "text-up" : "text-warn")}>
+          <nav className="flex flex-1 flex-col gap-0.5 px-2">
+            {NAV.map((item) => (
+              <NavLink key={item.to} {...item} active={pathActive(pathname, item.to)} />
+            ))}
+          </nav>
+          <div className="space-y-2 border-t border-border px-2 py-3">
+            <Link
+              to="/settings"
+              preload="intent"
+              className={cn(
+                "flex min-h-11 items-center gap-2 rounded-sm px-2 text-sm",
+                settingsOn ? "bg-elev text-fg" : "text-muted hover:text-fg",
+              )}
+            >
+              <MarkSettings className="size-4" />
+              Settings
+            </Link>
+            <p
+              className={cn(
+                "flex items-center gap-2 px-2 font-mono text-xs",
+                stamp.fuse_on ? "text-muted" : "text-subtle",
+              )}
+            >
               <LiveDot tone={stamp.fuse_on ? "ok" : "warn"} />
               <span>{stamp.fuse}</span>
-            </span>
+            </p>
+          </div>
+        </aside>
+
+        <div className="min-w-0 flex-1">
+          <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 md:hidden">
+            <div className="flex min-w-0 items-center gap-2">
+              <LabMark className="size-5 shrink-0 text-fg" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium">Mad Crack Lab</p>
+                <p className="truncate font-mono text-xs text-subtle">
+                  {plant.source === "oracle" ? `${stamp.day} · oracle` : plant.detail}
+                </p>
+              </div>
+            </div>
             <Link
               to="/settings"
               preload="intent"
@@ -94,14 +95,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             >
               <MarkSettings className="size-4" />
             </Link>
-          </div>
-        </header>
-        <main
-          key={pathname}
-          className="route-in min-w-0 overflow-x-hidden px-4 pb-28 pt-5 md:px-8 md:pb-12 md:pt-7"
-        >
-          {children}
-        </main>
+          </header>
+          <main
+            key={pathname}
+            className="route-in min-w-0 overflow-x-hidden px-4 pb-28 pt-5 md:px-8 md:pb-12 md:pt-7"
+          >
+            {showJob ? <JobChrome /> : null}
+            {children}
+          </main>
+        </div>
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-bg pb-[env(safe-area-inset-bottom)] md:hidden">
