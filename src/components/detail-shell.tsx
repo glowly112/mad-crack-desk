@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { LookLink } from "@/components/look-link";
 
 export function DetailShell({
   backTo,
@@ -11,12 +11,12 @@ export function DetailShell({
 }) {
   return (
     <div className="space-y-6">
-      <Link
+      <LookLink
         to={backTo}
         className="inline-flex min-h-11 items-center text-sm text-muted transition-transform duration-150 ease-out active:scale-[0.96]"
       >
         ← {backLabel}
-      </Link>
+      </LookLink>
       {children}
     </div>
   );

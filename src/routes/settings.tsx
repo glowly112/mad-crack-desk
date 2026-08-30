@@ -64,6 +64,10 @@ export function Settings() {
       <p className="text-sm text-muted">
         Sample · {THEME_LABEL[prefs.theme]} · {FONT_LABEL[prefs.font]} · {SIZE_LABEL[prefs.size]}
       </p>
+      <p className="text-sm text-subtle">
+        Tape / Ledger / Field on the shell are a proto gallery. They restyle the whole desk and
+        override this device theme while a look is on.
+      </p>
     </div>
   );
 }
