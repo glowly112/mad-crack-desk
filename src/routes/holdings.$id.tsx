@@ -44,6 +44,7 @@ function Holding() {
         />
       </dl>
       <p className="text-sm">{r.why}</p>
+      </div>
     </DetailShell>
   );
 }

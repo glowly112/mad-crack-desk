@@ -22,6 +22,7 @@ import { Route as HoldingsIdRouteImport } from './routes/holdings.$id'
 import { Route as HuntersIdRouteImport } from './routes/hunters.$id'
 import { Route as IssuesIndexRouteImport } from './routes/issues.index'
 import { Route as IssuesIdRouteImport } from './routes/issues.$id'
+import { Route as LooksLookRouteImport } from './routes/looks.$look'
 import { Route as StaffIndexRouteImport } from './routes/staff.index'
 import { Route as StaffIdRouteImport } from './routes/staff.$id'
 
@@ -90,6 +91,11 @@ const IssuesIdRoute = IssuesIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => IssuesRoute,
 } as any)
+const LooksLookRoute = LooksLookRouteImport.update({
+  id: '/looks/$look',
+  path: '/looks/$look',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StaffIndexRoute = StaffIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -114,6 +120,7 @@ export interface FileRoutesByFullPath {
   '/holdings/$id': typeof HoldingsIdRoute
   '/hunters/$id': typeof HuntersIdRoute
   '/issues/$id': typeof IssuesIdRoute
+  '/looks/$look': typeof LooksLookRoute
   '/staff/$id': typeof StaffIdRoute
   '/issues/': typeof IssuesIndexRoute
   '/staff/': typeof StaffIndexRoute
@@ -129,6 +136,7 @@ export interface FileRoutesByTo {
   '/holdings/$id': typeof HoldingsIdRoute
   '/hunters/$id': typeof HuntersIdRoute
   '/issues/$id': typeof IssuesIdRoute
+  '/looks/$look': typeof LooksLookRoute
   '/staff/$id': typeof StaffIdRoute
   '/issues': typeof IssuesIndexRoute
   '/staff': typeof StaffIndexRoute
@@ -147,6 +155,7 @@ export interface FileRoutesById {
   '/holdings/$id': typeof HoldingsIdRoute
   '/hunters/$id': typeof HuntersIdRoute
   '/issues/$id': typeof IssuesIdRoute
+  '/looks/$look': typeof LooksLookRoute
   '/staff/$id': typeof StaffIdRoute
   '/issues/': typeof IssuesIndexRoute
   '/staff/': typeof StaffIndexRoute
@@ -166,6 +175,7 @@ export interface FileRouteTypes {
     | '/holdings/$id'
     | '/hunters/$id'
     | '/issues/$id'
+    | '/looks/$look'
     | '/staff/$id'
     | '/issues/'
     | '/staff/'
@@ -181,6 +191,7 @@ export interface FileRouteTypes {
     | '/holdings/$id'
     | '/hunters/$id'
     | '/issues/$id'
+    | '/looks/$look'
     | '/staff/$id'
     | '/issues'
     | '/staff'
@@ -198,6 +209,7 @@ export interface FileRouteTypes {
     | '/holdings/$id'
     | '/hunters/$id'
     | '/issues/$id'
+    | '/looks/$look'
     | '/staff/$id'
     | '/issues/'
     | '/staff/'
@@ -215,6 +227,7 @@ export interface RootRouteChildren {
   TrendsRoute: typeof TrendsRoute
   HoldingsIdRoute: typeof HoldingsIdRoute
   HuntersIdRoute: typeof HuntersIdRoute
+  LooksLookRoute: typeof LooksLookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -310,6 +323,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IssuesIdRouteImport
       parentRoute: typeof IssuesRoute
     }
+    '/looks/$look': {
+      id: '/looks/$look'
+      path: '/looks/$look'
+      fullPath: '/looks/$look'
+      preLoaderRoute: typeof LooksLookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/staff/': {
       id: '/staff/'
       path: '/'
@@ -364,6 +384,7 @@ const rootRouteChildren: RootRouteChildren = {
   TrendsRoute: TrendsRoute,
   HoldingsIdRoute: HoldingsIdRoute,
   HuntersIdRoute: HuntersIdRoute,
+  LooksLookRoute: LooksLookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

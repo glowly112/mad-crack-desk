@@ -292,12 +292,12 @@ html[data-size="l"] {
 }
 
 .look-switcher {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.2rem;
   margin: 0 0.75rem 0.75rem;
   padding: 0.2rem;
-  border-radius: 999px;
+  border-radius: 0.7rem;
   background: var(--color-elev);
 }
 
@@ -358,7 +358,7 @@ html[data-size="l"] {
 
   .desk-nav {
     display: flex;
-    width: 13rem;
+    width: 14rem;
     flex-shrink: 0;
     flex-direction: column;
     border-right: 1px solid var(--color-border);
@@ -453,8 +453,8 @@ html[data-look="tape"] .look-switcher-tab.is-on {
 .look-pill-dead,
 .look-pill-stuck,
 .look-pill-need {
-  background: #3a1520;
-  color: #ff8b97;
+  background: #4a1620;
+  color: #ff9aa4;
 }
 
 .look-pill {
