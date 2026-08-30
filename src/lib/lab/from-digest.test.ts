@@ -21,7 +21,7 @@ test("stamp line: a printed score passes through", () => {
 test("digest overlay uses plant KEEP/measuring and leaves research £ off the hero", () => {
   const live = applyDigest(digest as Digest, STAMP);
   assert.equal(live.counts.keep, 2);
-  assert.equal(live.counts.measuring, 18);
+  assert.equal(live.counts.measuring, 17);
   assert.equal(live.counts.kill, 113);
   assert.equal(live.n_solid, 0);
   assert.equal(live.hero.day_u, null);
@@ -30,7 +30,7 @@ test("digest overlay uses plant KEEP/measuring and leaves research £ off the he
   assert.equal(live.pipe.certified, 0);
   assert.equal(live.pipe.proving, 16);
   assert.equal(live.source, "digest");
-  assert.equal(live.generated, "20260829T113344Z");
+  assert.equal(live.generated, "20260829T123147Z");
   assert.equal(live.office.activeHunter, "Lens");
   const igor = live.seats.find((s) => s.id === "igor");
   assert.equal(igor?.status, "GREEN");

@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { DetailShell } from "@/components/detail-shell";
+import { EmptyState } from "@/components/empty-state";
 import { ownerId, Portrait } from "@/components/portrait";
 import { issueById } from "@/lib/lab/lookup";
 
@@ -11,7 +12,7 @@ function Issue() {
   if (!iss) {
     return (
       <DetailShell backTo="/issues" backLabel="Issues">
-        <p className="text-sm text-subtle">No issue on this stamp for that id.</p>
+        <EmptyState />
       </DetailShell>
     );
   }

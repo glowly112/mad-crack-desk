@@ -4,12 +4,14 @@ import {
   CartesianGrid,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 import { useStamp } from "@/components/plant-context";
+import { productionDomain } from "@/lib/lab/desk";
 import { fmtU } from "@/lib/utils";
 
 export const Route = createFileRoute("/trends")({ component: Trends });
@@ -21,6 +23,10 @@ function Trends() {
     ...p,
     label: p.day.slice(5),
   }));
+  const domain = productionDomain(
+    stamp.trends.map((p) => p.paper_live_day_u),
+    stamp.hero.aim_u,
+  );
 
   return (
     <div className="space-y-10">
@@ -31,12 +37,20 @@ function Trends() {
         </p>
       </header>
 
-      <ChartBlock title="Today's production score" sub="Solid recipes only. Still paper. Aim £100/day.">
+      <ChartBlock title="Today's production score" sub="Solid recipes only. Still paper. Aim £100/day on the axis.">
         <ResponsiveContainer width="100%" height={220}>
           <LineChart data={points} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <CartesianGrid stroke="var(--color-border)" vertical={false} />
             <XAxis dataKey="label" stroke="var(--color-subtle)" fontSize={11} tickLine={false} axisLine={false} />
-            <YAxis stroke="var(--color-subtle)" fontSize={11} tickLine={false} axisLine={false} width={40} />
+            <YAxis
+              domain={domain}
+              stroke="var(--color-subtle)"
+              fontSize={11}
+              tickLine={false}
+              axisLine={false}
+              width={40}
+            />
+            <ReferenceLine y={stamp.hero.aim_u} stroke="var(--color-subtle)" strokeDasharray="3 4" />
             <Tooltip
               contentStyle={{
                 background: "var(--color-elev)",
@@ -88,7 +102,7 @@ function Trends() {
         <button
           type="button"
           onClick={() => setShowPile((s) => !s)}
-          className="min-h-11 rounded-sm border border-border px-4 text-sm text-muted"
+          className="min-h-11 rounded-sm border border-border px-4 text-sm text-muted transition-transform duration-150 ease-out active:scale-[0.96]"
         >
           {showPile ? "Hide research pile" : "Show research pile"}
         </button>

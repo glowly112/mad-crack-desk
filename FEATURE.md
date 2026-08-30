@@ -1,8 +1,8 @@
 # Feature
-Job: Publish the desk to GitHub + Vercel. Floor numbers from the plant stamp.
-Non-goals: Recompute P&L. Open the fuse. New chrome.
-Touched: plant fetch, digest tape, repo, Vercel
-Reuse: applySnapshot, productionScore, digest staff/hunters
-Risk: Inventing a score when solids 0
-Done: GitHub glowly112/mad-crack-desk. Live mcldesk.vercel.app. KEEP 2 / proving 17 / fuse off / score —. Missed box cannot blank the floor.
-Status: accepted
+Job: IA pass so Jamie answers in 5 seconds — today's production score, solid count, is real betting off, what to do next — on Floor and as shared chrome.
+Non-goals: Recompute P&L. Open the fuse. Invent recipes. Market nav. Costume redesign.
+Touched: shell strip, Floor pack grouping, Moves tone, Office/Pipe/Health/Issues/Staff/Trends chrome, desk helpers
+Reuse: plant stamp, productionScore, applySnapshot / applyDigest, Satoshi + Plex, portraits, plant stamp
+Risk: Research keep looking like a holdings win; production spark autoscaled to ~8; Hyde as a portrait card
+Done: Solids-0 Floor list is Empty (existing "No solid recipes on the day tape"). Research keep / Proving quieter groups. Betting OFF strip on every view. Trends Y includes aim £100. Dead/Stuck loud; research keep is not a win.
+Status: proto

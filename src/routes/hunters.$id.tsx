@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { DetailShell } from "@/components/detail-shell";
+import { EmptyState } from "@/components/empty-state";
 import { HUNTER_MARKS } from "@/components/marks";
 import { LiveDot } from "@/components/live-dot";
 import { useStamp } from "@/components/plant-context";
@@ -13,7 +14,7 @@ function Hunter() {
   if (!h) {
     return (
       <DetailShell backTo="/office" backLabel="Office">
-        <p className="text-sm text-subtle">No hunter on this stamp for that id.</p>
+        <EmptyState />
       </DetailShell>
     );
   }
@@ -27,7 +28,7 @@ function Hunter() {
       </div>
       <p className="flex items-center gap-2 font-mono text-sm">
         <LiveDot tone={off ? "warn" : "ok"} />
-        <span className={off ? "text-muted" : "text-up"}>{h.state}</span>
+        <span className="text-muted">{h.state}</span>
       </p>
       <p className="text-sm">{h.note}</p>
     </DetailShell>
