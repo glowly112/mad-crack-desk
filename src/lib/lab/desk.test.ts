@@ -7,6 +7,7 @@ import {
   issueLanes,
   moveTone,
   productionDomain,
+  productionTicks,
   recipePack,
   solidRows,
 } from "./desk.ts";
@@ -70,6 +71,7 @@ test("production domain includes aim £100 — does not autoscale to 8", () => {
   const [emptyLo, emptyHi] = productionDomain([null, null], 100);
   assert.equal(emptyHi, 100);
   assert.equal(emptyLo, 0);
+  assert.deepEqual(productionTicks([lo, hi], 100), [-64, 0, 100]);
 });
 
 test("empty copy is Empty, not poetry", () => {

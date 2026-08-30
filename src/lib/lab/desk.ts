@@ -55,3 +55,8 @@ export function productionDomain(
   if (lo === hi) return [lo - 1, hi + 1];
   return [lo, hi];
 }
+
+export function productionTicks(domain: [number, number], aim: number): number[] {
+  const ticks = [Math.floor(domain[0]), 0, aim];
+  return [...new Set(ticks)].sort((a, b) => a - b);
+}

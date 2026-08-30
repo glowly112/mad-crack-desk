@@ -11,7 +11,7 @@ import {
   YAxis,
 } from "recharts";
 import { useStamp } from "@/components/plant-context";
-import { productionDomain } from "@/lib/lab/desk";
+import { productionDomain, productionTicks } from "@/lib/lab/desk";
 import { fmtU } from "@/lib/utils";
 
 export const Route = createFileRoute("/trends")({ component: Trends });
@@ -44,6 +44,7 @@ function Trends() {
             <XAxis dataKey="label" stroke="var(--color-subtle)" fontSize={11} tickLine={false} axisLine={false} />
             <YAxis
               domain={domain}
+              ticks={productionTicks(domain, stamp.hero.aim_u)}
               stroke="var(--color-subtle)"
               fontSize={11}
               tickLine={false}
