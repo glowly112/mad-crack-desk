@@ -6,3 +6,5 @@ Operator floor for the plant. Display only: KEEP / measuring / fuse / staff. Doe
 - Live: [mcldesk.vercel.app](https://mcldesk.vercel.app)
 
 Floor numbers come from the plant stamp. Live lab snapshot when the console key is present, otherwise the last plant-published tape. Solids 0 → production score stays —. Research keep is not the score. Real betting is a system strip, not a control.
+
+Look gallery (same stamp, three systems): Tape, Ledger, Field via the shell switcher, `/looks/tape|ledger|field`, or `?look=`. Default is the charcoal IA desk.

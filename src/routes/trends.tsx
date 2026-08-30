@@ -10,14 +10,17 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { ViewHeader } from "@/components/looks/view-header";
+import { useLook } from "@/components/look-provider";
 import { useStamp } from "@/components/plant-context";
 import { productionDomain, productionTicks } from "@/lib/lab/desk";
-import { fmtU } from "@/lib/utils";
+import { cn, fmtU } from "@/lib/utils";
 
 export const Route = createFileRoute("/trends")({ component: Trends });
 
 function Trends() {
   const stamp = useStamp();
+  const look = useLook();
   const [showPile, setShowPile] = useState(false);
   const points = stamp.trends.map((p) => ({
     ...p,
@@ -29,13 +32,11 @@ function Trends() {
   );
 
   return (
-    <div className="space-y-10">
-      <header>
-        <h1 className="text-2xl">Trends</h1>
-        <p className="mt-1 text-sm text-muted">
-          Production score and conversion counts. Research pile stays behind a tap.
-        </p>
-      </header>
+    <div className={cn("space-y-10", `look-${look}`)}>
+      <ViewHeader
+        title="Trends"
+        lede="Production score and conversion counts. Research pile stays behind a tap."
+      />
 
       <ChartBlock title="Today's production score" sub="Solid recipes only. Still paper. Aim £100/day on the axis.">
         <ResponsiveContainer width="100%" height={220}>
@@ -140,8 +141,9 @@ function ChartBlock({
   sub: string;
   children: React.ReactNode;
 }) {
+  const look = useLook();
   return (
-    <section>
+    <section className={look === "ledger" ? "ledger-card" : look === "tape" ? "tape-hero" : undefined}>
       <h2 className="text-sm font-medium text-muted">{title}</h2>
       <p className="mb-3 text-xs text-subtle">{sub}</p>
       {children}

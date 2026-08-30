@@ -3,13 +3,14 @@ import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { PlantProvider } from "@/components/plant-provider";
 import { PrefsProvider } from "@/components/prefs-provider";
+import { LookProvider } from "@/components/look-provider";
 import { AppShell } from "@/components/app-shell";
 import { AppErrorComponent, AppNotFoundComponent } from "@/lib/error-component";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "Mad Crack Lab";
 
-const PREFS_BOOT = `(function(){try{var p=JSON.parse(localStorage.getItem("mcl.prefs")||"{}");var h=document.documentElement;if(p.theme)h.setAttribute("data-theme",p.theme);if(p.font)h.setAttribute("data-font",p.font);if(p.size)h.setAttribute("data-size",p.size);}catch(e){}})();`;
+const PREFS_BOOT = `(function(){try{var p=JSON.parse(localStorage.getItem("mcl.prefs")||"{}");var h=document.documentElement;if(p.theme)h.setAttribute("data-theme",p.theme);if(p.font)h.setAttribute("data-font",p.font);if(p.size)h.setAttribute("data-size",p.size);var m=location.pathname.match(/^\\/looks\\/(tape|ledger|field)/);var q=new URLSearchParams(location.search).get("look");var look=m?m[1]:q;if(look==="tape"||look==="ledger"||look==="field")h.setAttribute("data-look",look);}catch(e){}})();`;
 
 export const Route = createRootRoute({
   errorComponent: AppErrorComponent,
@@ -53,11 +54,13 @@ export const Route = createRootRoute({
         <PreviewHostBridge />
         <AuthProvider>
           <PrefsProvider>
-            <PlantProvider>
-            <AppShell>
-              <Outlet />
-            </AppShell>
-            </PlantProvider>
+            <LookProvider>
+              <PlantProvider>
+                <AppShell>
+                  <Outlet />
+                </AppShell>
+              </PlantProvider>
+            </LookProvider>
           </PrefsProvider>
         </AuthProvider>
         <Scripts />

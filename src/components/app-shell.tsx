@@ -1,4 +1,7 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { useRouterState } from "@tanstack/react-router";
+import { LookLink } from "@/components/look-link";
+import { LookSwitcher } from "@/components/look-switcher";
+import { useLook } from "@/components/look-provider";
 import { BettingStrip } from "@/components/betting-strip";
 import { JobChrome } from "@/components/job-chrome";
 import { LabMark, MarkSettings, NAV_MARKS } from "@/components/marks";
@@ -18,24 +21,25 @@ const NAV = [
 ] as const;
 
 function pathActive(pathname: string, to: string) {
-  if (to === "/") return pathname === "/";
+  if (to === "/") return pathname === "/" || pathname.startsWith("/looks/");
   return pathname === to || pathname.startsWith(`${to}/`);
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const look = useLook();
   const settingsOn = pathActive(pathname, "/settings");
   const stamp = useStamp();
   const plant = usePlantSource();
-  const floor = pathname === "/";
+  const floor = pathname === "/" || pathname.startsWith("/looks/");
   const showJob = !floor && !pathActive(pathname, "/settings");
 
   return (
-    <div className="min-h-dvh bg-bg text-fg">
+    <div className={cn("min-h-dvh bg-bg text-fg desk-shell", `look-${look}`)}>
       <BettingStrip />
-      <div className="md:flex">
-        <aside className="hidden w-52 shrink-0 flex-col border-r border-border md:flex">
-          <div className="flex items-center gap-2 px-4 py-4">
+      <div className="desk-cols">
+        <aside className="desk-nav">
+          <div className="desk-brand">
             <LabMark className="size-6 text-fg" />
             <div>
               <p className="text-sm font-medium tracking-tight">Mad Crack Lab</p>
@@ -44,23 +48,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </p>
             </div>
           </div>
-          <nav className="flex flex-1 flex-col gap-0.5 px-2">
+          <LookSwitcher />
+          <nav className="desk-nav-list">
             {NAV.map((item) => (
               <NavLink key={item.to} {...item} active={pathActive(pathname, item.to)} />
             ))}
           </nav>
-          <div className="space-y-2 border-t border-border px-2 py-3">
-            <Link
+          <div className="desk-nav-foot">
+            <LookLink
               to="/settings"
-              preload="intent"
-              className={cn(
-                "flex min-h-11 items-center gap-2 rounded-sm px-2 text-sm",
-                settingsOn ? "bg-elev text-fg" : "text-muted hover:text-fg",
-              )}
+              className={cn("desk-nav-link", settingsOn && "is-on")}
             >
               <MarkSettings className="size-4" />
               Settings
-            </Link>
+            </LookLink>
             <p
               className={cn(
                 "flex items-center gap-2 px-2 font-mono text-xs",
@@ -74,7 +75,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </aside>
 
         <div className="min-w-0 flex-1">
-          <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 md:hidden">
+          <header className="desk-mobile-bar">
             <div className="flex min-w-0 items-center gap-2">
               <LabMark className="size-5 shrink-0 text-fg" />
               <div className="min-w-0">
@@ -84,9 +85,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </p>
               </div>
             </div>
-            <Link
+            <LookLink
               to="/settings"
-              preload="intent"
               aria-label="Settings"
               className={cn(
                 "inline-flex size-11 items-center justify-center rounded-sm",
@@ -94,11 +94,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               )}
             >
               <MarkSettings className="size-4" />
-            </Link>
+            </LookLink>
           </header>
+          <div className="desk-mobile-look">
+            <LookSwitcher compact />
+          </div>
           <main
             key={pathname}
-            className="route-in min-w-0 overflow-x-hidden px-4 pb-28 pt-5 md:px-8 md:pb-12 md:pt-7"
+            className="route-in desk-main"
           >
             {showJob ? <JobChrome /> : null}
             {children}
@@ -106,7 +109,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-bg pb-[env(safe-area-inset-bottom)] md:hidden">
+      <nav className="desk-dock">
         <div className="flex overflow-x-auto">
           {NAV.map((item) => (
             <NavLink key={item.to} {...item} active={pathActive(pathname, item.to)} compact />
@@ -130,17 +133,16 @@ function NavLink({
 }) {
   const Icon = NAV_MARKS[to];
   return (
-    <Link
+    <LookLink
       to={to}
-      preload="intent"
       className={cn(
-        "flex items-center gap-2 rounded-sm px-2 py-2 text-sm transition-colors duration-150",
-        compact && "min-h-11 min-w-16 shrink-0 flex-col justify-center gap-1 py-2 text-xs",
-        active ? "bg-elev text-fg" : "text-muted hover:bg-elev/60 hover:text-fg",
+        "desk-nav-link",
+        compact && "is-compact",
+        active && "is-on",
       )}
     >
       <Icon className="size-4 shrink-0" />
       {label}
-    </Link>
+    </LookLink>
   );
 }
