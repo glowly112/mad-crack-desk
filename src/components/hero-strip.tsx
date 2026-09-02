@@ -2,7 +2,8 @@ import { DayChips } from "@/components/day-chips";
 import { useDayScope } from "@/components/day-scope";
 import { LiveDot } from "@/components/live-dot";
 import { usePlantSource, useStamp } from "@/components/plant-context";
-import { axisDay, dailyDomain, dayWindow } from "@/lib/lab/desk";
+import { EmptyState } from "@/components/empty-state";
+import { axisDay, chartWindow, dailyDomain, EMPTY } from "@/lib/lab/desk";
 import { productionScore } from "@/lib/lab/hero";
 import { cn, fmtAim, fmtScore } from "@/lib/utils";
 
@@ -76,25 +77,37 @@ export function ScoreChart() {
 function DailyBars() {
   const stamp = useStamp();
   const scope = useDayScope();
-  const days = stamp.trends.map((t) => t.day);
-  const windowDays = dayWindow(days, scope.day, 8);
-  const points = windowDays.map((d) => stamp.trends.find((t) => t.day === d)).filter(Boolean) as typeof stamp.trends;
+  const aim = stamp.hero.aim_u;
+  const points = chartWindow(stamp.trends, scope.day, 8);
+  const series = points
+    .map((d) => stamp.trends.find((t) => t.day === d))
+    .filter(Boolean) as typeof stamp.trends;
+  const nums = series.map((p) => p.paper_live_day_u);
+  const vacant = nums.every((v) => v == null);
+  if (vacant) {
+    return (
+      <div className="mt-3">
+        <EmptyState copy={EMPTY} />
+        <p className="mt-1 font-mono text-[10px] text-subtle">aim {aim}u · no production days on screen</p>
+      </div>
+    );
+  }
+
   const w = 360;
   const h = 200;
-  const padL = 32;
+  const padL = 34;
   const padR = 10;
-  const padT = 12;
+  const padT = 16;
   const padB = 28;
   const innerW = w - padL - padR;
   const innerH = h - padT - padB;
-  const nums = points.map((p) => p.paper_live_day_u);
-  const [lo, hi] = dailyDomain(nums);
+  const [lo, hi] = dailyDomain(nums, aim);
   const span = hi - lo || 1;
-  const slot = innerW / Math.max(1, points.length);
+  const slot = innerW / Math.max(1, series.length);
   const xAt = (i: number) => padL + i * slot + slot / 2;
   const yAt = (v: number) => padT + innerH - ((v - lo) / span) * innerH;
   const y0 = yAt(0);
-  const yTicks = [lo, 0, hi].filter((v, i, a) => a.indexOf(v) === i);
+  const yTicks = [lo, 0, aim].filter((v, i, a) => Number.isFinite(v) && a.indexOf(v) === i);
 
   return (
     <div>
@@ -102,38 +115,41 @@ function DailyBars() {
         viewBox={`0 0 ${w} ${h}`}
         className="h-52 w-full max-w-full min-w-0 text-subtle"
         role="img"
-        aria-label="Daily production units. Empty days stay Empty."
+        aria-label="Daily production units. Empty days stay Empty. Aim 100u is marked."
       >
         <text x={4} y={12} className="fill-subtle font-mono" fontSize="9">
           u
         </text>
-        {yTicks.map((tick) => (
-          <g key={`y-${tick}`}>
-            <line
-              x1={padL}
-              x2={w - padR}
-              y1={yAt(tick)}
-              y2={yAt(tick)}
-              stroke="currentColor"
-              strokeOpacity={tick === 0 ? 0.35 : 0.12}
-              strokeDasharray={tick === 0 ? "2 4" : undefined}
-            />
-            <text
-              x={padL - 5}
-              y={yAt(tick) + 3}
-              textAnchor="end"
-              className="fill-subtle font-mono"
-              fontSize="9"
-            >
-              {tick === 0 ? "0" : tick.toFixed(0)}
-            </text>
-          </g>
-        ))}
-        {points.map((p, i) => {
+        {yTicks.map((tick) => {
+          const aimTick = tick === aim;
+          return (
+            <g key={`y-${tick}`}>
+              <line
+                x1={padL}
+                x2={w - padR}
+                y1={yAt(tick)}
+                y2={yAt(tick)}
+                stroke={aimTick ? "var(--color-warn)" : "currentColor"}
+                strokeOpacity={aimTick ? 0.85 : tick === 0 ? 0.4 : 0.16}
+                strokeDasharray={aimTick ? "4 3" : tick === 0 ? "2 4" : undefined}
+              />
+              <text
+                x={padL - 5}
+                y={yAt(tick) + 3}
+                textAnchor="end"
+                className={aimTick ? "fill-warn font-mono" : "fill-subtle font-mono"}
+                fontSize="9"
+              >
+                {tick === 0 ? "0" : tick.toFixed(0)}
+              </text>
+            </g>
+          );
+        })}
+        {series.map((p, i) => {
           const selected = p.day === scope.day;
           const v = p.paper_live_day_u;
           const cx = xAt(i);
-          const barW = Math.max(8, slot * 0.55);
+          const barW = Math.max(6, slot * 0.55);
           return (
             <g
               key={p.day}
@@ -142,17 +158,7 @@ function DailyBars() {
               className="cursor-pointer"
               onClick={() => scope.setDay(p.day)}
             >
-              {v == null ? (
-                <line
-                  x1={cx - barW / 2}
-                  x2={cx + barW / 2}
-                  y1={y0}
-                  y2={y0}
-                  stroke="currentColor"
-                  strokeOpacity={selected ? 0.55 : 0.22}
-                  strokeWidth="1.5"
-                />
-              ) : (
+              {v != null ? (
                 <rect
                   x={cx - barW / 2}
                   y={Math.min(yAt(v), y0)}
@@ -161,7 +167,7 @@ function DailyBars() {
                   fill={v >= 0 ? "var(--color-up)" : "var(--color-bad)"}
                   opacity={selected ? 1 : 0.72}
                 />
-              )}
+              ) : null}
               <text
                 x={cx}
                 y={h - 8}
@@ -169,15 +175,13 @@ function DailyBars() {
                 className={selected ? "fill-fg font-mono" : "fill-subtle font-mono"}
                 fontSize="8"
               >
-                {i === 0 || i === points.length - 1 || selected ? axisDay(p.day) : String(Number(p.day.slice(8)))}
+                {i === 0 || i === series.length - 1 || selected ? axisDay(p.day) : String(Number(p.day.slice(8)))}
               </text>
             </g>
           );
         })}
       </svg>
-      <p className="mt-1 font-mono text-[10px] text-subtle">
-        {nums.every((v) => v == null) ? "Empty · aim 100u" : "one day · Empty stays Empty · aim 100u"}
-      </p>
+      <p className="mt-1 font-mono text-[10px] text-subtle">one bar · Empty stays Empty · aim {aim}u marked</p>
     </div>
   );
 }

@@ -65,10 +65,10 @@ export function Trades() {
         hint={scope.lookingBack ? axisDay(scope.day) : "In flight"}
         count={open.length}
         fills={open}
-        chips={chips}
         fuseOn={stamp.fuse_on}
         open
       />
+      <WaitOpenPack chips={chips} />
       <Pack
         label={scope.lookingBack ? `${axisDay(scope.day)} settled` : "Today settled"}
         hint="Won / lost / void"
@@ -85,7 +85,6 @@ function Pack({
   hint,
   count,
   fills,
-  chips,
   fuseOn,
   open,
 }: {
@@ -93,11 +92,9 @@ function Pack({
   hint: string;
   count: number;
   fills: readonly Fill[];
-  chips?: readonly WaitOpen[];
   fuseOn: boolean;
   open?: boolean;
 }) {
-  const vacant = fills.length === 0 && (chips?.length ?? 0) === 0;
   return (
     <section>
       <header className="mb-2 flex items-baseline justify-between gap-3 border-b border-border pb-2">
@@ -107,25 +104,37 @@ function Pack({
         </div>
         <p className="text-xs text-subtle">{hint}</p>
       </header>
-      {chips && chips.length > 0 ? <WaitOpenRow chips={chips} /> : null}
-      {vacant ? <EmptyState copy={EMPTY} /> : fills.length ? <TradeTape fills={fills} fuseOn={fuseOn} open={open} /> : null}
+      {fills.length === 0 ? <EmptyState copy={EMPTY} /> : <TradeTape fills={fills} fuseOn={fuseOn} open={open} />}
     </section>
   );
 }
 
-function WaitOpenRow({ chips }: { chips: readonly WaitOpen[] }) {
+function WaitOpenPack({ chips }: { chips: readonly WaitOpen[] }) {
+  if (!chips.length) return null;
   return (
-    <ul className="mb-3 space-y-2">
-      {chips.map((chip) => (
-        <li key={chip.id} className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <p className="text-sm text-fg">{chip.title}</p>
-          <span className="rounded-sm border border-border px-1.5 py-0.5 font-mono text-[10px] text-warn">
-            waiting for races
-          </span>
-          {chip.why ? <span className="font-mono text-[10px] text-subtle">{chip.why}</span> : null}
-        </li>
-      ))}
-    </ul>
+    <section>
+      <header className="mb-2 flex items-baseline justify-between gap-3 border-b border-border pb-2">
+        <div className="flex items-baseline gap-2">
+          <h2 className="text-sm font-medium">Waiting for races</h2>
+          <span className="font-mono text-xs text-subtle">{chips.length}</span>
+        </div>
+        <p className="text-xs text-subtle">Recipe · not a ticket</p>
+      </header>
+      <ul className="space-y-2">
+        {chips.map((chip) => (
+          <li
+            key={chip.id}
+            className="flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-sm border border-border bg-elev px-3 py-2"
+          >
+            <p className="text-sm text-fg">{chip.title}</p>
+            <span className="rounded-sm border border-border px-1.5 py-0.5 font-mono text-[10px] text-warn">
+              waiting for races
+            </span>
+            {chip.why ? <span className="font-mono text-[10px] text-subtle">{chip.why}</span> : null}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

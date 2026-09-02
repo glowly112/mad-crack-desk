@@ -164,13 +164,42 @@ export function dayWindow(days: readonly string[], selected: string, size = 8): 
   return days.slice(start, end);
 }
 
-/** Scale to the days on screen. Do not force aim 100u into the domain. */
-export function dailyDomain(values: readonly (number | null | undefined)[]): [number, number] {
+/**
+ * Daily chart window ending at `selected`. If the trailing days are all Empty,
+ * stretch back so the last production day is still on screen (cap `max`).
+ */
+export function chartWindow(
+  series: readonly { day: string; paper_live_day_u: number | null }[],
+  selected: string,
+  size = 8,
+  max = 15,
+): string[] {
+  const days = series.map((p) => p.day);
+  const trailing = dayWindow(days, selected, size);
+  const valueOf = (d: string) => series.find((p) => p.day === d)?.paper_live_day_u;
+  if (trailing.some((d) => valueOf(d) != null)) return trailing;
+  let lastProd = -1;
+  const end = days.indexOf(selected);
+  const endI = end < 0 ? days.length - 1 : end;
+  for (let i = endI; i >= 0; i--) {
+    if (series[i]?.paper_live_day_u != null) {
+      lastProd = i;
+      break;
+    }
+  }
+  if (lastProd < 0) return trailing;
+  const start = Math.max(0, Math.min(lastProd - (size - 1), endI + 1 - max));
+  return days.slice(start, endI + 1);
+}
+
+/** Scale includes aim 100u when there is production. All-Empty is [0, aim] — do not draw that dummy. */
+export function dailyDomain(
+  values: readonly (number | null | undefined)[],
+  aim = 100,
+): [number, number] {
   const present = values.filter((v): v is number => typeof v === "number" && Number.isFinite(v));
-  if (!present.length) return [0, 1];
+  if (!present.length) return [0, aim];
   const lo = Math.min(0, ...present);
-  const hi = Math.max(0, ...present);
-  if (lo === hi) return [lo - 1, hi + 1];
-  const pad = (hi - lo) * 0.12;
-  return [lo - pad, hi + pad];
+  const hi = Math.max(aim, ...present);
+  return [lo, hi];
 }

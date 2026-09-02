@@ -5,6 +5,7 @@ import {
   SOLID_EMPTY,
   axisDay,
   cellName,
+  chartWindow,
   dailyDomain,
   dayWindow,
   floorSeats,
@@ -66,6 +67,13 @@ test("daily window and domain keep Empty days off the scale", () => {
   const days = STAMP.trends.map((t) => t.day);
   assert.deepEqual(dayWindow(days, "2026-09-02", 8).at(-1), "2026-09-02");
   assert.equal(dayWindow(days, "2026-09-02", 8).length, 8);
-  const today = dailyDomain(dayWindow(days, "2026-09-02", 8).map((d) => STAMP.trends.find((t) => t.day === d)?.paper_live_day_u));
-  assert.deepEqual(today, [0, 1]);
+  const win = chartWindow(STAMP.trends, "2026-09-02", 8);
+  assert.equal(win.at(-1), "2026-09-02");
+  assert.ok(win.includes("2026-08-25"));
+  assert.ok(STAMP.trends.find((t) => t.day === "2026-08-25")?.paper_live_day_u != null);
+  const nums = win.map((d) => STAMP.trends.find((t) => t.day === d)?.paper_live_day_u);
+  const [lo, hi] = dailyDomain(nums, 100);
+  assert.ok(lo <= -60);
+  assert.equal(hi, 100);
+  assert.deepEqual(dailyDomain([null, null], 100), [0, 100]);
 });
