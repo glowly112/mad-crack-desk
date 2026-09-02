@@ -15,7 +15,7 @@ function Floor() {
 
   return (
     <div className="floor-desk grid grid-cols-1 gap-8 lg:grid-cols-12">
-      <div className="space-y-6 lg:col-span-7">
+      <div className="min-w-0 space-y-6 lg:col-span-7">
         <HeroStrip />
         <BettingStrip loud />
         <NextActionLine next={next} />

@@ -13,7 +13,7 @@ export function DeskTable({ groups, empty }: { groups: DeskGroup[]; empty: strin
   if (rows.length === 0) return <EmptyState copy={empty} />;
 
   return (
-    <DeskScroll>
+    <DeskScroll className="min-w-0">
       <table className="w-full min-w-[44rem] border-collapse text-left">
         <thead>
           <tr className="border-b border-border">

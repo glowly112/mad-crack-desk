@@ -9,7 +9,7 @@ export function PackList() {
   const solids = solidRows(stamp.recipes, stamp.n_solid);
 
   return (
-    <div>
+    <div className="min-w-0">
       <header className="mb-2 flex items-baseline justify-between gap-3 border-b border-border pb-2">
         <div className="flex items-center gap-2">
           <MarkSolid className="size-3.5 text-subtle" />
