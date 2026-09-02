@@ -1,6 +1,7 @@
 import type { LiveStamp } from "./from-digest.ts";
 import { prettyTitle } from "./desk.ts";
 import type { Badge, Chip, Recipe } from "./stamp.ts";
+import { parseFills } from "./trades.ts";
 
 const REGIONS = ["AU", "GB", "IE", "US", "NZ", "ZA", "HK", "FR"] as const;
 const BADGES: Badge[] = ["Solid", "Research", "Parked", "Dead"];
@@ -255,6 +256,7 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
     solids: recipes.length ? solids : n_solid > 0 ? base.solids : [],
     seats: overlaySeats(base.seats, snap),
     trends,
+    trades: Array.isArray(snap.fills) ? parseFills(snap.fills) : base.trades,
   };
 }
 

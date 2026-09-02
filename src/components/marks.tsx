@@ -60,6 +60,16 @@ export function MarkMoves({ className }: MarkProps) {
   );
 }
 
+export function MarkTrades({ className }: MarkProps) {
+  return (
+    <Svg className={className}>
+      <path d="M4 7h16" />
+      <path d="M4 12h16" />
+      <path d="M4 17h16" />
+    </Svg>
+  );
+}
+
 export function MarkOffice({ className }: MarkProps) {
   return (
     <Svg className={className}>
@@ -231,6 +241,7 @@ export const NAV_MARKS = {
   "/": MarkFloor,
   "/trends": MarkTrends,
   "/moves": MarkMoves,
+  "/trades": MarkTrades,
   "/office": MarkOffice,
   "/pipe": MarkPipe,
   "/health": MarkHealth,

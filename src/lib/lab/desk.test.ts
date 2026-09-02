@@ -1,6 +1,17 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { EMPTY, SOLID_EMPTY, floorSeats, hopMoves, parkedCount, recipePack, solidRows } from "./desk.ts";
+import {
+  EMPTY,
+  SOLID_EMPTY,
+  axisDay,
+  chartDayTicks,
+  floorSeats,
+  hopMoves,
+  parkedCount,
+  productionSegments,
+  recipePack,
+  solidRows,
+} from "./desk.ts";
 import { STAMP } from "./stamp.ts";
 
 test("empty copy is Empty, not a skeleton", () => {
@@ -36,4 +47,19 @@ test("floor log hops are state changes, not proving ticks", () => {
 test("floor watching strip is Clerk, Foreman, mill", () => {
   const ids = floorSeats(STAMP.seats).map((s) => s.id);
   assert.deepEqual(ids, ["clerk", "foreman", "igor"]);
+});
+
+test("production chart days are labelled and null days do not become 0", () => {
+  assert.equal(axisDay("2026-08-19"), "19 Aug");
+  assert.equal(axisDay("2026-09-02"), "2 Sep");
+  const ticks = chartDayTicks(STAMP.trends);
+  assert.deepEqual(
+    ticks.map((i) => STAMP.trends[i]?.day),
+    ["2026-08-19", "2026-08-25", "2026-09-02"],
+  );
+  const segs = productionSegments(STAMP.trends);
+  assert.equal(segs.length, 1);
+  assert.equal(segs[0]?.length, 7);
+  assert.ok(segs[0]?.every((p) => p.v != null));
+  assert.equal(productionSegments([{ paper_live_day_u: null }]).length, 0);
 });

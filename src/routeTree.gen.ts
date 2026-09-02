@@ -17,6 +17,7 @@ import { Route as OfficeRouteImport } from './routes/office'
 import { Route as PipeRouteImport } from './routes/pipe'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as StaffRouteImport } from './routes/staff'
+import { Route as TradesRouteImport } from './routes/trades'
 import { Route as TrendsRouteImport } from './routes/trends'
 import { Route as HoldingsIdRouteImport } from './routes/holdings.$id'
 import { Route as HuntersIdRouteImport } from './routes/hunters.$id'
@@ -65,6 +66,11 @@ const StaffRoute = StaffRouteImport.update({
   path: '/staff',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TradesRoute = TradesRouteImport.update({
+  id: '/trades',
+  path: '/trades',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TrendsRoute = TrendsRouteImport.update({
   id: '/trends',
   path: '/trends',
@@ -110,6 +116,7 @@ export interface FileRoutesByFullPath {
   '/pipe': typeof PipeRoute
   '/settings': typeof SettingsRoute
   '/staff': typeof StaffRouteWithChildren
+  '/trades': typeof TradesRoute
   '/trends': typeof TrendsRoute
   '/holdings/$id': typeof HoldingsIdRoute
   '/hunters/$id': typeof HuntersIdRoute
@@ -125,6 +132,7 @@ export interface FileRoutesByTo {
   '/office': typeof OfficeRoute
   '/pipe': typeof PipeRoute
   '/settings': typeof SettingsRoute
+  '/trades': typeof TradesRoute
   '/trends': typeof TrendsRoute
   '/holdings/$id': typeof HoldingsIdRoute
   '/hunters/$id': typeof HuntersIdRoute
@@ -143,6 +151,7 @@ export interface FileRoutesById {
   '/pipe': typeof PipeRoute
   '/settings': typeof SettingsRoute
   '/staff': typeof StaffRouteWithChildren
+  '/trades': typeof TradesRoute
   '/trends': typeof TrendsRoute
   '/holdings/$id': typeof HoldingsIdRoute
   '/hunters/$id': typeof HuntersIdRoute
@@ -162,6 +171,7 @@ export interface FileRouteTypes {
     | '/pipe'
     | '/settings'
     | '/staff'
+    | '/trades'
     | '/trends'
     | '/holdings/$id'
     | '/hunters/$id'
@@ -177,6 +187,7 @@ export interface FileRouteTypes {
     | '/office'
     | '/pipe'
     | '/settings'
+    | '/trades'
     | '/trends'
     | '/holdings/$id'
     | '/hunters/$id'
@@ -194,6 +205,7 @@ export interface FileRouteTypes {
     | '/pipe'
     | '/settings'
     | '/staff'
+    | '/trades'
     | '/trends'
     | '/holdings/$id'
     | '/hunters/$id'
@@ -212,6 +224,7 @@ export interface RootRouteChildren {
   PipeRoute: typeof PipeRoute
   SettingsRoute: typeof SettingsRoute
   StaffRoute: typeof StaffRouteWithChildren
+  TradesRoute: typeof TradesRoute
   TrendsRoute: typeof TrendsRoute
   HoldingsIdRoute: typeof HoldingsIdRoute
   HuntersIdRoute: typeof HuntersIdRoute
@@ -273,6 +286,13 @@ declare module '@tanstack/react-router' {
       path: '/staff'
       fullPath: '/staff'
       preLoaderRoute: typeof StaffRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/trades': {
+      id: '/trades'
+      path: '/trades'
+      fullPath: '/trades'
+      preLoaderRoute: typeof TradesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/trends': {
@@ -361,6 +381,7 @@ const rootRouteChildren: RootRouteChildren = {
   PipeRoute: PipeRoute,
   SettingsRoute: SettingsRoute,
   StaffRoute: StaffRouteWithChildren,
+  TradesRoute: TradesRoute,
   TrendsRoute: TrendsRoute,
   HoldingsIdRoute: HoldingsIdRoute,
   HuntersIdRoute: HuntersIdRoute,

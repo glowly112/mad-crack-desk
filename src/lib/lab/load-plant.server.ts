@@ -12,6 +12,33 @@ const execFileAsync = promisify(execFile);
 
 export type { PlantPayload };
 
+const SSH_DIGEST = `
+import json, pathlib
+p = pathlib.Path.home() / "bbb/data/firm/lab/latest"
+d = json.loads((p / "plant_digest.json").read_text())
+s = json.loads((p / "scoreboard.json").read_text())
+d["cells"] = s.get("cells")
+d["summary"] = s.get("summary", d.get("summary"))
+d["truth"] = s.get("truth")
+day = d.get("date") or d.get("day") or s.get("date")
+book = pathlib.Path.home() / "bbb/data/firm/live_ledger/book.jsonl"
+fills = []
+keys = ("pick_id","ts","settled_ts","cell_id","mode","status","odds","stake_gbp","paper_stake_gbp","paper_pnl_gbp","placed_result","certified_keep","gate_verdict","side","lab_status")
+if book.exists():
+    for line in book.read_text().splitlines()[-4000:]:
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except Exception:
+            continue
+        if day and row.get("date") != day:
+            continue
+        fills.append({k: row.get(k) for k in keys})
+d["fills"] = fills[-80:]
+print(json.dumps(d))
+`.trim();
+
 const LAB_SNAPSHOT = "https://stridesmart.uk/lab/api/snapshot";
 const LOOPBACK = ["http://127.0.0.1:8788/api/snapshot", "http://127.0.0.1:8780/api/snapshot"];
 
@@ -102,7 +129,7 @@ async function trySsh(base: LiveStamp): Promise<PlantPayload | null> {
         "-o",
         "ConnectTimeout=4",
         host,
-        "python3 -c \"import json,pathlib;p=pathlib.Path.home()/'bbb/data/firm/lab/latest';d=json.loads((p/'plant_digest.json').read_text());s=json.loads((p/'scoreboard.json').read_text());d['cells']=s.get('cells');d['summary']=s.get('summary',d.get('summary'));d['truth']=s.get('truth');print(json.dumps(d))\"",
+        `python3 -c ${JSON.stringify(SSH_DIGEST)}`,
       ],
       { timeout: 8000, maxBuffer: 4 * 1024 * 1024 },
     );
@@ -136,6 +163,9 @@ export async function loadPlant(): Promise<PlantPayload> {
     const remote = Promise.race([
       (async () => {
         const [http, ssh] = await Promise.all([tryHttp(base), trySsh(base)]);
+        if (http && ssh && http.stamp.trades.length === 0 && ssh.stamp.trades.length > 0) {
+          return { ...http, stamp: { ...http.stamp, trades: ssh.stamp.trades } };
+        }
         return http ?? ssh;
       })(),
       new Promise<null>((resolve) => {

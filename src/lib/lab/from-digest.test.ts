@@ -35,4 +35,5 @@ test("digest overlay uses plant KEEP/measuring and leaves research £ off the he
   assert.equal(live.office.activeHunter, "Geo");
   const igor = live.seats.find((s) => s.id === "igor");
   assert.equal(igor?.status, "GREEN");
+  assert.deepEqual(live.trades, []);
 });

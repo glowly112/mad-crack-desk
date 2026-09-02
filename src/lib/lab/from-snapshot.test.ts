@@ -174,6 +174,60 @@ test("garbage or error payload leaves the digest stamp", () => {
   assert.equal(live.counts.keep, boot.counts.keep);
 });
 
+test("fills overlay lists today's paper tape and does not invent production", () => {
+  const live = applySnapshot(
+    {
+      truth: { keep: 2 },
+      fills: [
+        {
+          pick_id: "nz-1",
+          ts: "2026-09-02T00:07:45Z",
+          cell_id: "H-20260828T020000Z-nz-morning-win-one-pick-band-2-5-4-49",
+          mode: "auto_dry",
+          status: "SETTLED",
+          odds: 3.35,
+          stake_gbp: 2,
+          paper_pnl_gbp: -2,
+          placed_result: false,
+          certified_keep: false,
+        },
+      ],
+    },
+    base(),
+  );
+  assert.equal(live.trades.length, 1);
+  assert.equal(live.trades[0]?.book, "paper");
+  assert.equal(live.trades[0]?.recipe, "NZ morning win");
+  assert.deepEqual(
+    live.trades.filter((t) => t.book === "production" || t.book === "live"),
+    [],
+  );
+});
+
+test("empty fills array is Empty, missing fills keeps the digest tape", () => {
+  const withTape = applySnapshot(
+    {
+      truth: { keep: 2 },
+      fills: [
+        {
+          pick_id: "keep-me",
+          ts: "2026-09-02T00:00:00Z",
+          cell_id: "H-20260828T020000Z-nz-morning-win-one-pick-band-2-5-4-49",
+          mode: "auto_dry",
+          status: "OPEN",
+        },
+      ],
+    },
+    base(),
+  );
+  assert.equal(withTape.trades.length, 1);
+  const cleared = applySnapshot({ truth: { keep: 2 }, fills: [] }, withTape);
+  assert.deepEqual(cleared.trades, []);
+  const kept = applySnapshot({ truth: { keep: 2 } }, withTape);
+  assert.equal(kept.trades.length, 1);
+  assert.equal(kept.trades[0]?.id, "keep-me");
+});
+
 test("plant live snapshot is oracle, score stays empty when day_u is null", () => {
   const live = applySnapshot(snap, base());
   assert.equal(live.source, "oracle");
@@ -193,4 +247,7 @@ test("plant live snapshot is oracle, score stays empty when day_u is null", () =
     productionScore({ n_solid: live.n_solid, day_u: live.hero.day_u, researchKeepGbp: live.researchKeepGbp }),
     null,
   );
+  assert.equal(live.trades.length, 8);
+  assert.ok(live.trades.every((t) => t.book === "paper"));
+  assert.equal(live.trades[0]?.t, "09:02:47");
 });

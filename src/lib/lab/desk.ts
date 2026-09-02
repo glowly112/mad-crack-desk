@@ -46,6 +46,52 @@ export function productionTicks(domain: [number, number], aim: number): number[]
   return [...new Set(ticks)].sort((a, b) => a - b);
 }
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** Floor chart x-label: `19 Aug`, not a bare `19`. */
+export function axisDay(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!m) return iso;
+  const day = Number.parseInt(m[3], 10);
+  const mon = MONTHS[Number.parseInt(m[2], 10) - 1];
+  return mon ? `${day} ${mon}` : iso;
+}
+
+/** First day, last day with production, last day — skip duplicates. */
+export function chartDayTicks(series: readonly { day: string; paper_live_day_u: number | null }[]): number[] {
+  if (!series.length) return [];
+  const last = series.length - 1;
+  let lastProd = -1;
+  for (let i = last; i >= 0; i--) {
+    if (series[i]?.paper_live_day_u != null) {
+      lastProd = i;
+      break;
+    }
+  }
+  const ticks = [0];
+  if (lastProd > 0 && lastProd !== last) ticks.push(lastProd);
+  if (last > 0) ticks.push(last);
+  return ticks;
+}
+
+/** Consecutive production days only. Null days stay a gap — never a fake 0. */
+export function productionSegments(
+  series: readonly { paper_live_day_u: number | null }[],
+): { i: number; v: number }[][] {
+  const segs: { i: number; v: number }[][] = [];
+  let cur: { i: number; v: number }[] = [];
+  series.forEach((p, i) => {
+    if (p.paper_live_day_u == null) {
+      if (cur.length) segs.push(cur);
+      cur = [];
+    } else {
+      cur.push({ i, v: p.paper_live_day_u });
+    }
+  });
+  if (cur.length) segs.push(cur);
+  return segs;
+}
+
 export function floorSeats<T extends { id: string }>(seats: readonly T[]): T[] {
   const order = ["clerk", "foreman", "igor"];
   return order

@@ -23,4 +23,7 @@ test("loadPlant stays on the plant tape and does not hang", async () => {
     null,
   );
   assert.equal(plant.stamp.pipe.certified, plant.stamp.n_solid);
+  assert.ok(Array.isArray(plant.stamp.trades));
+  assert.ok(plant.stamp.trades.every((t) => t.book === "paper" || t.book === "production" || t.book === "live"));
+  assert.equal(plant.stamp.trades.filter((t) => t.book === "live").length, 0);
 });

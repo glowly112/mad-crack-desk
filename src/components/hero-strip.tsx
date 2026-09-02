@@ -1,6 +1,12 @@
 import { LiveDot } from "@/components/live-dot";
 import { usePlantSource, useStamp } from "@/components/plant-context";
-import { productionDomain, productionTicks } from "@/lib/lab/desk";
+import {
+  axisDay,
+  chartDayTicks,
+  productionDomain,
+  productionSegments,
+  productionTicks,
+} from "@/lib/lab/desk";
 import { productionScore } from "@/lib/lab/hero";
 import type { LiveStamp } from "@/lib/lab/from-digest";
 import { cn, fmtScore } from "@/lib/utils";
@@ -54,7 +60,10 @@ export function ScoreChart() {
   const stamp = useStamp();
   return (
     <section>
-      <h2 className="mb-2 text-sm font-medium text-muted">Production</h2>
+      <header className="mb-2 flex items-baseline justify-between gap-3">
+        <h2 className="text-sm font-medium text-muted">Production</h2>
+        <p className="font-mono text-xs text-subtle">u / day · aim £{stamp.hero.aim_u}</p>
+      </header>
       <Spark series={stamp.trends} aim={stamp.hero.aim_u} />
     </section>
   );
@@ -62,90 +71,124 @@ export function ScoreChart() {
 
 function Spark({ series, aim }: { series: LiveStamp["trends"]; aim: number }) {
   const w = 360;
-  const h = 176;
+  const h = 220;
   const padL = 36;
-  const padR = 8;
-  const padT = 10;
-  const padB = 24;
+  const padR = 28;
+  const padT = 14;
+  const padB = 28;
   const innerW = w - padL - padR;
   const innerH = h - padT - padB;
   const nums = series.map((p) => p.paper_live_day_u);
   const [lo, hi] = productionDomain(nums, aim);
   const span = hi - lo || 1;
-  const xAt = (i: number) => padL + (i / Math.max(1, nums.length - 1)) * innerW;
+  const xAt = (i: number) => padL + (i / Math.max(1, series.length - 1)) * innerW;
   const yAt = (v: number) => padT + innerH - ((v - lo) / span) * innerH;
-  const pts = nums
-    .map((v, i) => (v == null ? null : `${xAt(i).toFixed(1)},${yAt(v).toFixed(1)}`))
-    .filter((p): p is string => p != null);
   const yTicks = productionTicks([lo, hi], aim);
-  const xTicks = [0, Math.floor((series.length - 1) / 2), series.length - 1];
+  const xTicks = chartDayTicks(series);
+  const segs = productionSegments(series);
+  const dots = segs.flat();
 
   return (
-    <svg
-      viewBox={`0 0 ${w} ${h}`}
-      className="h-44 w-full max-w-full min-w-0 text-subtle"
-      role="img"
-      aria-label="Paper live day units toward aim £100"
-    >
-      {yTicks.map((tick) => (
-        <g key={`y-${tick}`}>
-          <line
-            x1={padL}
-            x2={w - padR}
-            y1={yAt(tick)}
-            y2={yAt(tick)}
-            stroke="currentColor"
-            strokeOpacity={tick === 0 || tick === aim ? 0.4 : 0.16}
-            strokeDasharray={tick === aim ? "2 5" : tick === 0 ? "3 4" : undefined}
-          />
-          <text
-            x={padL - 6}
-            y={yAt(tick) + 3}
-            textAnchor="end"
-            className="fill-subtle font-mono"
-            fontSize="9"
-          >
-            {tick === 0 ? "0" : tick.toFixed(0)}
-          </text>
-        </g>
-      ))}
-      <line
-        x1={padL}
-        x2={padL}
-        y1={padT}
-        y2={h - padB}
-        stroke="currentColor"
-        strokeOpacity="0.28"
-      />
-      <line
-        x1={padL}
-        x2={w - padR}
-        y1={h - padB}
-        y2={h - padB}
-        stroke="currentColor"
-        strokeOpacity="0.28"
-      />
-      {xTicks.map((i) => (
+    <div>
+      <svg
+        viewBox={`0 0 ${w} ${h}`}
+        className="h-56 w-full max-w-full min-w-0 text-subtle"
+        role="img"
+        aria-label="Production units by day versus aim"
+      >
+        <text x={4} y={12} className="fill-subtle font-mono" fontSize="9">
+          u
+        </text>
+        {yTicks.map((tick) => (
+          <g key={`y-${tick}`}>
+            <line
+              x1={padL}
+              x2={w - padR}
+              y1={yAt(tick)}
+              y2={yAt(tick)}
+              stroke="currentColor"
+              strokeOpacity={tick === 0 || tick === aim ? 0.38 : 0.12}
+              strokeDasharray={tick === aim ? "3 5" : tick === 0 ? "2 4" : undefined}
+            />
+            <text
+              x={padL - 6}
+              y={yAt(tick) + 3}
+              textAnchor="end"
+              className="fill-subtle font-mono"
+              fontSize="9"
+            >
+              {tick === 0 ? "0" : tick.toFixed(0)}
+            </text>
+          </g>
+        ))}
         <text
-          key={`x-${series[i].day}`}
-          x={xAt(i)}
-          y={h - 6}
-          textAnchor={i === 0 ? "start" : i === series.length - 1 ? "end" : "middle"}
+          x={w - padR + 4}
+          y={yAt(aim) + 3}
           className="fill-subtle font-mono"
           fontSize="9"
         >
-          {series[i].day.slice(8)}
+          aim
         </text>
-      ))}
-      {pts.length > 1 ? (
-        <polyline
-          fill="none"
-          stroke="var(--color-up)"
-          strokeWidth="1.5"
-          className="spark-draw"
-          points={pts.join(" ")}
+        <line
+          x1={padL}
+          x2={padL}
+          y1={padT}
+          y2={h - padB}
+          stroke="currentColor"
+          strokeOpacity="0.28"
         />
-      ) : null}
-    </svg>
+        <line
+          x1={padL}
+          x2={w - padR}
+          y1={h - padB}
+          y2={h - padB}
+          stroke="currentColor"
+          strokeOpacity="0.28"
+        />
+        {xTicks.map((i) => (
+          <text
+            key={`x-${series[i].day}`}
+            x={xAt(i)}
+            y={h - 8}
+            textAnchor={i === 0 ? "start" : i === series.length - 1 ? "end" : "middle"}
+            className="fill-subtle font-mono"
+            fontSize="9"
+          >
+            {axisDay(series[i].day)}
+          </text>
+        ))}
+        {segs.map((seg, si) =>
+          seg.length > 1 ? (
+            <polyline
+              key={`seg-${seg[0].i}-${seg[seg.length - 1].i}`}
+              fill="none"
+              stroke="var(--color-up)"
+              strokeWidth="1.7"
+              className={si === 0 ? "spark-draw" : undefined}
+              points={seg.map((p) => `${xAt(p.i).toFixed(1)},${yAt(p.v).toFixed(1)}`).join(" ")}
+            />
+          ) : null,
+        )}
+        {dots.map((p) => (
+          <circle
+            key={`dot-${p.i}`}
+            cx={xAt(p.i)}
+            cy={yAt(p.v)}
+            r="2.2"
+            fill="var(--color-up)"
+          />
+        ))}
+      </svg>
+      <ul className="mt-1 flex flex-wrap gap-4 font-mono text-[10px] text-subtle">
+        <li className="inline-flex items-center gap-1.5">
+          <span className="inline-block h-px w-3 bg-up" aria-hidden="true" />
+          production
+        </li>
+        <li className="inline-flex items-center gap-1.5">
+          <span className="inline-block w-3 border-t border-dashed border-subtle" aria-hidden="true" />
+          aim
+        </li>
+      </ul>
+    </div>
   );
 }
