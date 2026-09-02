@@ -31,7 +31,7 @@ function Trends() {
         </p>
       </header>
 
-      <ChartBlock title="Today's production score" sub="Solid recipes only. Still paper. Aim £100/day.">
+        <ChartBlock title="Today's production score" sub="Solid recipes only. Still paper. Aim 100u/day.">
         <ResponsiveContainer width="100%" height={220}>
           <LineChart data={points} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <CartesianGrid stroke="var(--color-border)" vertical={false} />
@@ -57,7 +57,7 @@ function Trends() {
         </ResponsiveContainer>
       </ChartBlock>
 
-      <ChartBlock title="Conversion" sub="Keeps, proving, dropped — counts, not £.">
+        <ChartBlock title="Conversion" sub="Keeps, proving, dropped — counts, not the score.">
         <ResponsiveContainer width="100%" height={220}>
           <LineChart data={points} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <CartesianGrid stroke="var(--color-border)" vertical={false} />

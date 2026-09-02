@@ -4,7 +4,7 @@ import { hunterById, issueById, recipeById, seatById } from "./lookup.ts";
 
 test("recipe lookup returns the certified GB solid by id", () => {
   const r = recipeById("H-fast-gb-nearoff-win-83959Z");
-  assert.equal(r?.title, "GB win near-off");
+  assert.equal(r?.title, "GB near-off WIN");
   assert.equal(r?.badge, "Solid");
   assert.match(r?.why ?? "", /Certified keep/);
 });

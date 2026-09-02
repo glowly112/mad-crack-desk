@@ -1,5 +1,5 @@
 import type { LiveStamp } from "./from-digest.ts";
-import { prettyTitle } from "./desk.ts";
+import { cellName } from "./desk.ts";
 import type { Badge, Chip, Recipe } from "./stamp.ts";
 import { parseFills } from "./trades.ts";
 
@@ -110,7 +110,7 @@ function recipesFromCells(cells: Record<string, unknown>[]): Recipe[] {
     const stats = rec(c.stats) ?? {};
     const id = String(c.id || c.title || "").trim();
     if (!id) continue;
-    const title = prettyTitle(String(c.title || id));
+    const title = cellName(id, String(c.title || ""));
     const n = int(c.n) ?? int(score.n_size_ok) ?? int(c.n_size_ok) ?? 0;
     const roi = num(stats.roi) ?? num(score.roi_size_ok_pct) ?? num(c.roi) ?? 0;
     const pnl = num(c.pnl) ?? num(score.honest_pnl_size_ok) ?? num(c.freezePnl) ?? 0;

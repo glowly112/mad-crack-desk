@@ -1,24 +1,24 @@
+import { DayChips } from "@/components/day-chips";
+import { useDayScope } from "@/components/day-scope";
 import { LiveDot } from "@/components/live-dot";
 import { usePlantSource, useStamp } from "@/components/plant-context";
-import {
-  axisDay,
-  chartDayTicks,
-  productionDomain,
-  productionSegments,
-  productionTicks,
-} from "@/lib/lab/desk";
+import { axisDay, dailyDomain, dayWindow } from "@/lib/lab/desk";
 import { productionScore } from "@/lib/lab/hero";
-import type { LiveStamp } from "@/lib/lab/from-digest";
-import { cn, fmtScore } from "@/lib/utils";
+import { cn, fmtAim, fmtScore } from "@/lib/utils";
 
 export function HeroStrip() {
   const stamp = useStamp();
   const plant = usePlantSource();
-  const u = productionScore({
-    n_solid: stamp.n_solid,
-    day_u: stamp.hero.day_u,
-    researchKeepGbp: stamp.researchKeepGbp,
-  });
+  const scope = useDayScope();
+  const trend = stamp.trends.find((t) => t.day === scope.day);
+  const u = scope.lookingBack
+    ? (trend?.paper_live_day_u ?? null)
+    : productionScore({
+        n_solid: stamp.n_solid,
+        day_u: stamp.hero.day_u,
+        researchKeepGbp: stamp.researchKeepGbp,
+      });
+  const solids = scope.lookingBack ? (trend?.n_solid ?? 0) : stamp.n_solid;
   const empty = u == null;
   const tone = empty ? "text-fg" : u >= 0 ? "text-up" : "text-bad";
   const live = plant.source === "oracle";
@@ -32,7 +32,9 @@ export function HeroStrip() {
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <div>
-          <p className="text-sm text-muted">Today's production</p>
+          <p className="text-sm text-muted">
+            {scope.lookingBack ? `${axisDay(scope.day)} production` : "Today's production"}
+          </p>
           <p className={cn("mt-1 font-mono text-5xl leading-none tracking-tight md:text-6xl", tone)}>
             {fmtScore(u)}
           </p>
@@ -40,14 +42,14 @@ export function HeroStrip() {
         <div>
           <p className="text-sm text-muted">Aim</p>
           <p className="mt-1 font-mono text-5xl leading-none tracking-tight text-fg md:text-6xl">
-            £{stamp.hero.aim_u}
+            {fmtAim(stamp.hero.aim_u)}
           </p>
           <p className="mt-2 text-xs text-subtle">/day · {stamp.hero.aim_vs}</p>
         </div>
         <div className="col-span-2 sm:col-span-1">
           <p className="text-sm text-muted">Solids</p>
           <p className="mt-1 font-mono text-5xl leading-none tracking-tight text-fg md:text-6xl">
-            {stamp.n_solid}
+            {solids}
           </p>
           <p className="mt-2 text-xs text-subtle">certified production</p>
         </div>
@@ -58,43 +60,49 @@ export function HeroStrip() {
 
 export function ScoreChart() {
   const stamp = useStamp();
+  const days = stamp.trends.map((t) => t.day);
   return (
     <section>
       <header className="mb-2 flex items-baseline justify-between gap-3">
         <h2 className="text-sm font-medium text-muted">Production</h2>
-        <p className="font-mono text-xs text-subtle">u / day · aim £{stamp.hero.aim_u}</p>
+        <p className="font-mono text-xs text-subtle">u / day · aim {fmtAim(stamp.hero.aim_u)}</p>
       </header>
-      <Spark series={stamp.trends} aim={stamp.hero.aim_u} />
+      <DayChips days={days} />
+      <DailyBars />
     </section>
   );
 }
 
-function Spark({ series, aim }: { series: LiveStamp["trends"]; aim: number }) {
+function DailyBars() {
+  const stamp = useStamp();
+  const scope = useDayScope();
+  const days = stamp.trends.map((t) => t.day);
+  const windowDays = dayWindow(days, scope.day, 8);
+  const points = windowDays.map((d) => stamp.trends.find((t) => t.day === d)).filter(Boolean) as typeof stamp.trends;
   const w = 360;
-  const h = 220;
-  const padL = 36;
-  const padR = 28;
-  const padT = 14;
+  const h = 200;
+  const padL = 32;
+  const padR = 10;
+  const padT = 12;
   const padB = 28;
   const innerW = w - padL - padR;
   const innerH = h - padT - padB;
-  const nums = series.map((p) => p.paper_live_day_u);
-  const [lo, hi] = productionDomain(nums, aim);
+  const nums = points.map((p) => p.paper_live_day_u);
+  const [lo, hi] = dailyDomain(nums);
   const span = hi - lo || 1;
-  const xAt = (i: number) => padL + (i / Math.max(1, series.length - 1)) * innerW;
+  const slot = innerW / Math.max(1, points.length);
+  const xAt = (i: number) => padL + i * slot + slot / 2;
   const yAt = (v: number) => padT + innerH - ((v - lo) / span) * innerH;
-  const yTicks = productionTicks([lo, hi], aim);
-  const xTicks = chartDayTicks(series);
-  const segs = productionSegments(series);
-  const dots = segs.flat();
+  const y0 = yAt(0);
+  const yTicks = [lo, 0, hi].filter((v, i, a) => a.indexOf(v) === i);
 
   return (
     <div>
       <svg
         viewBox={`0 0 ${w} ${h}`}
-        className="h-56 w-full max-w-full min-w-0 text-subtle"
+        className="h-52 w-full max-w-full min-w-0 text-subtle"
         role="img"
-        aria-label="Production units by day versus aim"
+        aria-label="Daily production units. Empty days stay Empty."
       >
         <text x={4} y={12} className="fill-subtle font-mono" fontSize="9">
           u
@@ -107,11 +115,11 @@ function Spark({ series, aim }: { series: LiveStamp["trends"]; aim: number }) {
               y1={yAt(tick)}
               y2={yAt(tick)}
               stroke="currentColor"
-              strokeOpacity={tick === 0 || tick === aim ? 0.38 : 0.12}
-              strokeDasharray={tick === aim ? "3 5" : tick === 0 ? "2 4" : undefined}
+              strokeOpacity={tick === 0 ? 0.35 : 0.12}
+              strokeDasharray={tick === 0 ? "2 4" : undefined}
             />
             <text
-              x={padL - 6}
+              x={padL - 5}
               y={yAt(tick) + 3}
               textAnchor="end"
               className="fill-subtle font-mono"
@@ -121,74 +129,55 @@ function Spark({ series, aim }: { series: LiveStamp["trends"]; aim: number }) {
             </text>
           </g>
         ))}
-        <text
-          x={w - padR + 4}
-          y={yAt(aim) + 3}
-          className="fill-subtle font-mono"
-          fontSize="9"
-        >
-          aim
-        </text>
-        <line
-          x1={padL}
-          x2={padL}
-          y1={padT}
-          y2={h - padB}
-          stroke="currentColor"
-          strokeOpacity="0.28"
-        />
-        <line
-          x1={padL}
-          x2={w - padR}
-          y1={h - padB}
-          y2={h - padB}
-          stroke="currentColor"
-          strokeOpacity="0.28"
-        />
-        {xTicks.map((i) => (
-          <text
-            key={`x-${series[i].day}`}
-            x={xAt(i)}
-            y={h - 8}
-            textAnchor={i === 0 ? "start" : i === series.length - 1 ? "end" : "middle"}
-            className="fill-subtle font-mono"
-            fontSize="9"
-          >
-            {axisDay(series[i].day)}
-          </text>
-        ))}
-        {segs.map((seg, si) =>
-          seg.length > 1 ? (
-            <polyline
-              key={`seg-${seg[0].i}-${seg[seg.length - 1].i}`}
-              fill="none"
-              stroke="var(--color-up)"
-              strokeWidth="1.7"
-              className={si === 0 ? "spark-draw" : undefined}
-              points={seg.map((p) => `${xAt(p.i).toFixed(1)},${yAt(p.v).toFixed(1)}`).join(" ")}
-            />
-          ) : null,
-        )}
-        {dots.map((p) => (
-          <circle
-            key={`dot-${p.i}`}
-            cx={xAt(p.i)}
-            cy={yAt(p.v)}
-            r="2.2"
-            fill="var(--color-up)"
-          />
-        ))}
+        {points.map((p, i) => {
+          const selected = p.day === scope.day;
+          const v = p.paper_live_day_u;
+          const cx = xAt(i);
+          const barW = Math.max(8, slot * 0.55);
+          return (
+            <g
+              key={p.day}
+              role="button"
+              tabIndex={0}
+              className="cursor-pointer"
+              onClick={() => scope.setDay(p.day)}
+            >
+              {v == null ? (
+                <line
+                  x1={cx - barW / 2}
+                  x2={cx + barW / 2}
+                  y1={y0}
+                  y2={y0}
+                  stroke="currentColor"
+                  strokeOpacity={selected ? 0.55 : 0.22}
+                  strokeWidth="1.5"
+                />
+              ) : (
+                <rect
+                  x={cx - barW / 2}
+                  y={Math.min(yAt(v), y0)}
+                  width={barW}
+                  height={Math.max(2, Math.abs(yAt(v) - y0))}
+                  fill={v >= 0 ? "var(--color-up)" : "var(--color-bad)"}
+                  opacity={selected ? 1 : 0.72}
+                />
+              )}
+              <text
+                x={cx}
+                y={h - 8}
+                textAnchor="middle"
+                className={selected ? "fill-fg font-mono" : "fill-subtle font-mono"}
+                fontSize="8"
+              >
+                {i === 0 || i === points.length - 1 || selected ? axisDay(p.day) : String(Number(p.day.slice(8)))}
+              </text>
+            </g>
+          );
+        })}
       </svg>
-      <ul className="mt-1 flex flex-wrap gap-4 font-mono text-[10px] text-subtle">
-        <li className="inline-flex items-center gap-1.5">
-          <span className="inline-block h-px w-3 bg-up" aria-hidden="true" />
-          production
-        </li>
-        <li className="inline-flex items-center gap-1.5">
-          <span className="inline-block w-3 border-t border-dashed border-subtle" aria-hidden="true" />
-          aim
-        </li>
-      </ul>
+      <p className="mt-1 font-mono text-[10px] text-subtle">
+        {nums.every((v) => v == null) ? "Empty · aim 100u" : "one day · Empty stays Empty · aim 100u"}
+      </p>
     </div>
   );
 }

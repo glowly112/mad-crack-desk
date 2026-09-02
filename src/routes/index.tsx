@@ -7,7 +7,7 @@ import { Portrait } from "@/components/portrait";
 import { StaffStrip } from "@/components/staff-strip";
 import { useStamp } from "@/components/plant-context";
 import { parkedCount } from "@/lib/lab/desk";
-import { fmtGbp } from "@/lib/utils";
+import { fmtU } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({ component: Floor });
 
@@ -20,7 +20,7 @@ function Floor() {
         <BettingStrip loud />
         <p className="font-mono text-xs text-subtle">
           Keep {stamp.counts.keep} · parked {parkedCount(stamp.counts.keep, stamp.n_solid)} · proving{" "}
-          {stamp.counts.measuring} · freeze {fmtGbp(stamp.researchKeepGbp)} · not income
+          {stamp.counts.measuring} · freeze {fmtU(stamp.researchKeepGbp)} · not income
         </p>
       </div>
 

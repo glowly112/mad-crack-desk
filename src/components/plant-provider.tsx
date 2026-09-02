@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { DayScopeProvider } from "@/components/day-scope";
 import { PlantCtx, plantInitial } from "@/components/plant-context";
 import { getPlant } from "@/lib/lab/get-plant";
 
@@ -24,5 +25,9 @@ export function PlantProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  return <PlantCtx.Provider value={state}>{children}</PlantCtx.Provider>;
+  return (
+    <PlantCtx.Provider value={state}>
+      <DayScopeProvider>{children}</DayScopeProvider>
+    </PlantCtx.Provider>
+  );
 }

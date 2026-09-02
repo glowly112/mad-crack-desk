@@ -99,15 +99,78 @@ export function floorSeats<T extends { id: string }>(seats: readonly T[]): T[] {
     .filter((s): s is T => Boolean(s));
 }
 
+const REGIONS = ["AU", "GB", "IE", "US", "NZ", "ZA", "HK", "FR"] as const;
+
+const WINDOWS: [RegExp, string][] = [
+  [/near\s*-?off|nearoff/, "near-off"],
+  [/late\s*-?pre|latepre/, "late-pre"],
+  [/in\s*-?play|inplay/, "in-play"],
+  [/morning/, "morning"],
+];
+
+/** Country · window · market · pick/odds hint. Never a raw H-fast id. */
+export function cellName(...parts: string[]): string {
+  const raw = parts
+    .map((p) => p.split("|")[0] ?? "")
+    .join(" ")
+    .replace(/_/g, " ")
+    .replace(/^H-/i, "")
+    .replace(/\d{8}T\d{6}Z-?/g, "")
+    .replace(/\bfast-?/gi, "")
+    .replace(/\bautopsy-?/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const lower = raw.toLowerCase();
+  const region = REGIONS.find((r) => new RegExp(`\\b${r}\\b`, "i").test(raw)) ?? "";
+  const market = /place/.test(lower) ? "PLACE" : /win/.test(lower) ? "WIN" : "";
+  const window = WINDOWS.find(([re]) => re.test(lower))?.[1] ?? "";
+  const hints: string[] = [];
+  if (/one[\s-]?pick/.test(lower)) hints.push("one-pick");
+  if (/midfield/.test(lower)) hints.push("midfield");
+  if (/small\s*field/.test(lower)) hints.push("small field");
+  if (/large\s*field/.test(lower)) hints.push("large field");
+  const dotted = /band[\s-]+(\d+)-(\d+)-(\d+)-(\d+)/.exec(lower);
+  if (dotted) {
+    hints.push(`${dotted[1]}.${dotted[2]}–${dotted[3]}.${dotted[4]}`);
+  } else {
+    const band = /band[\s-]*(\d+(?:\.\d+)?)[\s-]+(\d+(?:\.\d+)?)/.exec(lower);
+    if (band) hints.push(`${band[1]}–${band[2]}`);
+    const span = /(\d+(?:\.\d+)?)to(\d+(?:\.\d+)?)/.exec(lower);
+    if (!band && span) hints.push(`${span[1]}–${span[2]}`);
+  }
+  const head = [region, window, market].filter(Boolean).join(" ");
+  if (!head) {
+    const cleaned = raw
+      .replace(/\bbanked\b/i, "")
+      .replace(/\bsize ok\b/i, "")
+      .replace(/[A-Z0-9]{5,}$/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    return cleaned || "Empty";
+  }
+  return hints.length ? `${head} · ${hints.join(" ")}` : head;
+}
+
+/** @deprecated use cellName — kept for existing imports */
 export function prettyTitle(title: string): string {
-  const t = title.replace(/_/g, " ").trim();
-  const lower = t.toLowerCase();
-  if (/gb\b/.test(lower) && /win/.test(lower) && /near\s*off/.test(lower)) return "GB win near-off";
-  if (/\bnz\b/.test(lower) && /morning/.test(lower) && /win/.test(lower)) return "NZ morning win";
-  if (/\bau\b/.test(lower) && /place/.test(lower) && /near\s*off/.test(lower)) return "AU place near-off";
-  if (/\bau\b/.test(lower) && /late\s*pre/.test(lower) && /win/.test(lower)) return "AU late-pre win midfield";
-  if (/\bus\b/.test(lower) && /in\s*play/.test(lower) && /place/.test(lower)) return "US in-play place small field";
-  if (/\bza\b/.test(lower) && /near\s*off/.test(lower) && /place/.test(lower)) return "ZA near-off place small field";
-  if (/\bfr\b/.test(lower) && /near\s*off/.test(lower) && /place/.test(lower)) return "FR near-off place";
-  return t.replace(/\bbanked\b/i, "").replace(/\bsize ok\b/i, "").replace(/\s+/g, " ").trim();
+  return cellName(title);
+}
+
+/** Last `size` days ending at `selected`. */
+export function dayWindow(days: readonly string[], selected: string, size = 8): string[] {
+  const i = days.indexOf(selected);
+  const end = i < 0 ? days.length : i + 1;
+  const start = Math.max(0, end - size);
+  return days.slice(start, end);
+}
+
+/** Scale to the days on screen. Do not force aim 100u into the domain. */
+export function dailyDomain(values: readonly (number | null | undefined)[]): [number, number] {
+  const present = values.filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+  if (!present.length) return [0, 1];
+  const lo = Math.min(0, ...present);
+  const hi = Math.max(0, ...present);
+  if (lo === hi) return [lo - 1, hi + 1];
+  const pad = (hi - lo) * 0.12;
+  return [lo - pad, hi + pad];
 }

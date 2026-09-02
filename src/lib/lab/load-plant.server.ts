@@ -14,6 +14,8 @@ export type { PlantPayload };
 
 const SSH_DIGEST = `
 import json, pathlib
+from collections import defaultdict
+from datetime import date, timedelta
 p = pathlib.Path.home() / "bbb/data/firm/lab/latest"
 d = json.loads((p / "plant_digest.json").read_text())
 s = json.loads((p / "scoreboard.json").read_text())
@@ -25,9 +27,15 @@ if day:
     d["date"] = day
     d["day"] = day
 book = pathlib.Path.home() / "bbb/data/firm/live_ledger/book.jsonl"
-fills = []
-keys = ("pick_id","ts","settled_ts","cell_id","mode","status","odds","stake_gbp","paper_stake_gbp","paper_pnl_gbp","placed_result","certified_keep","gate_verdict","side","lab_status")
-if book.exists() and day:
+keys = ("pick_id","ts","settled_ts","cell_id","mode","status","odds","stake_gbp","paper_stake_gbp","paper_pnl_gbp","placed_result","certified_keep","gate_verdict","side","lab_status","date","unmatched","unmatched_size","atb_size_gbp","phase","in_play","off_ts","off_time")
+want = set()
+try:
+    end = date.fromisoformat(str(day))
+    want = {(end - timedelta(days=i)).isoformat() for i in range(14)}
+except Exception:
+    want = set()
+by = defaultdict(list)
+if book.exists() and want:
     for line in book.read_text().splitlines()[-4000:]:
         if not line.strip():
             continue
@@ -35,10 +43,13 @@ if book.exists() and day:
             row = json.loads(line)
         except Exception:
             continue
-        if day and row.get("date") != day:
-            continue
-        fills.append({k: row.get(k) for k in keys})
-d["fills"] = fills[-80:]
+        dte = row.get("date")
+        if dte in want:
+            by[dte].append({k: row.get(k) for k in keys})
+fills = []
+for dte in sorted(by):
+    fills.extend(by[dte][-80:])
+d["fills"] = fills
 print(json.dumps(d))
 `.trim();
 

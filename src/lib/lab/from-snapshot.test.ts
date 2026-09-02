@@ -197,7 +197,7 @@ test("fills overlay lists today's paper tape and does not invent production", ()
   );
   assert.equal(live.trades.length, 1);
   assert.equal(live.trades[0]?.book, "paper");
-  assert.equal(live.trades[0]?.recipe, "NZ morning win");
+  assert.equal(live.trades[0]?.recipe, "NZ morning WIN · one-pick 2.5–4.49");
   assert.deepEqual(
     live.trades.filter((t) => t.book === "production" || t.book === "live"),
     [],
@@ -247,7 +247,10 @@ test("plant live snapshot is oracle, score stays empty when day_u is null", () =
     productionScore({ n_solid: live.n_solid, day_u: live.hero.day_u, researchKeepGbp: live.researchKeepGbp }),
     null,
   );
-  assert.equal(live.trades.length, 8);
+  assert.equal(live.trades.filter((t) => t.result === "waiting").length, 4);
+  assert.equal(live.trades.filter((t) => t.result !== "waiting").length, 8);
   assert.ok(live.trades.every((t) => t.book === "paper"));
-  assert.equal(live.trades[0]?.t, "09:02:47");
+  assert.equal(live.trades[0]?.t, "10:59:45");
+  assert.equal(live.trades[0]?.flight, "waiting result");
+  assert.equal(live.trades[0]?.recipe, "GB near-off WIN");
 });

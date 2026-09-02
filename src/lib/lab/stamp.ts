@@ -126,7 +126,7 @@ export const STAMP = {
   recipes: [
     {
       id: "H-fast-gb-nearoff-win-83959Z",
-      title: "GB win near-off",
+      title: "GB near-off WIN",
       region: "GB",
       status: "KEEP",
       badge: "Solid",
@@ -138,7 +138,7 @@ export const STAMP = {
     },
     {
       id: "H-20260828T020000Z-nz-morning-win-one-pick-band-2-5-4-49",
-      title: "NZ morning win",
+      title: "NZ morning WIN · one-pick 2.5–4.49",
       region: "NZ",
       status: "KEEP",
       badge: "Parked",
@@ -150,7 +150,7 @@ export const STAMP = {
     },
     {
       id: "H-20260820T014100Z",
-      title: "AU late-pre win midfield",
+      title: "AU late-pre WIN · midfield",
       region: "AU",
       status: "MEASURING",
       badge: "Research",
@@ -162,7 +162,7 @@ export const STAMP = {
     },
     {
       id: "H-20260831T141500Z-us-inplay-place-smallfield",
-      title: "US in-play place small field",
+      title: "US in-play PLACE · small field",
       region: "US",
       status: "MEASURING",
       badge: "Research",
@@ -174,7 +174,7 @@ export const STAMP = {
     },
     {
       id: "H-autopsy-za_near_off_place_back_one_pick_smallfield_5to7",
-      title: "ZA near-off place small field",
+      title: "ZA near-off PLACE · small field",
       region: "ZA",
       status: "MEASURING",
       badge: "Research",
@@ -186,7 +186,7 @@ export const STAMP = {
     },
     {
       id: "H-20260901T203000Z-fr-nearoff-place-flat-largefield-onepick",
-      title: "FR near-off place",
+      title: "FR near-off PLACE",
       region: "FR",
       status: "MEASURING",
       badge: "Research",
@@ -200,7 +200,7 @@ export const STAMP = {
   solids: [
     {
       id: "H-fast-gb-nearoff-win-83959Z",
-      title: "GB win near-off",
+      title: "GB near-off WIN",
       region: "GB",
       status: "KEEP",
       badge: "Solid",
@@ -250,7 +250,7 @@ export const STAMP = {
     {
       id: "keep-not-solid",
       title: "Research keep ≠ solid",
-      detail: "NZ morning win is parked. Freeze £408.67 is not today's production.",
+      detail: "NZ morning WIN is parked. Freeze 408.67u is not today's production.",
       owner: "Hyde",
       fix: "Holdout path. Do not treat parked pounds as income.",
     },

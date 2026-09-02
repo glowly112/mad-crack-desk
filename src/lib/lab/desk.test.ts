@@ -4,11 +4,12 @@ import {
   EMPTY,
   SOLID_EMPTY,
   axisDay,
-  chartDayTicks,
+  cellName,
+  dailyDomain,
+  dayWindow,
   floorSeats,
   hopMoves,
   parkedCount,
-  productionSegments,
   recipePack,
   solidRows,
 } from "./desk.ts";
@@ -49,17 +50,22 @@ test("floor watching strip is Clerk, Foreman, mill", () => {
   assert.deepEqual(ids, ["clerk", "foreman", "igor"]);
 });
 
-test("production chart days are labelled and null days do not become 0", () => {
+test("cell names carry country, window, market, and a pick hint", () => {
+  assert.equal(cellName("H-fast-gb-nearoff-win-83959Z"), "GB near-off WIN");
+  assert.equal(
+    cellName("H-20260828T020000Z-nz-morning-win-one-pick-band-2-5-4-49"),
+    "NZ morning WIN · one-pick 2.5–4.49",
+  );
+  assert.equal(cellName("H-fast-au-nearoff-place-83723Z"), "AU near-off PLACE");
+  assert.ok(!cellName("H-fast-gb-nearoff-win-83959Z").startsWith("H-"));
+});
+
+test("daily window and domain keep Empty days off the scale", () => {
   assert.equal(axisDay("2026-08-19"), "19 Aug");
   assert.equal(axisDay("2026-09-02"), "2 Sep");
-  const ticks = chartDayTicks(STAMP.trends);
-  assert.deepEqual(
-    ticks.map((i) => STAMP.trends[i]?.day),
-    ["2026-08-19", "2026-08-25", "2026-09-02"],
-  );
-  const segs = productionSegments(STAMP.trends);
-  assert.equal(segs.length, 1);
-  assert.equal(segs[0]?.length, 7);
-  assert.ok(segs[0]?.every((p) => p.v != null));
-  assert.equal(productionSegments([{ paper_live_day_u: null }]).length, 0);
+  const days = STAMP.trends.map((t) => t.day);
+  assert.deepEqual(dayWindow(days, "2026-09-02", 8).at(-1), "2026-09-02");
+  assert.equal(dayWindow(days, "2026-09-02", 8).length, 8);
+  const today = dailyDomain(dayWindow(days, "2026-09-02", 8).map((d) => STAMP.trends.find((t) => t.day === d)?.paper_live_day_u));
+  assert.deepEqual(today, [0, 1]);
 });
