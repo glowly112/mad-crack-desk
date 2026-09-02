@@ -82,16 +82,14 @@ export type FloorStamp = {
   moves: readonly Move[];
 };
 
-/** Recipes waiting on today's tape. Zero is Empty. */
+/** Solids on today's tape. Parked wait_open is not the tape. Zero is Empty. */
 export function floorTapeWaiting(stamp: {
   recipes: readonly Recipe[];
   n_solid: number;
-  wait_open?: readonly { id: string }[];
 }): number {
-  const onTape = solidRows(stamp.recipes, stamp.n_solid).filter(
+  return solidRows(stamp.recipes, stamp.n_solid).filter(
     (r) => r.chip === "Waiting for races" || r.chip === "On tape today" || r.chip === "Booking",
   ).length;
-  return onTape + (stamp.wait_open?.length ?? 0);
 }
 
 export function hopTally(moves: readonly Move[]): { label: string; n: number }[] {

@@ -141,6 +141,13 @@ test("Floor facts are plant numbers, not a 100u quota", () => {
   assert.equal(facts.find((f) => f.id === "paper")?.value, null);
   assert.equal(facts.find((f) => f.id === "solids")?.value, 1);
   assert.equal(facts.find((f) => f.id === "tape")?.value, 1);
+  assert.equal(
+    floorFacts(
+      { ...STAMP, wait_open: [{ id: "H-parked-not-tape" }] },
+      { day: STAMP.day, lookingBack: false },
+    ).find((f) => f.id === "tape")?.value,
+    1,
+  );
   assert.equal(facts.find((f) => f.id === "production")?.value, null);
   assert.equal(facts.find((f) => f.id === "live")?.value, null);
   const tally = hopTally(STAMP.moves);
