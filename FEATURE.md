@@ -5,4 +5,4 @@ Touched: Floor hero/packs/staff/log, plant poll, Pipe certified = solids
 Reuse: applySnapshot, productionScore, Staff portraits, existing tokens
 Risk: Showing freeze £ as income; labelling a baked tape as live oracle
 Done: Hero Empty vs £100 · Solids 1 · betting OFF loud · Solid pack first · hops-only log · frozen vs live labelled
-Status: in progress
+Status: done
