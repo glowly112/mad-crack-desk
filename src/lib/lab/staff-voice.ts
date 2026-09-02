@@ -1,6 +1,7 @@
 /** Ordinary-English staff bubbles. Stamp facts only. Never invents P&L. */
 
 import { EMPTY, hopMoves, strategyMark } from "./desk.ts";
+import { isBoardResetView } from "./board-reset.ts";
 import { bookStages, staffBookFacts, type StaffWatchStamp } from "./boards.ts";
 import type { Move, Recipe, Seat } from "./stamp.ts";
 
@@ -74,7 +75,31 @@ function olderFor(seatId: string, stamp: StaffWatchStamp): SeatBubble[] {
   return out;
 }
 
+function resetNowBubbles(seatId: string): string[] {
+  switch (seatId) {
+    case "clerk":
+      return ["The square is empty. Paper is Empty.", "Nothing from the old hunt is on today's tape."];
+    case "igor":
+      return ["Watching the empty square.", "Nothing on today's tape yet."];
+    case "hyde":
+      return ["Nothing certified is on today's tape.", "Tweaks wait for a new hole on the square."];
+    case "foreman":
+      return ["Nothing certified is on today's tape.", "The board reset — we start from empty holes."];
+    case "mercator":
+      return ["Watching empty holes on the square.", "Next pick lands when invent queues one."];
+    case "bauron":
+      return ["Invent is on.", "We are hunting empty holes, not replaying yesterday's tape."];
+    case "curator":
+      return ["Race files stay on disk.", "Today's board is Empty."];
+    case "virchow":
+      return ["Old kills stay in the archive.", "They are not on the morning board."];
+    default:
+      return ["Watching the empty square."];
+  }
+}
+
 function nowBubbles(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchStamp): string[] {
+  if (isBoardResetView(stamp)) return resetNowBubbles(seat.id);
   const f = staffBookFacts(seat.now ?? "", stamp);
   const britain = f.tape ? speakBook(f.tape.title) : "";
   switch (seat.id) {

@@ -4,7 +4,7 @@ import { useDayScope } from "@/components/day-scope";
 import { LiveDot } from "@/components/live-dot";
 import { usePlantSource, useStamp } from "@/components/plant-context";
 import { EmptyState } from "@/components/empty-state";
-import { racingSquare } from "@/lib/lab/boards";
+import { floorRacingSquare } from "@/lib/lab/boards";
 import {
   axisDay,
   dailyDomain,
@@ -23,15 +23,7 @@ export function PlantPane() {
   const plant = usePlantSource();
   const scope = useDayScope();
   const [fact, setFact] = useState<FloorFactId>("paper");
-  const huntNotes = [stamp.office.inventWhy, ...stamp.hunters.map((h) => h.note)];
-  const holes = racingSquare({
-    recipes: stamp.recipes,
-    coverage: stamp.coverage,
-    moves: stamp.moves,
-    floorLog: stamp.floorLog,
-    huntNotes,
-    namedHoles: stamp.holes,
-  });
+  const holes = floorRacingSquare({ namedHoles: stamp.holes });
   const emptyHoles = holes.filter((h) => h.tone === "empty").length;
   const facts = floorFacts(stamp, scope, emptyHoles);
   const selected = facts.find((f) => f.id === fact) ?? facts[0];

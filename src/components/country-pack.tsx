@@ -5,6 +5,7 @@ import {
   SQUARE_WINDOWS,
   capitalisingLine,
   countryMarket,
+  floorRacingSquare,
   inventHole,
   officeCountries,
   plantMarkets,
@@ -35,15 +36,7 @@ const TONE_LABEL: Record<MarketSquare["tone"], string> = {
 /** Morning board square: empty holes visible. No mill roll-up or invent lines. */
 export function FloorSquare() {
   const stamp = useStamp();
-  const huntNotes = [stamp.office.inventWhy, ...stamp.hunters.map((h) => h.note)];
-  const holes = racingSquare({
-    recipes: stamp.recipes,
-    coverage: stamp.coverage,
-    moves: stamp.moves,
-    floorLog: stamp.floorLog,
-    huntNotes,
-    namedHoles: stamp.holes,
-  });
+  const holes = floorRacingSquare({ namedHoles: stamp.holes });
   const markets = plantMarkets(holes.map((h) => h.market));
   const emptyN = holes.filter((h) => h.tone === "empty").length;
   const glance = `${emptyN} empty of ${holes.length} holes on the square`;

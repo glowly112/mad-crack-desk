@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import liveSnap from "./live-snapshot.json" with { type: "json" };
+import { applyBoardResetView } from "./board-reset.ts";
 import { applySnapshot } from "./from-snapshot.ts";
 import { bootStamp, digestStamp, plantFromTape, type PlantPayload } from "./plant-boot.ts";
 import type { LiveStamp } from "./from-digest.ts";
@@ -169,7 +170,7 @@ async function trySsh(base: LiveStamp): Promise<PlantPayload | null> {
 }
 
 function fromLiveFile(base: LiveStamp): PlantPayload {
-  const stamp = applySnapshot(liveSnap, base);
+  const stamp = applyBoardResetView(applySnapshot(liveSnap, base));
   const frozen = {
     ...stamp,
     source: "freeze" as const,
@@ -177,7 +178,7 @@ function fromLiveFile(base: LiveStamp): PlantPayload {
   return {
     stamp: frozen,
     source: "freeze",
-    detail: `oracle unreachable · frozen ${frozen.generated}`,
+    detail: `board reset · frozen ${frozen.generated}`,
   };
 }
 
@@ -187,6 +188,7 @@ export async function loadPlant(): Promise<PlantPayload> {
     const remote = Promise.race([
       (async () => {
         const [http, ssh] = await Promise.all([tryHttp(base), trySsh(base)]);
+        let hit: PlantPayload | null = null;
         if (http && ssh) {
           const trades =
             http.stamp.trades.length === 0 && ssh.stamp.trades.length > 0
@@ -196,9 +198,17 @@ export async function loadPlant(): Promise<PlantPayload> {
             (http.stamp.wait_open?.length ?? 0) === 0 && (ssh.stamp.wait_open?.length ?? 0) > 0
               ? ssh.stamp.wait_open
               : (http.stamp.wait_open ?? []);
-          return { ...http, stamp: { ...http.stamp, trades, wait_open } };
+          hit = { ...http, stamp: { ...http.stamp, trades, wait_open } };
+        } else {
+          hit = http ?? ssh;
         }
-        return http ?? ssh;
+        return hit
+          ? {
+              ...hit,
+              stamp: applyBoardResetView(hit.stamp),
+              detail: hit.source === "oracle" ? "new run · board reset" : hit.detail,
+            }
+          : null;
       })(),
       new Promise<null>((resolve) => {
         setTimeout(() => resolve(null), 10_000);
@@ -211,5 +221,6 @@ export async function loadPlant(): Promise<PlantPayload> {
 }
 
 export function fallbackPlant(): PlantPayload {
-  return plantFromTape(bootStamp());
+  const payload = plantFromTape(bootStamp());
+  return { ...payload, stamp: applyBoardResetView(payload.stamp) };
 }

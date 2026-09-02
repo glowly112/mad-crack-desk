@@ -9,7 +9,7 @@ test("loadPlant stays on the plant tape and does not hang", async () => {
   assert.ok(Date.now() - t0 < 9000);
   assert.ok(plant.source === "oracle" || plant.source === "freeze");
   if (plant.source === "freeze") {
-    assert.match(plant.detail, /frozen/);
+    assert.match(plant.detail, /frozen|board reset/);
   }
   assert.equal(plant.stamp.fuse_on, false);
   assert.equal(plant.stamp.hero.day_u, null);
@@ -23,7 +23,6 @@ test("loadPlant stays on the plant tape and does not hang", async () => {
     null,
   );
   assert.equal(plant.stamp.pipe.certified, plant.stamp.n_solid);
-  assert.ok(Array.isArray(plant.stamp.trades));
-  assert.ok(plant.stamp.trades.every((t) => t.book === "paper" || t.book === "production" || t.book === "live"));
-  assert.equal(plant.stamp.trades.filter((t) => t.book === "live").length, 0);
+  assert.equal(plant.stamp.trades.length, 0);
+  assert.equal(plant.stamp.recipes.length, 0);
 });

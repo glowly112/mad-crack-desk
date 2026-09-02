@@ -3,7 +3,7 @@
 import { EMPTY, cellName, recipePack, strategyMark } from "./desk.ts";
 import type { Move, Recipe, Seat } from "./stamp.ts";
 
-const REGIONS = ["AU", "GB", "IE", "US", "NZ", "ZA", "HK", "FR"] as const;
+export const REGIONS = ["AU", "GB", "IE", "US", "NZ", "ZA", "HK", "FR"] as const;
 
 export const COUNTRY: Record<string, string> = {
   AU: "Australia",
@@ -253,18 +253,36 @@ function occupy(
   }
 }
 
-/**
- * Whole racing square. Empty holes are real squares. Occupied only when the
- * mill names that country × window × market. Never paints 126 kills across countries.
- */
-export function racingSquare(input: {
+type RacingSquareInput = {
   recipes: readonly Recipe[];
   coverage?: readonly { region: string; keep: number; measuring: number; note?: string }[];
   moves?: readonly { recipe: string; to: string }[];
   floorLog?: readonly { kind?: string; line: string }[];
   huntNotes?: readonly string[];
   namedHoles?: readonly { region: string; window: string; market: string; tone?: string }[];
+  /** Floor morning board: hunt queue + named holes only — no legacy recipe roll-up. */
+  floorOnly?: boolean;
+};
+
+/**
+ * Morning Floor square. All holes Empty unless the plant names a new-hunt cell.
+ * Legacy KEEP / measuring / certified books never paint the Floor grid.
+ */
+export function floorRacingSquare(input: {
+  namedHoles?: readonly { region: string; window: string; market: string; tone?: string }[];
 }): HoleCell[] {
+  return racingSquare({
+    recipes: [],
+    namedHoles: input.namedHoles ?? [],
+    floorOnly: true,
+  });
+}
+
+/**
+ * Whole racing square. Empty holes are real squares. Occupied only when the
+ * mill names that country × window × market. Never paints 126 kills across countries.
+ */
+export function racingSquare(input: RacingSquareInput): HoleCell[] {
   const texts = [
     ...input.recipes.map((r) => `${r.id} ${r.title} ${r.why}`),
     ...(input.moves ?? []).map((m) => m.recipe),
@@ -288,7 +306,7 @@ export function racingSquare(input: {
   }
 
   const named = input.namedHoles ?? [];
-  if (named.length) {
+  if (input.floorOnly || named.length) {
     for (const h of named) {
       const window = parseWindow(h.window) ?? (SQUARE_WINDOWS.includes(h.window as SquareWindow) ? (h.window as SquareWindow) : null);
       const market = parseMarket(h.market);
