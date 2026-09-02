@@ -14,7 +14,17 @@ export function DeskTable({ groups, empty }: { groups: DeskGroup[]; empty: strin
 
   return (
     <DeskScroll className="min-w-0">
-      <table className="w-full min-w-[44rem] border-collapse text-left">
+      <table className="w-full min-w-[36rem] table-fixed border-collapse text-left">
+        <colgroup>
+          <col className="w-[4.5rem]" />
+          <col />
+          <col className="w-[3.25rem]" />
+          <col className="w-[3.25rem]" />
+          <col className="w-12" />
+          <col className="w-[3.5rem]" />
+          <col className="w-[7.25rem]" />
+          <col className="w-[3.75rem]" />
+        </colgroup>
         <thead>
           <tr className="border-b border-border">
             {DESK_HEADERS.map((h) => (
@@ -104,6 +114,7 @@ function Cell({ k, v }: { k: (typeof DESK_HEADERS)[number]; v: string }) {
         MONO.has(k) && "font-mono text-xs tabular-nums",
         RIGHT.has(k) && "text-right",
         shown === EMPTY ? "text-subtle" : k === "Name" ? "text-fg" : "text-muted",
+        k === "Name" && "break-words",
       )}
     >
       {shown}
