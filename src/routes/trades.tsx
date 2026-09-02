@@ -152,7 +152,7 @@ function TradeRow({
         onClick={onPick}
         className={cn(
           "flex w-full items-baseline gap-3 py-2.5 text-left transition-colors duration-150",
-          selected && "bg-elev/80",
+          selected && "bg-elev",
         )}
       >
         <span className="w-16 shrink-0 font-mono text-xs tabular-nums text-subtle">{clock}</span>
@@ -167,9 +167,7 @@ function TradeRow({
           </span>
         </span>
         <span className="shrink-0 text-right">
-          {open ? (
-            <span className="font-mono text-xs text-subtle">{EMPTY}</span>
-          ) : (
+          {open ? null : (
             <span
               className={cn(
                 "font-mono text-xs tabular-nums",
@@ -218,7 +216,7 @@ function WaitRow({
         onClick={onPick}
         className={cn(
           "flex w-full items-baseline gap-3 py-2.5 text-left transition-colors duration-150",
-          selected && "bg-elev/80",
+          selected && "bg-elev",
         )}
       >
         <span className="w-16 shrink-0 font-mono text-xs text-subtle" />
