@@ -5,11 +5,11 @@ import { HUNTER_MARKS } from "@/components/marks";
 import { LiveDot } from "@/components/live-dot";
 import { ownerId, Portrait } from "@/components/portrait";
 import { useStamp } from "@/components/plant-context";
+import { BookStageLine } from "@/components/book-stages";
 import {
-  bookPeriods,
   factorySquares,
   inventWhatHappened,
-  issueBoard,
+  officeIssues,
   officeWorkers,
   pipeBoard,
   recipeStatus,
@@ -17,12 +17,12 @@ import {
 } from "@/lib/lab/boards";
 import { EMPTY, recipePack } from "@/lib/lab/desk";
 import type { Recipe } from "@/lib/lab/stamp";
-import { cn, fmtU } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 /** Next action first. */
 export function ThingsToFix() {
   const stamp = useStamp();
-  const rows = stamp.issues.map(issueBoard);
+  const rows = officeIssues(stamp.issues);
 
   return (
     <section>
@@ -204,17 +204,6 @@ export function RecipesNotEarning() {
   );
 }
 
-function BookLine({ recipe }: { recipe: Recipe }) {
-  const book = bookPeriods(recipe);
-  const holdout = book.holdoutN == null ? EMPTY : `n=${book.holdoutN} ${EMPTY}`;
-  return (
-    <p className="mt-1 font-mono text-[10px] leading-snug text-subtle">
-      Paper n={book.paperN} {fmtU(book.paperU)} · Holdout {holdout}
-      <span className="mt-0.5 block font-sans text-xs">{book.line}</span>
-    </p>
-  );
-}
-
 function RecipeGroup({ title, hint, rows }: { title: string; hint: string; rows: Recipe[] }) {
   return (
     <section>
@@ -239,7 +228,9 @@ function RecipeGroup({ title, hint, rows }: { title: string; hint: string; rows:
                 <div className="min-w-0">
                   <p className="text-sm">{r.title}</p>
                   <p className="mt-0.5 text-xs text-subtle">{recipeStatus(r)}</p>
-                  <BookLine recipe={r} />
+                  {r.badge === "Solid" || r.badge === "Parked" || r.status === "KEEP" ? (
+                    <BookStageLine recipe={r} />
+                  ) : null}
                 </div>
                 <p className="shrink-0 text-xs text-subtle">{r.region}</p>
               </Link>

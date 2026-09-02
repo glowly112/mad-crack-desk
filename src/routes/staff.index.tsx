@@ -15,6 +15,7 @@ function StaffIndex() {
       <header>
         <h1 className="text-2xl">Staff</h1>
         <p className="mt-1 text-sm text-muted">Who is watching what.</p>
+        <p className="mt-2 text-xs text-subtle">One book: invent → paper → holdout → production → live.</p>
       </header>
       <ul className="divide-y divide-border border-y border-border">
         {stamp.seats.map((s) => {

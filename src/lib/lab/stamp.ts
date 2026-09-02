@@ -256,13 +256,6 @@ export const STAMP = {
       owner: "Hyde",
       fix: "Leave it parked. Do not treat it as income.",
     },
-    {
-      id: "live-subset",
-      title: "Real betting is off. Nothing is live.",
-      detail: "The fuse is off. No live orders.",
-      owner: "Clerk",
-      fix: "Leave the fuse off until a solid is on tape.",
-    },
   ],
   seats: [
     { id: "igor", name: "Igor", role: "Mill · freeze scorer", status: "GREEN", now: "Measuring n=33", cadence: "tick" },

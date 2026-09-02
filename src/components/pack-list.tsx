@@ -2,10 +2,10 @@ import { Link } from "@tanstack/react-router";
 import { MarkSolid } from "@/components/marks";
 import { EmptyState } from "@/components/empty-state";
 import { useStamp } from "@/components/plant-context";
-import { bookPeriods } from "@/lib/lab/boards";
-import { EMPTY, SOLID_EMPTY, solidRows } from "@/lib/lab/desk";
+import { BookStageLine } from "@/components/book-stages";
+import { SOLID_EMPTY, solidRows } from "@/lib/lab/desk";
 import type { Recipe } from "@/lib/lab/stamp";
-import { cn, fmtU } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 /** Floor morning board: solids only. */
 export function PackList() {
@@ -16,7 +16,7 @@ export function PackList() {
     <Group
       icon={MarkSolid}
       label="Solid"
-      hint="Production tape"
+      hint="One book"
       count={stamp.n_solid}
       empty={SOLID_EMPTY}
       rows={solids}
@@ -76,7 +76,7 @@ function Group({
                       </span>
                     ) : null}
                   </div>
-                  <BookPeriodsLine recipe={r} />
+                  <BookStageLine recipe={r} />
                 </div>
                 <p className="hidden font-mono text-xs text-subtle sm:block">{r.region}</p>
                 <p className="font-mono text-xs tabular-nums text-subtle">n={r.n}</p>
@@ -98,15 +98,3 @@ function Group({
   );
 }
 
-function BookPeriodsLine({ recipe }: { recipe: Recipe }) {
-  const book = bookPeriods(recipe);
-  const holdout = book.holdoutN == null ? EMPTY : `n=${book.holdoutN} ${EMPTY}`;
-  return (
-    <p className="mt-0.5 text-xs text-subtle">
-      <span className="font-mono text-[10px]">
-        Paper n={book.paperN} {fmtU(book.paperU)} · Holdout {holdout}
-      </span>
-      <span className="mt-0.5 block">{book.line}</span>
-    </p>
-  );
-}

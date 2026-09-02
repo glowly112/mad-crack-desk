@@ -339,6 +339,92 @@ export type BookPeriods = {
   line: string;
 };
 
+export type BookStageKind = "same" | "split" | "empty";
+
+export type BookStage = {
+  key: "invent" | "paper" | "holdout" | "production" | "live";
+  label: string;
+  kind: BookStageKind;
+  n: number | null;
+  u: number | null;
+  mark: string;
+};
+
+const SPLIT_MARK = "Hyde cousin, not the same picks";
+
+function isSplitBook(recipe: Recipe): boolean {
+  return /cousin|not the same pick|different pick|\btwin\b/i.test(`${recipe.why} ${recipe.title}`);
+}
+
+/** One book: invent → paper → holdout → production → live. Never recomputes P&L. */
+export function bookStages(recipe: Recipe): BookStage[] {
+  const periods = bookPeriods(recipe);
+  const split = isSplitBook(recipe);
+  const invent: BookStage = {
+    key: "invent",
+    label: "invent",
+    kind: split ? "split" : "same",
+    n: null,
+    u: null,
+    mark: split ? SPLIT_MARK : "same",
+  };
+  const paper: BookStage = {
+    key: "paper",
+    label: "paper",
+    kind: "same",
+    n: periods.paperN,
+    u: periods.paperU,
+    mark: "same",
+  };
+  const holdout: BookStage = {
+    key: "holdout",
+    label: "holdout",
+    kind: periods.holdoutN == null ? "empty" : split ? "split" : "same",
+    n: periods.holdoutN,
+    u: null,
+    mark: periods.holdoutN == null ? EMPTY : split ? SPLIT_MARK : "same",
+  };
+  const production: BookStage = {
+    key: "production",
+    label: "production",
+    kind: recipe.badge === "Solid" ? "same" : "empty",
+    n: null,
+    u: null,
+    mark: recipe.badge === "Solid" ? "same" : EMPTY,
+  };
+  const live: BookStage = {
+    key: "live",
+    label: "live",
+    kind: "empty",
+    n: null,
+    u: null,
+    mark: EMPTY,
+  };
+  return [invent, paper, holdout, production, live];
+}
+
+export function bookStageLine(stages: readonly BookStage[]): string {
+  return stages
+    .map((s) => {
+      if (s.kind === "empty") return `${s.label} ${EMPTY}`;
+      if (s.kind === "split") return `${s.label} ${s.mark}`;
+      const n = s.n != null ? ` n=${s.n}` : "";
+      return `${s.label} ${s.mark}${n}`;
+    })
+    .join(" · ");
+}
+
+/** Fuse off is the law, not a problem. */
+export function isLawNotIssue(iss: { id: string; title?: string }): boolean {
+  return iss.id === "live-subset" || /real betting is off/i.test(iss.title ?? "");
+}
+
+export function officeIssues(
+  issues: readonly { id: string; owner: string; title: string; detail: string; fix: string }[],
+): IssueRow[] {
+  return issues.filter((iss) => !isLawNotIssue(iss)).map(issueBoard);
+}
+
 /** Paper and holdout as two periods of one book. Never recomputes P&L. */
 export function bookPeriods(recipe: Recipe): BookPeriods {
   const paperN = Number.isFinite(recipe.n) ? recipe.n : 0;

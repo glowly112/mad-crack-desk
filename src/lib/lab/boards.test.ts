@@ -17,6 +17,9 @@ import {
   inventHole,
   inventWhatHappened,
   bookPeriods,
+  bookStageLine,
+  bookStages,
+  officeIssues,
   pipeBoard,
   plantMarkets,
   racingSquare,
@@ -148,6 +151,46 @@ test("the racing square is the finite mill grid; Empty holes are real area", () 
   const gbWin = holes.find((h) => h.id === "GB|near_off|WIN");
   const gbPlace = holes.find((h) => h.id === "GB|near_off|PLACE");
   assert.ok(gbWin && gbPlace);
+});
+
+test("one book is invent, paper, holdout, production, live", () => {
+  const solid = STAMP.recipes.find((r) => r.badge === "Solid");
+  const parked = STAMP.recipes.find((r) => r.badge === "Parked");
+  assert.ok(solid && parked);
+  const gb = bookStages(solid);
+  assert.deepEqual(
+    gb.map((s) => s.key),
+    ["invent", "paper", "holdout", "production", "live"],
+  );
+  assert.equal(gb.find((s) => s.key === "invent")?.kind, "same");
+  assert.equal(gb.find((s) => s.key === "paper")?.n, 76);
+  assert.equal(gb.find((s) => s.key === "holdout")?.n, 23);
+  assert.equal(gb.find((s) => s.key === "production")?.kind, "same");
+  assert.equal(gb.find((s) => s.key === "live")?.kind, "empty");
+  assert.match(bookStageLine(gb), /live Empty/);
+  const nz = bookStages(parked);
+  assert.equal(nz.find((s) => s.key === "production")?.kind, "empty");
+  const cousin = bookStages({
+    ...solid,
+    why: "Hyde cousin of GB near-off WIN · not the same picks",
+  });
+  assert.equal(cousin.find((s) => s.key === "invent")?.kind, "split");
+  assert.match(cousin.find((s) => s.key === "invent")?.mark ?? "", /Hyde cousin/);
+});
+
+test("fuse off is the law, not a thing to fix", () => {
+  const rows = officeIssues([
+    ...STAMP.issues,
+    {
+      id: "live-subset",
+      title: "Real betting is off. Nothing is live.",
+      detail: "The fuse is off.",
+      owner: "Clerk",
+      fix: "Leave the fuse off.",
+    },
+  ]);
+  assert.equal(rows.some((r) => /real betting is off/i.test(r.problem)), false);
+  assert.ok(rows.some((r) => r.id === "keep-hold-paper"));
 });
 
 test("paper and holdout are two periods of one book", () => {

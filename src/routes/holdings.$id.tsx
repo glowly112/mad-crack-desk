@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { DetailShell } from "@/components/detail-shell";
 import { useStamp } from "@/components/plant-context";
-import { bookPeriods, recipeStatus } from "@/lib/lab/boards";
+import { BookStageLine } from "@/components/book-stages";
+import { bookStages, recipeStatus } from "@/lib/lab/boards";
 import { EMPTY } from "@/lib/lab/desk";
 import { cn, fmtU } from "@/lib/utils";
 
@@ -18,25 +19,31 @@ function Holding() {
       </DetailShell>
     );
   }
-  const book = bookPeriods(r);
+  const stages = bookStages(r);
   return (
     <DetailShell backTo="/" backLabel="Floor">
       <p className="font-mono text-xs text-subtle">{r.id}</p>
       <h1 className="text-2xl">{r.title}</h1>
-      <dl className="divide-y divide-border border-y border-border text-sm">
+      <p className="mt-2 text-xs text-subtle">One book</p>
+      <BookStageLine recipe={r} />
+      <dl className="mt-4 divide-y divide-border border-y border-border text-sm">
         <Row k="Region" v={r.region} />
         <Row k="Status" v={recipeStatus(r)} />
-        <Row k="Paper" v={`n=${book.paperN} · ${fmtU(book.paperU)}`} />
-        <Row
-          k="Holdout"
-          v={book.holdoutN == null ? EMPTY : `n=${book.holdoutN} · ${EMPTY}`}
-        />
-        <Row k="Book" v={book.line} />
-        <Row
-          k="Paper ROI"
-          v={`${r.roi >= 0 ? "+" : ""}${r.roi.toFixed(1)}%`}
-          tone={r.roi >= 0 ? "up" : "bad"}
-        />
+        {stages.map((s) => (
+          <Row
+            key={s.key}
+            k={s.label}
+            v={
+              s.kind === "empty"
+                ? EMPTY
+                : s.kind === "split"
+                  ? s.mark
+                  : s.n != null
+                    ? `n=${s.n} · ${s.key === "paper" ? fmtU(s.u) : EMPTY}`
+                    : s.mark
+            }
+          />
+        ))}
       </dl>
     </DetailShell>
   );
