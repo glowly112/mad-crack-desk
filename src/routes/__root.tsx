@@ -9,7 +9,7 @@ import appCss from "../styles.css?url";
 
 const APP_NAME = "Mad Crack Lab";
 
-const PREFS_BOOT = `(function(){try{var p=JSON.parse(localStorage.getItem("mcl.prefs")||"{}");var h=document.documentElement;if(p.theme)h.setAttribute("data-theme",p.theme);if(p.font)h.setAttribute("data-font",p.font);if(p.size)h.setAttribute("data-size",p.size);}catch(e){}})();`;
+const PREFS_BOOT = `(function(){try{var p=JSON.parse(localStorage.getItem("mcl.prefs")||"{}");var h=document.documentElement;var theme=p.theme||"charcoal";if(p.theme)h.setAttribute("data-theme",theme);if(p.font)h.setAttribute("data-font",p.font);if(p.size)h.setAttribute("data-size",p.size);var colors={charcoal:"#0a0a0b",paper:"#f7f0e3",night:"#06080f",lab:"#041208"};var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",colors[theme]||colors.charcoal);}catch(e){}})();`;
 
 export const Route = createRootRoute({
   errorComponent: AppErrorComponent,
