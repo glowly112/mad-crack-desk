@@ -1073,18 +1073,19 @@ function bookLabel(raw: string, recipes: readonly Recipe[] = []): string {
     const hit = recipes.find((r) => r.id === id);
     if (hit?.title) return hit.title;
     const named = cellName(id);
-    if (named && named !== EMPTY) return named;
+    if (named && named !== EMPTY && named.length > 2) return named;
   }
-  const titled = recipes.find((r) => r.title === raw || r.id === raw);
+  const slug = raw.replace(/_/g, " ");
+  const titled = recipes.find((r) => r.title === raw || r.id === raw || r.title === slug);
   if (titled?.title) return titled.title;
-  const cell = cellName(raw);
-  if (cell && cell !== EMPTY) return cell;
-  const hole = holeName(raw);
-  return hole !== EMPTY ? hole : "";
+  const cell = cellName(slug);
+  if (cell && cell !== EMPTY && cell.length > 2) return cell;
+  const hole = holeName(slug);
+  return hole !== EMPTY && hole.length > 2 ? hole : "";
 }
 
 function firstRecipeId(text: string): string {
-  return /(?:first:\s*)?(H-[A-Za-z0-9-]+)/i.exec(text)?.[1] ?? "";
+  return /first:\s*([A-Za-z0-9_-]+)/i.exec(text)?.[1] ?? /H-[A-Za-z0-9-]+/.exec(text)?.[0] ?? "";
 }
 
 function staffBookFacts(seatNow: string, stamp: StaffWatchStamp) {
@@ -1175,7 +1176,9 @@ export function seatWatching(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchSt
             : `${f.tapeName} is a split — not the same picks through the book.`
           : "",
         live?.kind === "empty" ? "Live Empty." : "",
-        f.holdBook && f.holdBook !== f.tapeName ? `${f.holdBook} is on hold. Not the tape.` : "",
+        f.holdBook && f.holdBook !== f.tapeName
+          ? `${f.holdBook} is on hold.${f.tapeName ? " Not the tape." : ""}`
+          : "",
         fillName ? `Holdout fill-adj killed ${fillName} — not this book.` : "",
         "A Hyde cousin is not it.",
       );

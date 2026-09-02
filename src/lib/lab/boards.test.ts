@@ -339,6 +339,18 @@ test("Hyde names a SHARPEN cousin when the stamp does", () => {
   assert.match(text, /not the GB near-off WIN KEEP/);
 });
 
+test("Clerk names a hold book in English, not a bare country", () => {
+  const clerk = STAMP.seats.find((s) => s.id === "clerk");
+  assert.ok(clerk);
+  const text = seatWatching(
+    { ...clerk, now: "keep_hold_paper first: Britain_near_off_WIN_steam_fade_residual_one_pick" },
+    { ...STAMP, solids: [], recipes: STAMP.recipes.filter((r) => r.badge !== "Solid") },
+  );
+  assert.match(text, /near-off WIN/);
+  assert.equal(/\bGB is on hold\b/.test(text), false);
+  assert.equal(/real betting is off/i.test(text), false);
+});
+
 test("Staff seat with nothing is Empty", () => {
   const curator = STAMP.seats.find((s) => s.id === "curator");
   assert.ok(curator);
