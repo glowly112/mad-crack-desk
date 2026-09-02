@@ -134,6 +134,7 @@ function recipesFromCells(cells: Record<string, unknown>[]): Recipe[] {
     if (status === "KEEP") keep.push(recipe);
     else measuring.push(recipe);
   }
+  keep.sort((a, b) => Number(b.badge === "Solid") - Number(a.badge === "Solid"));
   return [...keep, ...measuring].slice(0, RECIPE_CAP);
 }
 

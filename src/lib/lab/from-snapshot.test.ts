@@ -117,6 +117,32 @@ test("live_on without place_on does not open the fuse", () => {
   assert.equal(live.fuse_on, false);
 });
 
+test("Solid recipes lead the tape even when the scoreboard lists a parked keep first", () => {
+  const live = applySnapshot(
+    {
+      truth: { keep: 2, measuring: 0, dropped: 0 },
+      n_solid: 1,
+      paper_live_day_u: null,
+      cells: [
+        { id: "parked_nz", title: "NZ morning win", status: "KEEP", keep_badge: "Parked", n: 68 },
+        {
+          id: "solid_gb",
+          title: "GB win near-off",
+          status: "KEEP",
+          keep_badge: "Solid",
+          status_chip: "Waiting for races",
+          certified: true,
+          n: 76,
+        },
+      ],
+    },
+    base(),
+  );
+  assert.equal(live.recipes[0]?.id, "solid_gb");
+  assert.equal(live.recipes[0]?.badge, "Solid");
+  assert.equal(live.recipes[1]?.badge, "Parked");
+});
+
 test("boardUx n_solid and paperLive day_u pass through; KEEP count is not solids", () => {
   const live = applySnapshot(
     {

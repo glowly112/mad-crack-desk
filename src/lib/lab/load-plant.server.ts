@@ -134,9 +134,12 @@ export async function loadPlant(): Promise<PlantPayload> {
   try {
     const base = digestStamp();
     const remote = Promise.race([
-      (async () => (await tryHttp(base)) ?? (await trySsh(base)))(),
+      (async () => {
+        const [http, ssh] = await Promise.all([tryHttp(base), trySsh(base)]);
+        return http ?? ssh;
+      })(),
       new Promise<null>((resolve) => {
-        setTimeout(() => resolve(null), 8000);
+        setTimeout(() => resolve(null), 10_000);
       }),
     ]);
     return (await remote) ?? fromLiveFile(base);
