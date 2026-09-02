@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  countryPackBoxes,
+  countryPackLine,
   countrySentence,
   healthBoard,
   hunterWork,
@@ -10,6 +12,7 @@ import {
   pipeBoard,
   recipeStatus,
   staffLine,
+  waffleCols,
 } from "./boards.ts";
 import { EMPTY } from "./desk.ts";
 import { STAMP } from "./stamp.ts";
@@ -32,6 +35,26 @@ test("Office countries speak English and pick up a parked NZ the coverage missed
   assert.equal(nz?.line, "1 parked, 2 still being tested");
   assert.equal(us?.line, "1 still being tested");
   assert.equal(hk?.line, EMPTY);
+});
+
+test("country pack sizes Australia over a one-recipe market and omits Empty", () => {
+  const rows = officeCountries(STAMP.coverage, STAMP.recipes);
+  const boxes = countryPackBoxes(rows);
+  const au = boxes.find((b) => b.region === "AU");
+  const us = boxes.find((b) => b.region === "US");
+  assert.ok(au && us);
+  assert.equal(
+    boxes.some((b) => b.region === "HK" || b.line === EMPTY),
+    false,
+  );
+  const auArea = au.w * au.h;
+  const usArea = us.w * us.h;
+  assert.ok(usArea > 0);
+  assert.ok(Math.abs(auArea / usArea - 6) < 0.05);
+  assert.equal(waffleCols(6), 3);
+  assert.equal(waffleCols(1), 1);
+  assert.equal(countryPackLine(rows), "Australia is the pile. Hong Kong Empty.");
+  assert.equal(countryPackLine([]), EMPTY);
 });
 
 test("recipe status drops holdout_n_too_small", () => {

@@ -1,16 +1,11 @@
 import { Link } from "@tanstack/react-router";
+import { CountryPack } from "@/components/country-pack";
 import { EmptyState } from "@/components/empty-state";
 import { HUNTER_MARKS } from "@/components/marks";
 import { LiveDot } from "@/components/live-dot";
 import { ownerId, Portrait } from "@/components/portrait";
 import { useStamp } from "@/components/plant-context";
-import {
-  issueBoard,
-  officeCountries,
-  officeWorkers,
-  pipeBoard,
-  recipeStatus,
-} from "@/lib/lab/boards";
+import { issueBoard, officeWorkers, pipeBoard, recipeStatus } from "@/lib/lab/boards";
 import { EMPTY, recipePack } from "@/lib/lab/desk";
 import type { Recipe } from "@/lib/lab/stamp";
 import { cn } from "@/lib/utils";
@@ -98,30 +93,12 @@ export function FactoryLine() {
 /** Parked vs still being tested, by country, then who’s working. */
 export function RecipesNotEarning() {
   const stamp = useStamp();
-  const countries = officeCountries(stamp.coverage, stamp.recipes);
   const pack = recipePack(stamp.recipes);
   const workers = officeWorkers(stamp.hunters, stamp.office.activeHunter);
 
   return (
     <div className="space-y-8">
-      <section>
-        <header className="mb-2 flex items-baseline justify-between gap-3 border-b border-border pb-2">
-          <h2 className="text-sm font-medium text-muted">By country</h2>
-          <p className="text-xs text-subtle">Parked vs still being tested</p>
-        </header>
-        <ul>
-          {countries.map((c, i) => (
-            <li
-              key={c.region}
-              className="log-in flex items-baseline justify-between gap-3 border-b border-border py-2.5"
-              style={{ animationDelay: `${Math.min(i, 8) * 28}ms` }}
-            >
-              <p className="text-sm">{c.name}</p>
-              <p className="text-right text-sm text-muted">{c.line}</p>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <CountryPack />
 
       <RecipeGroup title="Parked" hint="Not income" rows={pack.keeps} />
       <RecipeGroup title="Still being tested" hint="Not the score" rows={pack.proving} />

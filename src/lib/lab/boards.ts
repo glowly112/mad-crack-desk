@@ -80,6 +80,148 @@ export function officeCountries(
   return rows;
 }
 
+export function countryPile(row: CountryRow): number {
+  return row.parked + row.testing;
+}
+
+/** Compact waffle columns for n unit squares. */
+export function waffleCols(n: number): number {
+  return Math.max(1, Math.ceil(Math.sqrt(Math.max(0, n))));
+}
+
+/** `Australia is the pile. Hong Kong Empty.` Empty markets stay Empty. */
+export function countryPackLine(rows: readonly CountryRow[]): string {
+  const piled = [...rows]
+    .filter((r) => countryPile(r) > 0)
+    .sort((a, b) => countryPile(b) - countryPile(a) || a.name.localeCompare(b.name));
+  const empty = rows.filter((r) => countryPile(r) === 0);
+  const bits: string[] = [];
+  if (piled[0]) bits.push(`${piled[0].name} is the pile`);
+  for (const e of empty) bits.push(`${e.name} Empty`);
+  return bits.length ? `${bits.join(". ")}.` : EMPTY;
+}
+
+export type PackBox = CountryRow & { x: number; y: number; w: number; h: number };
+
+type AreaNode = CountryRow & { value: number; area: number };
+
+/** Squarified treemap. Outer area ∝ parked+testing. Empty omitted. */
+export function countryPackBoxes(
+  rows: readonly CountryRow[],
+  width = 100,
+  height = 62,
+): PackBox[] {
+  const items = [...rows]
+    .filter((r) => countryPile(r) > 0)
+    .map((r) => ({ ...r, value: countryPile(r) }))
+    .sort((a, b) => b.value - a.value || a.name.localeCompare(b.name));
+  if (!items.length || width <= 0 || height <= 0) return [];
+  const total = items.reduce((s, n) => s + n.value, 0);
+  const scale = (width * height) / total;
+  return squarify(
+    items.map((n) => ({ ...n, area: n.value * scale })),
+    0,
+    0,
+    width,
+    height,
+  );
+}
+
+function worstAspect(row: AreaNode[], side: number): number {
+  if (!row.length || side <= 0) return Number.POSITIVE_INFINITY;
+  const sum = row.reduce((s, n) => s + n.area, 0);
+  if (sum <= 0) return Number.POSITIVE_INFINITY;
+  const across = sum / side;
+  if (across <= 0) return Number.POSITIVE_INFINITY;
+  let worst = 0;
+  for (const n of row) {
+    const along = n.area / across;
+    worst = Math.max(worst, along / across, across / along);
+  }
+  return worst;
+}
+
+function squarify(nodes: AreaNode[], x: number, y: number, w: number, h: number): PackBox[] {
+  const out: PackBox[] = [];
+  let rest = nodes;
+  let cx = x;
+  let cy = y;
+  let cw = w;
+  let ch = h;
+
+  const flush = (row: AreaNode[]) => {
+    const sum = row.reduce((s, n) => s + n.area, 0);
+    if (sum <= 0 || cw <= 0 || ch <= 0) return;
+    if (cw >= ch) {
+      const stripW = sum / ch;
+      let yy = cy;
+      for (const n of row) {
+        const hh = n.area / stripW;
+        out.push(boxOf(n, cx, yy, stripW, hh));
+        yy += hh;
+      }
+      cx += stripW;
+      cw -= stripW;
+    } else {
+      const stripH = sum / cw;
+      let xx = cx;
+      for (const n of row) {
+        const ww = n.area / stripH;
+        out.push(boxOf(n, xx, cy, ww, stripH));
+        xx += ww;
+      }
+      cy += stripH;
+      ch -= stripH;
+    }
+  };
+
+  while (rest.length) {
+    if (cw < 1e-6 || ch < 1e-6) {
+      const leftover = rest.reduce((s, n) => s + n.area, 0);
+      if (leftover > 0) {
+        out.push(
+          boxOf(
+            {
+              ...rest[0],
+              area: leftover,
+              value: rest.reduce((s, n) => s + n.value, 0),
+            },
+            cx,
+            cy,
+            Math.max(cw, 0),
+            Math.max(ch, 0),
+          ),
+        );
+      }
+      break;
+    }
+    const side = Math.min(cw, ch);
+    const row: AreaNode[] = [];
+    for (const node of rest) {
+      const next = [...row, node];
+      if (row.length && worstAspect(next, side) > worstAspect(row, side)) break;
+      row.push(node);
+    }
+    rest = rest.slice(row.length);
+    flush(row);
+  }
+  return out;
+}
+
+function boxOf(n: AreaNode, x: number, y: number, w: number, h: number): PackBox {
+  return {
+    region: n.region,
+    name: n.name,
+    parked: n.parked,
+    testing: n.testing,
+    line: n.line,
+    x,
+    y,
+    w,
+    h,
+  };
+}
+
 /** Status in English. Drops holdout_n_too_small and plant tokens. */
 export function recipeStatus(recipe: Recipe): string {
   if (recipe.status === "MEASURING" || recipe.badge === "Research") {
