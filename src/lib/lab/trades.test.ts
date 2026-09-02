@@ -13,6 +13,7 @@ import {
   settledFills,
   tapePnl,
   tradeCounts,
+  tradeMark,
   waitOpenChips,
 } from "./trades.ts";
 
@@ -175,6 +176,30 @@ test("paper P&L is not income; live is 0 while fuse off", () => {
   assert.ok(liveFill);
   assert.deepEqual(tapePnl(liveFill, false), { pnl: 0, caption: "fuse off" });
   assert.deepEqual(tapePnl(liveFill, true), { pnl: 4, caption: null });
+});
+
+test("trade mark is the strategy plus runner and odds", () => {
+  const opens = [3.2, 25, 10, 9.4].map((odds) => fillFromRow({ ...gbOpen, odds, pick_id: `${gbOpen.pick_id}:${odds}` }));
+  const marks = opens.map((f) => {
+    assert.ok(f);
+    return tradeMark(f);
+  });
+  assert.deepEqual(marks, [
+    "Britain · near-off · winner · Empty · 3.2",
+    "Britain · near-off · winner · Empty · 25",
+    "Britain · near-off · winner · Empty · 10",
+    "Britain · near-off · winner · Empty · 9.4",
+  ]);
+  assert.equal(new Set(marks).size, 4);
+  assert.ok(marks.every((m) => !m.includes("recipe that bets")));
+  assert.ok(marks.every((m) => !m.startsWith("H-")));
+  const named = fillFromRow({ ...gbOpen, horse: "Desert Crown", odds: 3.2 });
+  assert.ok(named);
+  assert.equal(named.horse, "Desert Crown");
+  assert.equal(tradeMark(named), "Britain · near-off · winner · Desert Crown · 3.2");
+  const blank = fillFromRow({ ...gbOpen, horse: "H-fast-gb-nearoff-win-83959Z", runner: "67117187" });
+  assert.equal(blank?.horse, null);
+  assert.match(tradeMark(blank!), /Empty · 3\.2/);
 });
 
 test("booked clock is a real time, never Empty", () => {

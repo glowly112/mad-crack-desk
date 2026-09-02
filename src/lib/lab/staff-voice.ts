@@ -1,6 +1,6 @@
 /** Ordinary-English staff bubbles. Stamp facts only. Never invents P&L. */
 
-import { EMPTY, cellName, hopMoves } from "./desk.ts";
+import { EMPTY, hopMoves, strategyMark } from "./desk.ts";
 import { bookStages, staffBookFacts, type StaffWatchStamp } from "./boards.ts";
 import type { Move, Recipe, Seat } from "./stamp.ts";
 
@@ -10,19 +10,6 @@ export type SeatBubble = {
   older?: boolean;
 };
 
-const LAND: Record<string, string> = {
-  AU: "Australia",
-  GB: "Britain",
-  IE: "Ireland",
-  US: "the United States",
-  NZ: "New Zealand",
-  ZA: "South Africa",
-  HK: "Hong Kong",
-  FR: "France",
-};
-
-const REGIONS = ["AU", "GB", "IE", "US", "NZ", "ZA", "HK", "FR"] as const;
-
 const JARGON =
   /\bGB WIN\b|freeze fuel|\bKEEP\b|\bcousin\b|\bdensify\b|size_ok|\bn=|LIVE_CANDIDATE|holdout_fill_adj|\bmill\b|\bhole\b/i;
 
@@ -30,70 +17,14 @@ export function hasJargon(text: string): boolean {
   return JARGON.test(text);
 }
 
-function land(code: string): string {
-  return LAND[code] ?? code;
-}
-
-function windowBit(named: string): "near-off" | "late-pre" | "morning" | "in-play" | "" {
-  if (/near-?off/.test(named)) return "near-off";
-  if (/late-?pre/.test(named)) return "late-pre";
-  if (/morning/.test(named)) return "morning";
-  if (/in-?play/.test(named)) return "in-play";
-  return "";
-}
-
-function regionOf(named: string): string {
-  const code = REGIONS.find((r) => new RegExp(`\\b${r}\\b`, "i").test(named));
-  if (code) return code;
-  const lower = named.toLowerCase();
-  if (lower.includes("south africa")) return "ZA";
-  if (lower.includes("britain") || lower.includes("united kingdom")) return "GB";
-  if (lower.includes("australia")) return "AU";
-  if (lower.includes("ireland")) return "IE";
-  if (lower.includes("united states") || lower.includes("america")) return "US";
-  if (lower.includes("new zealand")) return "NZ";
-  if (lower.includes("hong kong")) return "HK";
-  if (lower.includes("france")) return "FR";
-  return "";
-}
-
-/** Britain winner just-before-off — never a raw GB WIN. */
+/** Same short mark Staff, Office and Floor use. Never a paragraph, never H-fast-…. */
 export function speakBook(raw: string): string {
-  const slug = raw.replace(/\|/g, " ");
-  const named = cellName(slug);
-  const region = regionOf(slug) || regionOf(named);
-  const country = region ? land(region) : "";
-  const place = /place/i.test(named);
-  const win = /win/i.test(named) && !place;
-  const w = windowBit(named.toLowerCase());
-  if (region === "GB" && w === "near-off" && win) {
-    return "the Britain recipe that bets the winner just before the off";
-  }
-  if (place && w === "near-off") return `${country} place just before the off`;
-  if (place && w === "in-play") return `${country} place while the race is on`;
-  if (place && w === "morning") return `${country} morning place`;
-  if (place && w === "late-pre") return `${country} late-afternoon place`;
-  if (place) return `${country} place`.trim();
-  if (win && w === "morning") return `a ${country} morning winner idea`;
-  if (win && w === "late-pre") return `an ${country} late-afternoon winner idea`;
-  if (win && w === "near-off") return `a ${country} winner idea for races about to start`;
-  if (win && w === "in-play") return `a ${country} winner idea while the race is on`;
-  if (win && country) return `a ${country} winner idea`;
-  return country ? `${country} market` : named && named !== EMPTY ? named : "";
+  return strategyMark(raw);
 }
 
-/** South Africa, morning, winner — a look, not a hole. */
+/** Same mark — a look, not a hole. */
 export function speakLook(raw: string): string {
-  const slug = raw.replace(/\|/g, " ");
-  const named = cellName(slug);
-  const region = regionOf(slug) || regionOf(named);
-  const country = region ? land(region) : "";
-  const place = /place/i.test(named);
-  const w = windowBit(named.toLowerCase());
-  const when =
-    w === "near-off" ? "just before the off" : w === "late-pre" ? "late afternoon" : w === "in-play" ? "in running" : w;
-  const market = place ? "place" : "winner";
-  return [country, when, market].filter(Boolean).join(", ");
+  return strategyMark(raw);
 }
 
 function cap(s: string): string {

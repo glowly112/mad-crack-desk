@@ -1,6 +1,6 @@
 /** Display mapping for the clerk book. Never invents tickets or sums P&L. */
 
-import { cellName } from "./desk.ts";
+import { EMPTY, cellName, strategyMark } from "./desk.ts";
 
 export type FillBook = "paper" | "production" | "live";
 export type FillResult = "won" | "lost" | "void" | "waiting";
@@ -32,6 +32,8 @@ export type Fill = {
   /** Available-to-bet size. Liquidity — never unmatched. */
   liquidity: number | null;
   pnl: number | null;
+  /** Runner if the stamp names one. Empty is Empty — never invented. */
+  horse: string | null;
 };
 
 function rec(v: unknown): Record<string, unknown> | null {
@@ -112,6 +114,20 @@ function heroStake(row: Record<string, unknown>): number | null {
   return HERO_U;
 }
 
+function horseOf(row: Record<string, unknown>): string | null {
+  const keys = ["horse", "runner", "horse_name", "runner_name", "selection_name", "sel_name"];
+  for (const k of keys) {
+    const v = row[k];
+    if (typeof v !== "string") continue;
+    const raw = v.trim();
+    if (!raw || raw === EMPTY) continue;
+    if (/^H-[a-z0-9-]+$/i.test(raw)) continue;
+    if (/^\d+$/.test(raw)) continue;
+    return raw;
+  }
+  return null;
+}
+
 export function fillFromRow(raw: unknown): Fill | null {
   const row = rec(raw);
   if (!row) return null;
@@ -142,7 +158,15 @@ export function fillFromRow(raw: unknown): Fill | null {
     flight: flightOf(row),
     liquidity: num(row.atb_size_gbp),
     pnl,
+    horse: horseOf(row),
   };
+}
+
+/** Trade line: strategy mark plus runner and odds. Empty horse stays Empty. */
+export function tradeMark(fill: Fill): string {
+  const mark = strategyMark(fill.recipe, fill.recipeId);
+  const horse = fill.horse && fill.horse !== EMPTY ? fill.horse : EMPTY;
+  return `${mark} · ${horse} · ${fmtOdds(fill.odds)}`;
 }
 
 export function parseFills(raw: unknown): Fill[] {

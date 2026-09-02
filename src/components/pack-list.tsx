@@ -3,7 +3,7 @@ import { MarkSolid } from "@/components/marks";
 import { EmptyState } from "@/components/empty-state";
 import { useStamp } from "@/components/plant-context";
 import { BookStageLine } from "@/components/book-stages";
-import { SOLID_EMPTY, solidRows } from "@/lib/lab/desk";
+import { SOLID_EMPTY, solidRows, strategyMark } from "@/lib/lab/desk";
 import type { Recipe } from "@/lib/lab/stamp";
 import { cn } from "@/lib/utils";
 
@@ -66,7 +66,9 @@ function Group({
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                    <p className={quiet ? "text-sm text-muted" : "text-sm font-medium"}>{r.title}</p>
+                    <p className={quiet ? "text-sm text-muted" : "text-sm font-medium"}>
+                      {strategyMark(r.title, r.id)}
+                    </p>
                     <span className="rounded-sm bg-elev px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-subtle">
                       {label}
                     </span>

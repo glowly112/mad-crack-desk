@@ -4,10 +4,13 @@ import { STAMP } from "./stamp.ts";
 import { EMPTY } from "./desk.ts";
 import { hasJargon, seatBubbles, speakBook, speakLook } from "./staff-voice.ts";
 
-test("speakBook says Britain winner just before the off", () => {
-  assert.match(speakBook("GB near-off WIN"), /Britain recipe that bets the winner just before the off/);
-  assert.match(speakBook("AU place near-off"), /Australia place just before the off/);
-  assert.match(speakLook("South Africa morning WIN"), /South Africa, morning, winner/);
+test("speakBook is the short strategy mark, not a paragraph", () => {
+  assert.equal(speakBook("GB near-off WIN"), "Britain · near-off · winner");
+  assert.equal(speakBook("H-fast-gb-nearoff-win-83959Z"), "Britain · near-off · winner");
+  assert.equal(speakBook("AU place near-off"), "Australia · near-off · place");
+  assert.equal(speakLook("South Africa morning WIN"), "South Africa · morning · winner");
+  assert.ok(!speakBook("GB near-off WIN").includes("recipe that bets"));
+  assert.ok(!speakBook("H-fast-gb-nearoff-win-83959Z").startsWith("H-"));
 });
 
 test("Staff bubbles speak like a person and ban jargon", () => {
@@ -20,16 +23,17 @@ test("Staff bubbles speak like a person and ban jargon", () => {
     }
   }
   const clerk = seatBubbles(STAMP.seats.find((s) => s.id === "clerk")!, STAMP).map((b) => b.text).join(" ");
-  assert.match(clerk, /Britain recipe that bets the winner just before the off/);
+  assert.match(clerk, /Britain · near-off · winner/);
+  assert.ok(!clerk.includes("recipe that bets"));
   assert.match(clerk, /later races of those same bets/);
-  assert.match(clerk, /Australia place just before the off/);
+  assert.match(clerk, /Australia · near-off · place/);
   const bauron = seatBubbles(STAMP.seats.find((s) => s.id === "bauron")!, STAMP).map((b) => b.text).join(" ");
-  assert.match(bauron, /South Africa morning winner/);
+  assert.match(bauron, /South Africa · morning · winner/);
   assert.match(bauron, /not a patch on Britain/);
   const curator = seatBubbles(STAMP.seats.find((s) => s.id === "curator")!, STAMP).map((b) => b.text).join(" ");
   assert.match(curator, /race files/);
   const mercator = seatBubbles(STAMP.seats.find((s) => s.id === "mercator")!, STAMP).map((b) => b.text).join(" ");
-  assert.match(mercator, /South Africa, morning, winner/);
+  assert.match(mercator, /South Africa · morning · winner/);
 });
 
 test("Hyde names a different-horses tweak without saying cousin", () => {

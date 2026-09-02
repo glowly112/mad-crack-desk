@@ -5,6 +5,7 @@ import {
   SOLID_EMPTY,
   axisDay,
   cellName,
+  strategyMark,
   chartWindow,
   dailyDomain,
   dayWindow,
@@ -66,6 +67,26 @@ test("cell names carry country, window, market, and a pick hint", () => {
   );
   assert.equal(cellName("H-fast-au-nearoff-place-83723Z"), "AU near-off PLACE");
   assert.ok(!cellName("H-fast-gb-nearoff-win-83959Z").startsWith("H-"));
+});
+
+test("strategy mark is country · window · market · axis", () => {
+  assert.equal(strategyMark("H-fast-gb-nearoff-win-83959Z"), "Britain · near-off · winner");
+  assert.equal(
+    strategyMark("H-20260828T020000Z-nz-morning-win-one-pick-band-2-5-4-49"),
+    "New Zealand · morning · winner · one-pick 2.5–4.49",
+  );
+  assert.equal(strategyMark("AU late-pre WIN · midfield"), "Australia · late-pre · winner · midfield");
+  assert.equal(
+    strategyMark("Britain · near-off · winner"),
+    "Britain · near-off · winner",
+  );
+  assert.equal(
+    strategyMark("Britain · near-off · winner · one-pick"),
+    "Britain · near-off · winner · one-pick",
+  );
+  assert.equal(strategyMark("ZA|morning|WIN"), "South Africa · morning · winner");
+  assert.ok(!strategyMark("H-fast-gb-nearoff-win-83959Z").includes("H-"));
+  assert.ok(!strategyMark("GB near-off WIN").includes("WIN"));
 });
 
 test("daily window and domain keep Empty days off the scale", () => {

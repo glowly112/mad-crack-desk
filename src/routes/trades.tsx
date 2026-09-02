@@ -5,17 +5,16 @@ import { useDayScope } from "@/components/day-scope";
 import { EmptyState } from "@/components/empty-state";
 import { LiveDot } from "@/components/live-dot";
 import { usePlantSource, useStamp } from "@/components/plant-context";
-import { axisDay, EMPTY } from "@/lib/lab/desk";
-import { speakBook } from "@/lib/lab/staff-voice";
+import { axisDay, EMPTY, strategyMark } from "@/lib/lab/desk";
 import {
   bookedClock,
   dayTapePnl,
   fillsOnDay,
-  fmtOdds,
   fmtStake,
   openFills,
   settledFills,
   tapePnl,
+  tradeMark,
   waitOpenChips,
   type Fill,
   type WaitOpen,
@@ -133,7 +132,7 @@ function TradeRow({
 }) {
   const tape = tapePnl(fill, fuseOn);
   const clock = bookedClock(fill.ts, fill.t);
-  const name = speakBook(fill.recipe) || fill.recipe;
+  const name = tradeMark(fill);
   const result = open
     ? "Still open."
     : fill.result === "won"
@@ -157,11 +156,10 @@ function TradeRow({
       >
         <span className="w-16 shrink-0 font-mono text-xs tabular-nums text-subtle">{clock}</span>
         <span className="min-w-0 flex-1">
-          <span className="text-sm">{cap(name)}</span>
+          <span className="text-sm">{name}</span>
           <span className="mt-0.5 block font-mono text-[10px] text-subtle">
-            {fill.side ? `${fill.side} · ` : ""}
-            {fmtOdds(fill.odds)}
-            {fill.stake != null ? ` · ${fmtStake(fill.stake)}` : ""}
+            {fill.side ? `${fill.side}` : ""}
+            {fill.stake != null ? `${fill.side ? " · " : ""}${fmtStake(fill.stake)}` : ""}
             {paper ? " · paper, not income" : ""}
             {open ? ` · ${result}` : ""}
           </span>
@@ -207,7 +205,7 @@ function WaitRow({
   selected: boolean;
   onPick: () => void;
 }) {
-  const name = speakBook(chip.title) || chip.title;
+  const name = strategyMark(chip.title, chip.id);
   const why = /size_ok/i.test(chip.why ?? "") ? "No races of the right size yet." : chip.why;
   return (
     <li>
@@ -221,7 +219,7 @@ function WaitRow({
       >
         <span className="w-16 shrink-0 font-mono text-xs text-subtle" />
         <span className="min-w-0 flex-1">
-          <span className="text-sm">{cap(name)}</span>
+          <span className="text-sm">{name}</span>
           <span className="mt-0.5 block text-xs text-subtle">Waiting for races. Not a ticket.</span>
           {why ? <span className="mt-0.5 block text-xs text-subtle">{why}</span> : null}
         </span>
@@ -230,7 +228,3 @@ function WaitRow({
   );
 }
 
-function cap(s: string): string {
-  if (!s) return s;
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}

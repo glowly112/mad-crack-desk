@@ -1,6 +1,6 @@
 /** Display English for Office, Pipe, Health, Issues. Never invents counts. */
 
-import { EMPTY, cellName, recipePack } from "./desk.ts";
+import { EMPTY, cellName, recipePack, strategyMark } from "./desk.ts";
 import type { Move, Recipe, Seat } from "./stamp.ts";
 
 const REGIONS = ["AU", "GB", "IE", "US", "NZ", "ZA", "HK", "FR"] as const;
@@ -33,10 +33,10 @@ export function expandCountry(text: string): string {
   return text.replace(/\b(AU|GB|IE|US|NZ|ZA|HK|FR)\b/g, (m) => COUNTRY[m] ?? m);
 }
 
-/** `ZA|morning|WIN` → `South Africa morning WIN`. */
+/** `ZA|morning|WIN` → `South Africa · morning · winner`. Same mark as Staff and Floor. */
 export function holeName(raw: string): string {
-  const named = cellName(raw.replace(/\|/g, " "));
-  return named && named !== EMPTY ? expandCountry(named) : EMPTY;
+  const named = strategyMark(raw.replace(/\|/g, " "));
+  return named && named !== EMPTY ? named : EMPTY;
 }
 
 /** Caption a named invent hole. Never extra squares. */
@@ -1071,15 +1071,15 @@ export function bookLabel(raw: string, recipes: readonly Recipe[] = []): string 
   const id = /H-[A-Za-z0-9-]+/.exec(raw)?.[0];
   if (id) {
     const hit = recipes.find((r) => r.id === id);
-    if (hit?.title) return hit.title;
-    const named = cellName(id);
+    if (hit) return strategyMark(hit.title, hit.id);
+    const named = strategyMark(id);
     if (named && named !== EMPTY && named.length > 2) return named;
   }
   const slug = raw.replace(/_/g, " ");
   const titled = recipes.find((r) => r.title === raw || r.id === raw || r.title === slug);
-  if (titled?.title) return titled.title;
-  const cell = cellName(slug);
-  if (cell && cell !== EMPTY && cell.length > 2) return cell;
+  if (titled) return strategyMark(titled.title, titled.id);
+  const mark = strategyMark(slug);
+  if (mark && mark !== EMPTY && mark.length > 2) return mark;
   const hole = holeName(slug);
   return hole !== EMPTY && hole.length > 2 ? hole : "";
 }
@@ -1125,7 +1125,7 @@ export function staffBookFacts(seatNow: string, stamp: StaffWatchStamp) {
   const densify = /\bdensify\b/i.test(blob);
   const holdId = firstRecipeId(seatNow);
   const holdBook = holdId ? bookLabel(holdId, recipes) : "";
-  const tapeName = tape?.title ?? "";
+  const tapeName = tape ? strategyMark(tape.title, tape.id) : "";
   return { recipes, tape, tapeName, parked, trial, hydeTrials, fillAdjKills, inventCell, densify, holdBook };
 }
 

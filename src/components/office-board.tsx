@@ -15,7 +15,7 @@ import {
   recipeStatus,
   waffleCols,
 } from "@/lib/lab/boards";
-import { EMPTY, recipePack } from "@/lib/lab/desk";
+import { EMPTY, recipePack, strategyMark } from "@/lib/lab/desk";
 import type { Recipe } from "@/lib/lab/stamp";
 import { cn } from "@/lib/utils";
 
@@ -226,7 +226,7 @@ function RecipeGroup({ title, hint, rows }: { title: string; hint: string; rows:
                 className="flex items-baseline justify-between gap-3 py-2.5 transition-transform duration-150 ease-out active:scale-[0.96]"
               >
                 <div className="min-w-0">
-                  <p className="text-sm">{r.title}</p>
+                  <p className="text-sm">{strategyMark(r.title, r.id)}</p>
                   <p className="mt-0.5 text-xs text-subtle">{recipeStatus(r)}</p>
                   {r.badge === "Solid" || r.badge === "Parked" || r.status === "KEEP" ? (
                     <BookStageLine recipe={r} />

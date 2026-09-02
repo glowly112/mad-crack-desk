@@ -3,7 +3,7 @@ import { DetailShell } from "@/components/detail-shell";
 import { useStamp } from "@/components/plant-context";
 import { BookStageLine } from "@/components/book-stages";
 import { bookStages, recipeStatus } from "@/lib/lab/boards";
-import { EMPTY } from "@/lib/lab/desk";
+import { EMPTY, strategyMark } from "@/lib/lab/desk";
 import { cn, fmtU } from "@/lib/utils";
 
 export const Route = createFileRoute("/holdings/$id")({ component: Holding });
@@ -22,8 +22,7 @@ function Holding() {
   const stages = bookStages(r);
   return (
     <DetailShell backTo="/" backLabel="Floor">
-      <p className="font-mono text-xs text-subtle">{r.id}</p>
-      <h1 className="text-2xl">{r.title}</h1>
+      <h1 className="text-2xl">{strategyMark(r.title, r.id)}</h1>
       <p className="mt-2 text-xs text-subtle">One book</p>
       <BookStageLine recipe={r} />
       <dl className="mt-4 divide-y divide-border border-y border-border text-sm">

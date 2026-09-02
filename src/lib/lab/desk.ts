@@ -171,6 +171,52 @@ export function cellName(...parts: string[]): string {
   return hints.length ? `${head} · ${hints.join(" ")}` : head;
 }
 
+const LAND: Record<string, string> = {
+  AU: "Australia",
+  GB: "Britain",
+  IE: "Ireland",
+  US: "United States",
+  NZ: "New Zealand",
+  ZA: "South Africa",
+  HK: "Hong Kong",
+  FR: "France",
+};
+
+/** Short strategy mark: Britain · near-off · winner · one-pick. Never a paragraph or H-fast id. */
+export function strategyMark(...parts: string[]): string {
+  const blob = parts.filter(Boolean).join(" ").replace(/\|/g, " ");
+  if (!blob.trim()) return EMPTY;
+  const lower = blob.toLowerCase().replace(/_/g, " ");
+  const region =
+    REGIONS.find((r) => new RegExp(`\\b${r}\\b`, "i").test(blob)) ??
+    (Object.entries(LAND).find(([, name]) => lower.includes(name.toLowerCase()))?.[0] ?? "");
+  const window = WINDOWS.find(([re]) => re.test(lower))?.[1] ?? "";
+  const place = /\bplace\b/.test(lower);
+  const win = /\bwin(?:ner)?\b/.test(lower) && !place;
+  const market = place ? "place" : win ? "winner" : "";
+  const axis: string[] = [];
+  const onePick = /one[\s-]?pick/.test(lower);
+  const dotted = /band[\s-]+(\d+)-(\d+)-(\d+)-(\d+)/.exec(lower);
+  const band = /band[\s-]*(\d+(?:\.\d+)?)[\s-]+(\d+(?:\.\d+)?)/.exec(lower);
+  const span = /(\d+(?:\.\d+)?)to(\d+(?:\.\d+)?)/.exec(lower);
+  const already = /(\d+(?:\.\d+)?)[–-](\d+(?:\.\d+)?)/.exec(lower);
+  let range = "";
+  if (dotted) range = `${dotted[1]}.${dotted[2]}–${dotted[3]}.${dotted[4]}`;
+  else if (band) range = `${band[1]}–${band[2]}`;
+  else if (span) range = `${span[1]}–${span[2]}`;
+  else if (already && (onePick || /band/.test(lower))) range = `${already[1]}–${already[2]}`;
+  if (onePick) axis.push(range ? `one-pick ${range}` : "one-pick");
+  else if (range) axis.push(range);
+  if (/\bmidfield\b/.test(lower)) axis.push("midfield");
+  if (/small\s*field/.test(lower)) axis.push("small field");
+  if (/large\s*field/.test(lower)) axis.push("large field");
+  if (/steam|fade/.test(lower) && !axis.some((a) => /steam|fade/.test(a))) axis.push("steam fade");
+  const bits = [region ? LAND[region] : "", window, market, ...axis].filter(Boolean);
+  if (bits.length) return bits.join(" · ");
+  const fallback = cellName(...parts);
+  return fallback && fallback !== EMPTY ? fallback : EMPTY;
+}
+
 /** @deprecated use cellName — kept for existing imports */
 export function prettyTitle(title: string): string {
   return cellName(title);

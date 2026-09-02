@@ -126,7 +126,7 @@ test("the plant waffle is stamp cells: unused leftover, hunting, kill, then the 
   assert.ok(buckets.loss + buckets.hunt + buckets.empty > buckets.win + buckets.parked + buckets.idea);
   const leftover = plantCellBuckets({ ...STAMP.counts, cells: 180 });
   assert.equal(leftover.empty, 180 - leftover.used);
-  assert.equal(inventHole(STAMP.office.inventWhy), "South Africa morning WIN");
+  assert.equal(inventHole(STAMP.office.inventWhy), "South Africa · morning · winner");
   assert.equal(inventHole("invent off"), EMPTY);
 });
 
@@ -215,7 +215,7 @@ test("invent what happened names the queue and a known reject", () => {
     hunters: STAMP.hunters,
   });
   assert.match(line, /12 new ideas/);
-  assert.match(line, /South Africa morning WIN/);
+  assert.match(line, /South Africa · morning · winner/);
   assert.match(line, /not stalled/);
   const rejected = inventWhatHappened({
     invent: true,
@@ -240,7 +240,7 @@ test("recipe status drops holdout_n_too_small", () => {
 test("hunter work drops FLOWING, pitched=, and conv%", () => {
   assert.equal(hunterWork("FLOWING · pitched=3 · proving=6 · conv 0.0%"), "Working 3 new ideas, 6 still being tested");
   assert.equal(hunterWork("FLOWING · no open deals"), EMPTY);
-  assert.equal(hunterWork("FLOWING · queue ZA|morning|WIN"), "Looking at South Africa morning WIN");
+  assert.equal(hunterWork("FLOWING · queue ZA|morning|WIN"), "Looking at South Africa · morning · winner");
   assert.ok(officeWorkers(STAMP.hunters, "geo")[0]?.id === "geo");
 });
 
@@ -289,26 +289,26 @@ test("Staff watching lines are same-bets, not bios", () => {
     return seatWatching(seat, STAMP);
   };
   assert.match(line("bauron"), /this cell/);
-  assert.match(line("bauron"), /South Africa morning WIN/);
+  assert.match(line("bauron"), /South Africa · morning · winner/);
   assert.match(line("bauron"), /densify cousin is a new book/);
-  assert.match(line("bauron"), /GB near-off WIN/);
+  assert.match(line("bauron"), /Britain · near-off · winner/);
   assert.match(line("igor"), /same freeze bets/);
-  assert.match(line("igor"), /GB near-off WIN/);
+  assert.match(line("igor"), /Britain · near-off · winner/);
   assert.match(line("hyde"), /KEEP is the original/);
   assert.match(line("hyde"), /No Hyde SHARPEN cousin/);
   assert.match(line("clerk"), /same pick set/);
   assert.match(line("clerk"), /fill-adj killed/);
-  assert.match(line("clerk"), /AU near-off PLACE/);
+  assert.match(line("clerk"), /Australia · near-off · place/);
   assert.match(line("clerk"), /Hyde cousin is not it/);
   assert.equal(/real betting is off/i.test(line("clerk")), false);
-  assert.match(line("foreman"), /Tape KEEP is GB near-off WIN/);
+  assert.match(line("foreman"), /Tape KEEP is Britain · near-off · winner/);
   assert.match(line("foreman"), /on trial, not the tape/);
   assert.match(line("foreman"), /not treat a Hyde cousin as a restore/);
-  assert.match(line("virchow"), /AU near-off PLACE is dead/);
+  assert.match(line("virchow"), /Australia · near-off · place is dead/);
   assert.match(line("virchow"), /not a twin of a dead school/);
-  assert.match(line("mercator"), /Next hole is South Africa morning WIN/);
+  assert.match(line("mercator"), /Next hole is South Africa · morning · winner/);
   assert.match(line("mercator"), /not a new product type/);
-  assert.match(line("curator"), /Freeze fuel for GB near-off WIN/);
+  assert.match(line("curator"), /Freeze fuel for Britain · near-off · winner/);
   for (const s of STAMP.seats) {
     const text = seatWatching(s, STAMP);
     assert.equal(/keep_hold_paper|n_schools|n_applied|Measuring n=/.test(text), false);
@@ -336,7 +336,7 @@ test("Hyde names a SHARPEN cousin when the stamp does", () => {
     },
   );
   assert.match(text, /SHARPEN cousin/);
-  assert.match(text, /not the GB near-off WIN KEEP/);
+  assert.match(text, /not the Britain · near-off · winner KEEP/);
 });
 
 test("Clerk names a hold book in English, not a bare country", () => {
@@ -346,7 +346,7 @@ test("Clerk names a hold book in English, not a bare country", () => {
     { ...clerk, now: "keep_hold_paper first: Britain_near_off_WIN_steam_fade_residual_one_pick" },
     { ...STAMP, solids: [], recipes: STAMP.recipes.filter((r) => r.badge !== "Solid") },
   );
-  assert.match(text, /near-off WIN/);
+  assert.match(text, /near-off · winner/);
   assert.equal(/\bGB is on hold\b/.test(text), false);
   assert.equal(/real betting is off/i.test(text), false);
 });
@@ -365,7 +365,7 @@ test("Staff seat with nothing is Empty", () => {
 
 test("Staff watching lines drop plant tokens", () => {
   assert.match(staffLine("Measuring n=33"), /Watching 33 still being tested/);
-  assert.match(staffLine("next hole: ZA|morning|WIN"), /South Africa morning WIN/);
+  assert.match(staffLine("next hole: ZA|morning|WIN"), /South Africa\. morning\. winner/);
   assert.ok(!staffLine(STAMP.seats.find((s) => s.id === "clerk")?.now ?? "").includes("keep_hold_paper"));
   assert.ok(!staffLine("invent on · densify · hunter Geo · proving=21").includes("densify"));
   const liveClerk =
