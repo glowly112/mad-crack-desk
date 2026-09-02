@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  capitalisingLine,
+  countryKillMarks,
   countryMarket,
   countryPackBoxes,
   countryPackLine,
@@ -8,11 +10,14 @@ import {
   healthBoard,
   hunterWork,
   issueBoard,
+  marketGlance,
   officeCountries,
   officeWorkers,
   factorySquares,
   pipeBoard,
   recipeStatus,
+  sizeMarket,
+  sizePackBoxes,
   staffLine,
   waffleCols,
 } from "./boards.ts";
@@ -64,6 +69,30 @@ test("the market keeps every stamp region, including Empty Hong Kong", () => {
   );
   assert.equal(market[0]?.region, "AU");
   assert.ok(market.some((r) => r.region === "HK" && r.line === EMPTY));
+});
+
+test("country size is measured n, not a recipe count, and HK stays Empty", () => {
+  const market = sizeMarket(STAMP.coverage, STAMP.recipes, STAMP.moves, STAMP.floorLog);
+  const gb = market.find((c) => c.region === "GB");
+  const au = market.find((c) => c.region === "AU");
+  const hk = market.find((c) => c.region === "HK");
+  assert.equal(market.map((c) => c.region).sort().join(), "AU,FR,GB,HK,IE,NZ,US,ZA");
+  assert.equal(gb?.n, 76);
+  assert.equal(au?.n, 32);
+  assert.ok(gb && au && gb.n > au.n);
+  assert.equal(gb.squares.filter((s) => s.tone === "win").length, 1);
+  assert.equal(au.squares.filter((s) => s.tone === "loss").length, 1);
+  assert.equal(market.flatMap((c) => c.squares).filter((s) => s.tone === "loss").length, 1);
+  assert.equal(hk?.empty, true);
+  assert.equal(hk?.squares.length, 0);
+  assert.equal(countryKillMarks(STAMP.moves, STAMP.floorLog).has("AU"), true);
+  const boxes = sizePackBoxes(market);
+  const gbBox = boxes.find((b) => b.region === "GB");
+  const auBox = boxes.find((b) => b.region === "AU");
+  assert.ok(gbBox && auBox);
+  assert.ok(gbBox.w * gbBox.h > auBox.w * auBox.h);
+  assert.equal(capitalisingLine(STAMP.counts), "1 solid of 161 cells. 126 killed.");
+  assert.match(marketGlance(market, STAMP.counts), /Hong Kong Empty/);
 });
 
 test("recipe status drops holdout_n_too_small", () => {

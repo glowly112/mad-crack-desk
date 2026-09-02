@@ -3,6 +3,8 @@
 import { EMPTY, cellName, recipePack } from "./desk.ts";
 import type { Recipe } from "./stamp.ts";
 
+const REGIONS = ["AU", "GB", "IE", "US", "NZ", "ZA", "HK", "FR"] as const;
+
 export const COUNTRY: Record<string, string> = {
   AU: "Australia",
   GB: "Britain",
@@ -110,6 +112,170 @@ export function countryPackLine(rows: readonly CountryRow[]): string {
   if (piled[0]) bits.push(`${piled[0].name} is the pile`);
   for (const e of empty) bits.push(`${e.name} Empty`);
   return bits.length ? `${bits.join(". ")}.` : EMPTY;
+}
+
+export type MarketTone = "idea" | "win" | "loss" | "parked";
+
+export type MarketSquare = { id: string; tone: MarketTone };
+
+export type MarketCountry = {
+  region: string;
+  name: string;
+  n: number;
+  empty: boolean;
+  squares: MarketSquare[];
+  caption: string;
+};
+
+export function recipeTone(recipe: Recipe): MarketTone {
+  if (recipe.badge === "Solid") return "win";
+  if (recipe.badge === "Dead" || recipe.status === "KILL") return "loss";
+  if (recipe.status === "MEASURING" || recipe.badge === "Research") return "idea";
+  if (recipe.status === "KEEP") return "parked";
+  return "idea";
+}
+
+export function regionFromText(text: string): string | null {
+  const t = text.toUpperCase();
+  for (const r of REGIONS) {
+    if (new RegExp(`\\b${r}\\b`).test(t)) return r;
+  }
+  return null;
+}
+
+/** One loss mark per country that the stamp actually killed. Never 126 red squares. */
+export function countryKillMarks(
+  moves: readonly { recipe: string; to: string }[],
+  log: readonly { kind?: string; line: string }[] = [],
+): Set<string> {
+  const regions = new Set<string>();
+  for (const m of moves) {
+    if (m.to !== "Dead") continue;
+    const r = regionFromText(m.recipe);
+    if (r) regions.add(r);
+  }
+  for (const row of log) {
+    if (row.kind !== "kill" && !/→\s*Dead/i.test(row.line)) continue;
+    const r = regionFromText(row.line);
+    if (r) regions.add(r);
+  }
+  return regions;
+}
+
+/** `1 solid of 161 cells. 126 killed.` Occupied vs Empty — not a percent of world racing. */
+export function capitalisingLine(counts: {
+  certified: number;
+  cells: number;
+  kill: number;
+}): string {
+  const bits = [`${counts.certified} solid of ${counts.cells} cells`];
+  if (counts.kill > 0) bits.push(`${counts.kill} killed`);
+  return `${bits.join(". ")}.`;
+}
+
+export function marketGlance(
+  countries: readonly MarketCountry[],
+  counts: { certified: number; cells: number; kill: number },
+): string {
+  const cap = capitalisingLine(counts);
+  const empty = countries.filter((c) => c.empty);
+  if (!empty.length) return cap;
+  return `${cap} ${empty.map((e) => `${e.name} Empty`).join(". ")}.`.replace(/\.\s*\./g, ".");
+}
+
+/** Size ∝ sum of recipe n. Squares are named recipes + coverage extras + honest kill marks. */
+export function sizeMarket(
+  coverage: readonly { region: string; keep: number; measuring: number }[],
+  recipes: readonly Recipe[],
+  moves: readonly { recipe: string; to: string }[] = [],
+  log: readonly { kind?: string; line: string }[] = [],
+): MarketCountry[] {
+  const kills = countryKillMarks(moves, log);
+  const named = new Map<string, Recipe[]>();
+  for (const r of recipes) {
+    const list = named.get(r.region) ?? [];
+    list.push(r);
+    named.set(r.region, list);
+  }
+  const seen = new Set<string>();
+  const rows: MarketCountry[] = [];
+  const push = (region: string, keep: number, measuring: number) => {
+    if (seen.has(region)) return;
+    seen.add(region);
+    const list = named.get(region) ?? [];
+    const n = list.reduce((s, r) => s + (Number.isFinite(r.n) ? r.n : 0), 0);
+    const squares: MarketSquare[] = list.map((r) => ({ id: r.id, tone: recipeTone(r) }));
+    const namedParked = squares.filter((s) => s.tone === "parked").length;
+    const namedWin = squares.filter((s) => s.tone === "win").length;
+    const namedIdea = squares.filter((s) => s.tone === "idea").length;
+    const extraParked = Math.max(0, keep - namedParked - namedWin);
+    const extraIdea = Math.max(0, measuring - namedIdea);
+    for (let i = 0; i < extraParked; i++) squares.push({ id: `${region}-parked-${i}`, tone: "parked" });
+    for (let i = 0; i < extraIdea; i++) squares.push({ id: `${region}-idea-${i}`, tone: "idea" });
+    if (kills.has(region) && !squares.some((s) => s.tone === "loss")) {
+      squares.push({ id: `${region}-kill`, tone: "loss" });
+    }
+    const empty = keep + measuring === 0 && list.length === 0 && !kills.has(region);
+    const win = list.find((r) => recipeTone(r) === "win");
+    const caption = win && win.n > 0 ? `n=${win.n}` : n > 0 ? `n=${n}` : "";
+    rows.push({ region, name: countryName(region), n, empty, squares, caption });
+  };
+  for (const c of coverage) push(c.region, c.keep, c.measuring);
+  for (const r of recipes) push(r.region, 0, 0);
+  return rows.sort((a, b) => {
+    if (a.empty !== b.empty) return a.empty ? 1 : -1;
+    return b.n - a.n || a.name.localeCompare(b.name);
+  });
+}
+
+export type SizeBox = MarketCountry & { x: number; y: number; w: number; h: number };
+
+/** Treemap area ∝ measured n. Empty and n=0 keep a tiny cell so they stay in the market. */
+export function sizePackBoxes(
+  countries: readonly MarketCountry[],
+  width = 100,
+  height = 52,
+): SizeBox[] {
+  const items = countries.map((c) => ({ ...c, value: Math.max(c.n, 1) }));
+  if (!items.length || width <= 0 || height <= 0) return [];
+  const total = items.reduce((s, n) => s + n.value, 0);
+  const scale = (width * height) / total;
+  return splitRects(
+    items.map((n) => ({ ...n, area: n.value * scale })),
+    0,
+    0,
+    width,
+    height,
+  );
+}
+
+type SplitNode = MarketCountry & { value: number; area: number };
+
+function splitRects(items: SplitNode[], x: number, y: number, w: number, h: number): SizeBox[] {
+  if (!items.length) return [];
+  if (items.length === 1) {
+    const it = items[0];
+    return [{ ...it, x, y, w, h }];
+  }
+  const total = items.reduce((s, i) => s + i.value, 0);
+  let acc = 0;
+  let cut = 1;
+  for (let i = 0; i < items.length; i++) {
+    acc += items[i].value;
+    cut = i + 1;
+    if (acc >= total / 2) break;
+  }
+  if (cut >= items.length) cut = items.length - 1;
+  const left = items.slice(0, cut);
+  const right = items.slice(cut);
+  const leftSum = left.reduce((s, i) => s + i.value, 0);
+  const frac = leftSum / total;
+  if (w >= h) {
+    const lw = w * frac;
+    return [...splitRects(left, x, y, lw, h), ...splitRects(right, x + lw, y, w - lw, h)];
+  }
+  const lh = h * frac;
+  return [...splitRects(left, x, y, w, lh), ...splitRects(right, x, y + lh, w, h - lh)];
 }
 
 export type PackBox = CountryRow & { x: number; y: number; w: number; h: number };

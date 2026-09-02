@@ -1,89 +1,112 @@
 import { EmptyState } from "@/components/empty-state";
 import { useStamp } from "@/components/plant-context";
-import { countryMarket, countryPackLine, countryPile, officeCountries, waffleCols } from "@/lib/lab/boards";
+import { capitalisingLine, marketGlance, sizeMarket, sizePackBoxes, waffleCols } from "@/lib/lab/boards";
 import { EMPTY } from "@/lib/lab/desk";
-import type { CountryRow } from "@/lib/lab/boards";
+import type { MarketSquare, SizeBox } from "@/lib/lab/boards";
 import { cn } from "@/lib/utils";
 
-/** One market. Every region lives inside it. Parked is fg, still being tested is warn. */
+const TONE: Record<MarketSquare["tone"], string> = {
+  win: "bg-fg",
+  idea: "bg-warn",
+  loss: "bg-bad",
+  parked: "bg-muted",
+};
+
+/** One market sized by measured n. Colour is win / idea / loss / parked. */
 export function CountryPack() {
   const stamp = useStamp();
-  const countries = officeCountries(stamp.coverage, stamp.recipes);
-  const market = countryMarket(countries);
-  const line = countryPackLine(countries);
+  const countries = sizeMarket(stamp.coverage, stamp.recipes, stamp.moves, stamp.floorLog);
+  const boxes = sizePackBoxes(countries);
+  const glance = marketGlance(countries, stamp.counts);
+  const cap = capitalisingLine(stamp.counts);
 
   return (
     <section>
-      <header className="mb-2 flex items-baseline justify-between gap-3 border-b border-border pb-2">
+      <header className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-border pb-2">
         <h2 className="text-sm font-medium text-muted">By country</h2>
-        <p className="flex items-center gap-3 text-xs text-subtle">
-          <span className="inline-flex items-center gap-1.5">
-            <span className="inline-block size-2 bg-fg" aria-hidden />
-            parked
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="inline-block size-2 bg-warn" aria-hidden />
-            still being tested
-          </span>
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-subtle">
+          <LegendDot tone="win" label="solid" />
+          <LegendDot tone="idea" label="still being tested" />
+          <LegendDot tone="parked" label="parked" />
+          <LegendDot tone="loss" label="killed" />
         </p>
       </header>
-      {market.length === 0 ? (
+      {boxes.length === 0 ? (
         <EmptyState copy={EMPTY} />
       ) : (
         <div>
-          <div className="border border-border bg-elev px-4 py-4" role="img" aria-label={line}>
-            <div className="flex flex-wrap items-end gap-x-7 gap-y-5">
-              {market.map((c, i) => (
-                <Cluster key={c.region} row={c} delay={i} />
-              ))}
-            </div>
+          <div
+            className="relative aspect-[2/1] w-full border border-border bg-elev"
+            role="img"
+            aria-label={glance}
+          >
+            {boxes.map((b, i) => (
+              <Cluster key={b.region} box={b} delay={i} />
+            ))}
           </div>
-          <p className="mt-2 text-sm text-muted">{line}</p>
+          <p className="mt-2 text-sm text-muted">{cap}</p>
+          {countries.some((c) => c.empty) ? (
+            <p className="mt-0.5 text-xs text-subtle">
+              {countries
+                .filter((c) => c.empty)
+                .map((c) => `${c.name} Empty`)
+                .join(". ")}
+              .
+            </p>
+          ) : null}
         </div>
       )}
     </section>
   );
 }
 
-function Cluster({ row, delay }: { row: CountryRow; delay: number }) {
-  const n = countryPile(row);
+function LegendDot({ tone, label }: { tone: MarketSquare["tone"]; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className={cn("inline-block size-2", TONE[tone])} aria-hidden />
+      {label}
+    </span>
+  );
+}
+
+function Cluster({ box, delay }: { box: SizeBox; delay: number }) {
   return (
     <article
-      className="log-in min-w-0"
-      style={{ animationDelay: `${Math.min(delay, 8) * 28}ms` }}
-      aria-label={`${row.name}. ${row.line}`}
-      title={`${row.name}. ${row.line}`}
+      className="log-in absolute min-w-0 px-2 py-1.5"
+      style={{
+        left: `calc(${box.x}% + 1px)`,
+        top: `calc(${box.y}% + 1px)`,
+        width: `calc(${box.w}% - 2px)`,
+        height: `calc(${box.h}% - 2px)`,
+        animationDelay: `${Math.min(delay, 8) * 28}ms`,
+      }}
+      aria-label={`${box.name}. ${box.empty ? EMPTY : box.caption || `n=${box.n}`}`}
+      title={`${box.name}${box.caption ? ` · ${box.caption}` : ""}`}
     >
-      {n > 0 ? (
-        <Waffle parked={row.parked} testing={row.testing} />
-      ) : (
+      {box.empty ? (
         <p className="text-xs text-subtle">{EMPTY}</p>
+      ) : (
+        <Waffle squares={box.squares} />
       )}
-      <p className="mt-1.5 text-xs leading-tight">{row.name}</p>
+      <p className="mt-1 truncate text-xs leading-tight">{box.name}</p>
+      {box.caption ? <p className="truncate font-mono text-[10px] text-subtle">{box.caption}</p> : null}
     </article>
   );
 }
 
-function Waffle({ parked, testing }: { parked: number; testing: number }) {
-  const n = parked + testing;
-  const cols = waffleCols(n);
-  const cells = [
-    ...Array.from({ length: parked }, (_, i) => ({ key: `p${i}`, tone: "parked" as const })),
-    ...Array.from({ length: testing }, (_, i) => ({ key: `t${i}`, tone: "test" as const })),
-  ];
+function Waffle({ squares }: { squares: MarketSquare[] }) {
+  if (!squares.length) return null;
+  const cols = waffleCols(squares.length);
   return (
     <div
       className="grid gap-[3px]"
       style={{
-        gridTemplateColumns: `repeat(${cols}, 1.25rem)`,
-        gridAutoRows: "1.25rem",
+        gridTemplateColumns: `repeat(${cols}, 0.85rem)`,
+        gridAutoRows: "0.85rem",
       }}
     >
-      {cells.map((c) => (
-        <span
-          key={c.key}
-          className={cn("block rounded-[2px]", c.tone === "parked" ? "bg-fg" : "bg-warn")}
-        />
+      {squares.map((s) => (
+        <span key={s.id} className={cn("block rounded-[2px]", TONE[s.tone])} />
       ))}
     </div>
   );
