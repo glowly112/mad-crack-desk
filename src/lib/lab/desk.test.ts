@@ -11,7 +11,10 @@ import {
   strategyMark,
   chartWindow,
   dailyDomain,
+  dailyTicks,
   dayWindow,
+  floorFacts,
+  hopTally,
   floorSeats,
   hopMoves,
   floorNextAction,
@@ -118,8 +121,30 @@ test("daily window and domain keep Empty days off the scale", () => {
   assert.ok(win.includes("2026-08-25"));
   assert.ok(STAMP.trends.find((t) => t.day === "2026-08-25")?.paper_live_day_u != null);
   const nums = win.map((d) => STAMP.trends.find((t) => t.day === d)?.paper_live_day_u);
-  const [lo, hi] = dailyDomain(nums, 100);
+  const [lo, hi] = dailyDomain(nums);
   assert.ok(lo <= -60);
-  assert.equal(hi, 100);
-  assert.deepEqual(dailyDomain([null, null], 100), [0, 100]);
+  assert.ok(hi < 20);
+  assert.notEqual(hi, 100);
+  assert.ok(!dailyTicks([lo, hi]).includes(100));
+  assert.deepEqual(dailyDomain([null, null]), [0, 1]);
+});
+
+test("Floor facts are plant numbers, not a 100u quota", () => {
+  const facts = floorFacts(STAMP, { day: STAMP.day, lookingBack: false });
+  const blob = JSON.stringify(facts).toLowerCase();
+  assert.ok(!blob.includes("aim"));
+  assert.ok(!blob.includes("behind"));
+  assert.ok(!blob.includes("on track"));
+  assert.ok(!blob.includes("remaining"));
+  assert.ok(!blob.includes("100"));
+  assert.ok(!blob.includes("£"));
+  assert.equal(facts.find((f) => f.id === "paper")?.value, null);
+  assert.equal(facts.find((f) => f.id === "solids")?.value, 1);
+  assert.equal(facts.find((f) => f.id === "tape")?.value, 1);
+  assert.equal(facts.find((f) => f.id === "production")?.value, null);
+  assert.equal(facts.find((f) => f.id === "live")?.value, null);
+  const tally = hopTally(STAMP.moves);
+  assert.ok(tally.some((t) => t.label === "Certified" && t.n === 1));
+  assert.ok(tally.some((t) => t.label === "Dead" && t.n === 1));
+  assert.ok(tally.some((t) => t.label === "parked" && t.n === 1));
 });

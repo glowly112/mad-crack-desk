@@ -1,6 +1,7 @@
 /** Display grouping for the desk. Never sums cells or invents a score. */
 
-import type { Move, Recipe } from "./stamp.ts";
+import type { Move, Recipe, TrendPoint } from "./stamp.ts";
+import { productionScore } from "./hero.ts";
 
 export const EMPTY = "Empty";
 export const SOLID_EMPTY = "No solid recipes on the day tape.";
@@ -52,18 +53,113 @@ export function hopMoves(moves: readonly Move[]): Move[] {
 
 export function productionDomain(
   values: readonly (number | null | undefined)[],
-  aim: number,
 ): [number, number] {
-  const present = values.filter((v): v is number => typeof v === "number" && Number.isFinite(v));
-  const lo = present.length ? Math.min(0, ...present) : Math.min(0, aim);
-  const hi = Math.max(aim, 0, ...present);
-  if (lo === hi) return [lo - 1, hi + 1];
-  return [lo, hi];
+  return dailyDomain(values);
 }
 
-export function productionTicks(domain: [number, number], aim: number): number[] {
-  const ticks = [Math.floor(domain[0]), 0, aim];
-  return [...new Set(ticks)].sort((a, b) => a - b);
+export function productionTicks(domain: [number, number]): number[] {
+  return dailyTicks(domain);
+}
+
+export type FloorFactId = "paper" | "solids" | "tape" | "production" | "live";
+
+export type FloorFact = {
+  id: FloorFactId;
+  label: string;
+  hint: string;
+  value: number | null;
+  kind: "u" | "count";
+};
+
+export type FloorStamp = {
+  n_solid: number;
+  fuse_on: boolean;
+  hero: { day_u: number | null };
+  recipes: readonly Recipe[];
+  wait_open?: readonly { id: string }[];
+  trends: readonly TrendPoint[];
+  researchKeepGbp: number;
+  moves: readonly Move[];
+};
+
+/** Recipes waiting on today's tape. Zero is Empty. */
+export function floorTapeWaiting(stamp: {
+  recipes: readonly Recipe[];
+  n_solid: number;
+  wait_open?: readonly { id: string }[];
+}): number {
+  const onTape = solidRows(stamp.recipes, stamp.n_solid).filter(
+    (r) => r.chip === "Waiting for races" || r.chip === "On tape today" || r.chip === "Booking",
+  ).length;
+  return onTape + (stamp.wait_open?.length ?? 0);
+}
+
+export function hopTally(moves: readonly Move[]): { label: string; n: number }[] {
+  const names: Record<string, string> = {
+    Certified: "Certified",
+    Solid: "Solid",
+    "Research keep": "parked",
+    Dead: "Dead",
+    Parked: "parked",
+  };
+  const counts = new Map<string, number>();
+  for (const hop of hopMoves(moves)) {
+    const label = names[hop.to] ?? hop.to;
+    counts.set(label, (counts.get(label) ?? 0) + 1);
+  }
+  return [...counts].map(([label, n]) => ({ label, n }));
+}
+
+export function floorDayValue(id: FloorFactId, point: TrendPoint | undefined): number | null {
+  if (!point) return null;
+  if (id === "paper") return point.paper_live_day_u;
+  if (id === "solids" || id === "tape") return point.n_solid;
+  if (id === "production") return point.factory_day_pnl_u;
+  return null;
+}
+
+/** Independent Floor facts. No aim, behind, or remaining. */
+export function floorFacts(
+  stamp: FloorStamp,
+  scope: { day: string; lookingBack: boolean },
+): FloorFact[] {
+  const trend = stamp.trends.find((t) => t.day === scope.day);
+  const paper = scope.lookingBack
+    ? (trend?.paper_live_day_u ?? null)
+    : productionScore({
+        n_solid: stamp.n_solid,
+        day_u: stamp.hero.day_u,
+        researchKeepGbp: stamp.researchKeepGbp,
+      });
+  const solids = scope.lookingBack ? (trend?.n_solid ?? 0) : stamp.n_solid;
+  const tape = scope.lookingBack ? (trend?.n_solid ?? 0) : floorTapeWaiting(stamp);
+  const production = trend?.factory_day_pnl_u ?? null;
+  const dayHint = scope.lookingBack ? axisDay(scope.day) : "today";
+  return [
+    { id: "paper", label: "Paper", hint: dayHint, value: paper, kind: "u" },
+    {
+      id: "solids",
+      label: "Solids",
+      hint: "certified",
+      value: solids > 0 ? solids : null,
+      kind: "count",
+    },
+    {
+      id: "tape",
+      label: "Tape",
+      hint: scope.lookingBack ? "on tape" : "waiting",
+      value: tape > 0 ? tape : null,
+      kind: "count",
+    },
+    { id: "production", label: "Production", hint: dayHint, value: production, kind: "u" },
+    {
+      id: "live",
+      label: "Live",
+      hint: stamp.fuse_on ? dayHint : "fuse off",
+      value: null,
+      kind: "u",
+    },
+  ];
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -281,6 +377,30 @@ export function dayWindow(days: readonly string[], selected: string, size = 8): 
   return days.slice(start, end);
 }
 
+/** Window ending at `selected`. Stretch back only when the trailing days are Empty. */
+export function seriesWindow(
+  days: readonly string[],
+  selected: string,
+  valueOf: (day: string) => number | null | undefined,
+  size = 8,
+  max = 15,
+): string[] {
+  const trailing = dayWindow(days, selected, size);
+  if (trailing.some((d) => valueOf(d) != null)) return trailing;
+  let lastProd = -1;
+  const end = days.indexOf(selected);
+  const endI = end < 0 ? days.length - 1 : end;
+  for (let i = endI; i >= 0; i--) {
+    if (valueOf(days[i] ?? "") != null) {
+      lastProd = i;
+      break;
+    }
+  }
+  if (lastProd < 0) return trailing;
+  const start = Math.max(0, Math.min(lastProd - (size - 1), endI + 1 - max));
+  return days.slice(start, endI + 1);
+}
+
 /**
  * Daily chart window ending at `selected`. If the trailing days are all Empty,
  * stretch back so the last production day is still on screen (cap `max`).
@@ -291,32 +411,28 @@ export function chartWindow(
   size = 8,
   max = 15,
 ): string[] {
-  const days = series.map((p) => p.day);
-  const trailing = dayWindow(days, selected, size);
-  const valueOf = (d: string) => series.find((p) => p.day === d)?.paper_live_day_u;
-  if (trailing.some((d) => valueOf(d) != null)) return trailing;
-  let lastProd = -1;
-  const end = days.indexOf(selected);
-  const endI = end < 0 ? days.length - 1 : end;
-  for (let i = endI; i >= 0; i--) {
-    if (series[i]?.paper_live_day_u != null) {
-      lastProd = i;
-      break;
-    }
-  }
-  if (lastProd < 0) return trailing;
-  const start = Math.max(0, Math.min(lastProd - (size - 1), endI + 1 - max));
-  return days.slice(start, endI + 1);
+  return seriesWindow(
+    series.map((p) => p.day),
+    selected,
+    (d) => series.find((p) => p.day === d)?.paper_live_day_u,
+    size,
+    max,
+  );
 }
 
-/** Scale includes aim 100u when there is production. All-Empty is [0, aim] — do not draw that dummy. */
+/** Scale from the bars only. Never pad to a target. All-Empty is a dummy — do not draw it. */
 export function dailyDomain(
   values: readonly (number | null | undefined)[],
-  aim = 100,
 ): [number, number] {
   const present = values.filter((v): v is number => typeof v === "number" && Number.isFinite(v));
-  if (!present.length) return [0, aim];
+  if (!present.length) return [0, 1];
   const lo = Math.min(0, ...present);
-  const hi = Math.max(aim, ...present);
+  const hi = Math.max(0, ...present);
+  if (lo === hi) return [lo - 1, hi + 1];
   return [lo, hi];
+}
+
+export function dailyTicks(domain: [number, number]): number[] {
+  const [lo, hi] = domain;
+  return [...new Set([lo, 0, hi].filter((v) => Number.isFinite(v)))].sort((a, b) => a - b);
 }
