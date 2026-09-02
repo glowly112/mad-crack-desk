@@ -1,21 +1,20 @@
 import { Link } from "@tanstack/react-router";
 import { CountryPack } from "@/components/country-pack";
+import { DeskTable } from "@/components/desk-table";
 import { EmptyState } from "@/components/empty-state";
 import { HUNTER_MARKS } from "@/components/marks";
 import { LiveDot } from "@/components/live-dot";
 import { ownerId, Portrait } from "@/components/portrait";
 import { useStamp } from "@/components/plant-context";
-import { BookStageLine } from "@/components/book-stages";
 import {
   factorySquares,
   inventWhatHappened,
   officeIssues,
   officeWorkers,
   pipeBoard,
-  recipeStatus,
   waffleCols,
 } from "@/lib/lab/boards";
-import { EMPTY, recipePack, strategyMark } from "@/lib/lab/desk";
+import { EMPTY, recipeDeskRow, recipePack } from "@/lib/lab/desk";
 import type { Recipe } from "@/lib/lab/stamp";
 import { cn } from "@/lib/utils";
 
@@ -214,30 +213,7 @@ function RecipeGroup({ title, hint, rows }: { title: string; hint: string; rows:
         </div>
         <p className="text-xs text-subtle">{hint}</p>
       </header>
-      {rows.length === 0 ? (
-        <EmptyState copy={EMPTY} />
-      ) : (
-        <ul>
-          {rows.map((r) => (
-            <li key={r.id} className="border-b border-border">
-              <Link
-                to="/holdings/$id"
-                params={{ id: r.id }}
-                className="flex items-baseline justify-between gap-3 py-2.5 transition-transform duration-150 ease-out active:scale-[0.96]"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm">{strategyMark(r.title, r.id)}</p>
-                  <p className="mt-0.5 text-xs text-subtle">{recipeStatus(r)}</p>
-                  {r.badge === "Solid" || r.badge === "Parked" || r.status === "KEEP" ? (
-                    <BookStageLine recipe={r} />
-                  ) : null}
-                </div>
-                <p className="shrink-0 text-xs text-subtle">{r.region}</p>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
+      <DeskTable groups={[{ id: title, rows: rows.map(recipeDeskRow) }]} empty={EMPTY} />
     </section>
   );
 }

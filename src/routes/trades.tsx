@@ -2,24 +2,20 @@ import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { DayChips } from "@/components/day-chips";
 import { useDayScope } from "@/components/day-scope";
-import { EmptyState } from "@/components/empty-state";
+import { DeskTable } from "@/components/desk-table";
 import { LiveDot } from "@/components/live-dot";
 import { usePlantSource, useStamp } from "@/components/plant-context";
-import { axisDay, EMPTY, strategyMark } from "@/lib/lab/desk";
+import { axisDay, EMPTY, type DeskGroup } from "@/lib/lab/desk";
 import {
-  bookedClock,
   dayTapePnl,
+  fillDeskRow,
   fillsOnDay,
-  fmtStake,
   openFills,
   settledFills,
-  tapePnl,
-  tradeMark,
+  waitDeskRow,
   waitOpenChips,
-  type Fill,
-  type WaitOpen,
 } from "@/lib/lab/trades";
-import { cn, fmtU } from "@/lib/utils";
+import { fmtU } from "@/lib/utils";
 
 export const Route = createFileRoute("/trades")({ component: Trades });
 
@@ -37,6 +33,40 @@ export function Trades() {
   const firstId = open[0]?.id ?? settled[0]?.id ?? chips[0]?.id ?? "";
   const [picked, setPicked] = useState(firstId);
   const selected = picked || firstId;
+
+  const pick = (id: string) => () => setPicked(id);
+  const groups: DeskGroup[] = [
+    {
+      id: "open",
+      label: "Open",
+      hint: scope.lookingBack ? axisDay(scope.day) : "Still in flight",
+      rows: open.map((fill) => ({
+        ...fillDeskRow(fill, stamp.fuse_on),
+        selected: selected === fill.id,
+        onPick: pick(fill.id),
+      })),
+    },
+    {
+      id: "wait",
+      label: "Waiting for races",
+      hint: "Recipe · not a ticket",
+      rows: chips.map((chip) => ({
+        ...waitDeskRow(chip),
+        selected: selected === chip.id,
+        onPick: pick(chip.id),
+      })),
+    },
+    {
+      id: "settled",
+      label: scope.lookingBack ? `${axisDay(scope.day)} settled` : "Settled",
+      hint: "Won / lost in u",
+      rows: settled.map((fill) => ({
+        ...fillDeskRow(fill, stamp.fuse_on),
+        selected: selected === fill.id,
+        onPick: pick(fill.id),
+      })),
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -63,168 +93,7 @@ export function Trades() {
         </p>
       </div>
 
-      {open.length === 0 && chips.length === 0 && settled.length === 0 ? (
-        <EmptyState copy={EMPTY} />
-      ) : (
-        <ol className="divide-y divide-border border-y border-border">
-          {open.length ? <Divider label="Open" hint={scope.lookingBack ? axisDay(scope.day) : "Still in flight"} /> : null}
-          {open.map((fill) => (
-            <TradeRow
-              key={`${scope.day}:${fill.id}`}
-              fill={fill}
-              fuseOn={stamp.fuse_on}
-              open
-              selected={selected === fill.id}
-              onPick={() => setPicked(fill.id)}
-            />
-          ))}
-          {chips.length ? <Divider label="Waiting for races" hint="Recipe · not a ticket" /> : null}
-          {chips.map((chip) => (
-            <WaitRow
-              key={chip.id}
-              chip={chip}
-              selected={selected === chip.id}
-              onPick={() => setPicked(chip.id)}
-            />
-          ))}
-          {settled.length ? (
-            <Divider
-              label={scope.lookingBack ? `${axisDay(scope.day)} settled` : "Settled"}
-              hint="Won / lost in u"
-            />
-          ) : null}
-          {settled.map((fill) => (
-            <TradeRow
-              key={`${scope.day}:${fill.id}`}
-              fill={fill}
-              fuseOn={stamp.fuse_on}
-              selected={selected === fill.id}
-              onPick={() => setPicked(fill.id)}
-            />
-          ))}
-        </ol>
-      )}
+      <DeskTable groups={groups} empty={EMPTY} />
     </div>
   );
 }
-
-function Divider({ label, hint }: { label: string; hint: string }) {
-  return (
-    <li className="flex items-baseline justify-between gap-3 bg-bg py-2">
-      <p className="text-sm font-medium">{label}</p>
-      <p className="text-xs text-subtle">{hint}</p>
-    </li>
-  );
-}
-
-function TradeRow({
-  fill,
-  fuseOn,
-  open,
-  selected,
-  onPick,
-}: {
-  fill: Fill;
-  fuseOn: boolean;
-  open?: boolean;
-  selected: boolean;
-  onPick: () => void;
-}) {
-  const tape = tapePnl(fill, fuseOn);
-  const clock = bookedClock(fill.ts, fill.t);
-  const name = tradeMark(fill);
-  const result = open
-    ? "Still open."
-    : fill.result === "won"
-      ? "Won"
-      : fill.result === "lost"
-        ? "Lost"
-        : fill.result === "void"
-          ? "Void"
-          : "";
-  const paper = fill.book === "paper";
-
-  return (
-    <li>
-      <button
-        type="button"
-        onClick={onPick}
-        className={cn(
-          "flex w-full items-baseline gap-3 py-2.5 text-left transition-colors duration-150",
-          selected && "bg-elev",
-        )}
-      >
-        <span className="w-16 shrink-0 font-mono text-xs tabular-nums text-subtle">{clock}</span>
-        <span className="min-w-0 flex-1">
-          <span className="text-sm">{name}</span>
-          <span className="mt-0.5 block font-mono text-[10px] text-subtle">
-            {fill.side ? `${fill.side}` : ""}
-            {fill.stake != null ? `${fill.side ? " · " : ""}${fmtStake(fill.stake)}` : ""}
-            {paper ? " · paper, not income" : ""}
-            {open ? ` · ${result}` : ""}
-          </span>
-        </span>
-        <span className="shrink-0 text-right">
-          {open ? null : (
-            <span
-              className={cn(
-                "font-mono text-xs tabular-nums",
-                tape.pnl != null && tape.pnl > 0 && "text-up",
-                tape.pnl != null && tape.pnl < 0 && "text-bad",
-                (tape.pnl == null || tape.pnl === 0) && "text-muted",
-                paper && "text-muted",
-              )}
-            >
-              {tape.pnl == null ? EMPTY : fmtU(tape.pnl)}
-            </span>
-          )}
-          {!open && result ? (
-            <span
-              className={cn(
-                "mt-0.5 block font-mono text-[10px]",
-                fill.result === "won" && "text-up",
-                fill.result === "lost" && "text-bad",
-                fill.result === "void" && "text-subtle",
-              )}
-            >
-              {result}
-            </span>
-          ) : null}
-        </span>
-      </button>
-    </li>
-  );
-}
-
-function WaitRow({
-  chip,
-  selected,
-  onPick,
-}: {
-  chip: WaitOpen;
-  selected: boolean;
-  onPick: () => void;
-}) {
-  const name = strategyMark(chip.title, chip.id);
-  const why = /size_ok/i.test(chip.why ?? "") ? "No races of the right size yet." : chip.why;
-  return (
-    <li>
-      <button
-        type="button"
-        onClick={onPick}
-        className={cn(
-          "flex w-full items-baseline gap-3 py-2.5 text-left transition-colors duration-150",
-          selected && "bg-elev",
-        )}
-      >
-        <span className="w-16 shrink-0 font-mono text-xs text-subtle" />
-        <span className="min-w-0 flex-1">
-          <span className="text-sm">{name}</span>
-          <span className="mt-0.5 block text-xs text-subtle">Waiting for races. Not a ticket.</span>
-          {why ? <span className="mt-0.5 block text-xs text-subtle">{why}</span> : null}
-        </span>
-      </button>
-    </li>
-  );
-}
-

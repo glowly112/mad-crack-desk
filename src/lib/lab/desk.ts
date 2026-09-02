@@ -222,6 +222,57 @@ export function prettyTitle(title: string): string {
   return cellName(title);
 }
 
+/** One board: Time · Name · Side · Odds · Stake · Book · Result · P&L */
+export const DESK_HEADERS = ["Time", "Name", "Side", "Odds", "Stake", "Book", "Result", "P&L"] as const;
+
+export type DeskRow = {
+  id: string;
+  time: string;
+  name: string;
+  side: string;
+  odds: string;
+  stake: string;
+  book: string;
+  result: string;
+  pnl: number | null;
+  holdingId?: string;
+  selected?: boolean;
+  onPick?: () => void;
+};
+
+export type DeskGroup = {
+  id: string;
+  label?: string;
+  hint?: string;
+  rows: DeskRow[];
+};
+
+/** Result word on a recipe row. Sentences stay on the holding. */
+export function recipeResult(recipe: Recipe): string {
+  if (recipe.chip) return recipe.chip;
+  if (recipe.status === "MEASURING" || recipe.badge === "Research") return "Still being tested";
+  if (recipe.badge === "Parked" || (recipe.status === "KEEP" && recipe.badge !== "Solid")) return "Parked";
+  if (recipe.badge === "Solid") return "On tape today";
+  return EMPTY;
+}
+
+/** Recipe as a board row. Missing ticket facts stay Empty. Never freeze P&L as income. */
+export function recipeDeskRow(recipe: Recipe): DeskRow {
+  return {
+    id: recipe.id,
+    time: EMPTY,
+    name: strategyMark(recipe.title, recipe.id),
+    side: EMPTY,
+    odds: EMPTY,
+    stake: EMPTY,
+    book: EMPTY,
+    result: recipeResult(recipe),
+    pnl: null,
+    holdingId: recipe.id,
+  };
+}
+
+
 /** Last `size` days ending at `selected`. */
 export function dayWindow(days: readonly string[], selected: string, size = 8): string[] {
   const i = days.indexOf(selected);

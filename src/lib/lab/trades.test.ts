@@ -13,7 +13,11 @@ import {
   settledFills,
   tapePnl,
   tradeCounts,
-  tradeMark,
+  bookWord,
+  fillDeskRow,
+  fillResultWord,
+  tradeName,
+  waitDeskRow,
   waitOpenChips,
 } from "./trades.ts";
 
@@ -178,28 +182,40 @@ test("paper P&L is not income; live is 0 while fuse off", () => {
   assert.deepEqual(tapePnl(liveFill, true), { pnl: 4, caption: null });
 });
 
-test("trade mark is the strategy plus runner and odds", () => {
+test("trade name is the mark plus horse; odds live in Odds", () => {
   const opens = [3.2, 25, 10, 9.4].map((odds) => fillFromRow({ ...gbOpen, odds, pick_id: `${gbOpen.pick_id}:${odds}` }));
-  const marks = opens.map((f) => {
+  const rows = opens.map((f) => {
     assert.ok(f);
-    return tradeMark(f);
+    return fillDeskRow(f, false);
   });
-  assert.deepEqual(marks, [
-    "Britain · near-off · winner · Empty · 3.2",
-    "Britain · near-off · winner · Empty · 25",
-    "Britain · near-off · winner · Empty · 10",
-    "Britain · near-off · winner · Empty · 9.4",
-  ]);
-  assert.equal(new Set(marks).size, 4);
-  assert.ok(marks.every((m) => !m.includes("recipe that bets")));
-  assert.ok(marks.every((m) => !m.startsWith("H-")));
+  assert.ok(rows.every((r) => r.name === "Britain · near-off · winner"));
+  assert.deepEqual(rows.map((r) => r.odds), ["3.2", "25", "10", "9.4"]);
+  assert.ok(rows.every((r) => r.book === "paper"));
+  assert.ok(rows.every((r) => r.side === "BACK"));
+  assert.ok(rows.every((r) => r.stake === "1u"));
+  assert.ok(rows.every((r) => r.result === "Open"));
+  assert.ok(rows.every((r) => r.pnl == null));
+  assert.ok(rows.every((r) => !`${r.name} ${r.book} ${r.result}`.includes("not income")));
+  assert.equal(new Set(rows.map((r) => r.odds)).size, 4);
   const named = fillFromRow({ ...gbOpen, horse: "Desert Crown", odds: 3.2 });
   assert.ok(named);
-  assert.equal(named.horse, "Desert Crown");
-  assert.equal(tradeMark(named), "Britain · near-off · winner · Desert Crown · 3.2");
+  assert.equal(tradeName(named), "Britain · near-off · winner · Desert Crown");
+  assert.equal(fillDeskRow(named, false).odds, "3.2");
   const blank = fillFromRow({ ...gbOpen, horse: "H-fast-gb-nearoff-win-83959Z", runner: "67117187" });
   assert.equal(blank?.horse, null);
-  assert.match(tradeMark(blank!), /Empty · 3\.2/);
+  assert.equal(tradeName(blank!), "Britain · near-off · winner");
+  assert.equal(bookWord("production"), "paper");
+  assert.equal(bookWord("live"), "live");
+  assert.equal(fillResultWord(fillFromRow(auWon)!), "Won");
+  const wait = waitDeskRow({
+    id: "H-20260828T020000Z-nz-morning-win-one-pick-band-2-5-4-49",
+    title: "NZ morning WIN · one-pick 2.5–4.49",
+    why: "no size_ok candidates",
+  });
+  assert.equal(wait.name, "New Zealand · morning · winner · one-pick 2.5–4.49");
+  assert.equal(wait.odds, "Empty");
+  assert.equal(wait.book, "Empty");
+  assert.equal(wait.result, "Waiting for races");
 });
 
 test("booked clock is a real time, never Empty", () => {

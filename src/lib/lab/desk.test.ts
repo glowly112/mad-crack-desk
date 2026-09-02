@@ -5,6 +5,9 @@ import {
   SOLID_EMPTY,
   axisDay,
   cellName,
+  DESK_HEADERS,
+  recipeDeskRow,
+  recipeResult,
   strategyMark,
   chartWindow,
   dailyDomain,
@@ -87,6 +90,21 @@ test("strategy mark is country · window · market · axis", () => {
   assert.equal(strategyMark("ZA|morning|WIN"), "South Africa · morning · winner");
   assert.ok(!strategyMark("H-fast-gb-nearoff-win-83959Z").includes("H-"));
   assert.ok(!strategyMark("GB near-off WIN").includes("WIN"));
+});
+
+test("recipe board row uses the same columns; missing facts are Empty", () => {
+  assert.deepEqual([...DESK_HEADERS], ["Time", "Name", "Side", "Odds", "Stake", "Book", "Result", "P&L"]);
+  const solid = recipeDeskRow(STAMP.recipes[0]);
+  assert.equal(solid.name, "Britain · near-off · winner");
+  assert.equal(solid.time, "Empty");
+  assert.equal(solid.odds, "Empty");
+  assert.equal(solid.book, "Empty");
+  assert.equal(solid.pnl, null);
+  assert.equal(solid.result, "Waiting for races");
+  const parked = STAMP.recipes.find((r) => r.badge === "Parked");
+  assert.ok(parked);
+  assert.equal(recipeResult(parked), "Parked");
+  assert.equal(recipeDeskRow(parked).name, "New Zealand · morning · winner · one-pick 2.5–4.49");
 });
 
 test("daily window and domain keep Empty days off the scale", () => {

@@ -1,6 +1,6 @@
 /** Display mapping for the clerk book. Never invents tickets or sums P&L. */
 
-import { EMPTY, cellName, strategyMark } from "./desk.ts";
+import { EMPTY, cellName, strategyMark, type DeskRow } from "./desk.ts";
 
 export type FillBook = "paper" | "production" | "live";
 export type FillResult = "won" | "lost" | "void" | "waiting";
@@ -162,11 +162,60 @@ export function fillFromRow(raw: unknown): Fill | null {
   };
 }
 
-/** Trade line: strategy mark plus runner and odds. Empty horse stays Empty. */
-export function tradeMark(fill: Fill): string {
+/** Name on the board: strategy mark, plus horse if the stamp names one. Odds stay in Odds. */
+export function tradeName(fill: Fill): string {
   const mark = strategyMark(fill.recipe, fill.recipeId);
-  const horse = fill.horse && fill.horse !== EMPTY ? fill.horse : EMPTY;
-  return `${mark} · ${horse} · ${fmtOdds(fill.odds)}`;
+  if (fill.horse && fill.horse !== EMPTY) return `${mark} · ${fill.horse}`;
+  return mark;
+}
+
+/** @deprecated odds live in the Odds column — use tradeName */
+export function tradeMark(fill: Fill): string {
+  return tradeName(fill);
+}
+
+/** Book column is paper or live. Production is still paper. */
+export function bookWord(book: FillBook): "paper" | "live" {
+  return book === "live" ? "live" : "paper";
+}
+
+export function fillResultWord(fill: Fill): string {
+  if (fill.result === "waiting") return "Open";
+  if (fill.result === "won") return "Won";
+  if (fill.result === "lost") return "Lost";
+  if (fill.result === "void") return "Void";
+  return EMPTY;
+}
+
+/** Ticket as a board row. Open P&L is Empty. */
+export function fillDeskRow(fill: Fill, fuseOn: boolean): DeskRow {
+  const tape = tapePnl(fill, fuseOn);
+  return {
+    id: fill.id,
+    time: bookedClock(fill.ts, fill.t) || EMPTY,
+    name: tradeName(fill),
+    side: fill.side && fill.side !== EMPTY ? fill.side : EMPTY,
+    odds: fmtOdds(fill.odds),
+    stake: fmtStake(fill.stake),
+    book: bookWord(fill.book),
+    result: fillResultWord(fill),
+    pnl: tape.pnl,
+  };
+}
+
+/** Recipe armed with no fill. Not a ticket. */
+export function waitDeskRow(chip: WaitOpen): DeskRow {
+  return {
+    id: chip.id,
+    time: EMPTY,
+    name: strategyMark(chip.title, chip.id),
+    side: EMPTY,
+    odds: EMPTY,
+    stake: EMPTY,
+    book: EMPTY,
+    result: "Waiting for races",
+    pnl: null,
+  };
 }
 
 export function parseFills(raw: unknown): Fill[] {
