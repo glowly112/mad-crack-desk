@@ -58,19 +58,26 @@ export function officeCountries(
   recipes: readonly Recipe[],
 ): CountryRow[] {
   const pack = recipePack(recipes);
-  return coverage.map((c) => {
-    const parkedRecipes = pack.keeps.filter((r) => r.region === c.region).length;
-    const testingRecipes = pack.proving.filter((r) => r.region === c.region).length;
-    const parked = Math.max(c.keep, parkedRecipes);
-    const testing = Math.max(c.measuring, testingRecipes);
-    return {
-      region: c.region,
-      name: countryName(c.region),
+  const seen = new Set<string>();
+  const rows: CountryRow[] = [];
+  const push = (region: string, keep: number, measuring: number) => {
+    if (seen.has(region)) return;
+    seen.add(region);
+    const parkedRecipes = pack.keeps.filter((r) => r.region === region).length;
+    const testingRecipes = pack.proving.filter((r) => r.region === region).length;
+    const parked = Math.max(keep, parkedRecipes);
+    const testing = Math.max(measuring, testingRecipes);
+    rows.push({
+      region,
+      name: countryName(region),
       parked,
       testing,
       line: countrySentence(parked, testing),
-    };
-  });
+    });
+  };
+  for (const c of coverage) push(c.region, c.keep, c.measuring);
+  for (const r of [...pack.keeps, ...pack.proving]) push(r.region, 0, 0);
+  return rows;
 }
 
 /** Status in English. Drops holdout_n_too_small and plant tokens. */
@@ -359,6 +366,7 @@ export function staffLine(now: string): string {
   s = s.replace(/closed=(\d+)/gi, "$1 out of window");
   s = s.replace(/certified=(\d+)/gi, "$1 solid");
   s = s.replace(/scaling=(\d+)/gi, "$1 live");
+  s = s.replace(/passed=(\d+)/gi, "");
   s = s.replace(/KEEP=(\d+)/gi, "$1 keeps");
   s = s.replace(/keep=(\d+)/gi, "$1 parked");
   s = s.replace(/measuring=(\d+)/gi, "$1 still being tested");
@@ -368,18 +376,23 @@ export function staffLine(now: string): string {
   s = s.replace(/PAPER_ONLY/gi, "Paper only");
   s = s.replace(/fuse off/gi, "Fuse off");
   s = s.replace(/invent on/gi, "Invent is on");
+  s = s.replace(/invent\s*\([^)]*\)/gi, "");
   s = s.replace(/\bdensify\b/gi, "");
   s = s.replace(/hunter\s+(\w+)/gi, (_, n) => hunterName(String(n).toLowerCase()));
-  s = s.replace(/not LIVE_CANDIDATE[^.·—-]*/gi, "cannot go live this tick");
+  s = s.replace(/not LIVE_CANDIDATE this tick/gi, "cannot go live this tick");
+  s = s.replace(/not LIVE_CANDIDATE[^.·—]*/gi, "cannot go live this tick");
   s = s.replace(/scoreboard KEEP\(s\)/gi, "A keep");
-  s = s.replace(/KEEP on hold\s*\(n=(\d+)\)/gi, "A keep is on hold");
+  s = s.replace(/KEEP on hold\s*\(n=\d+\)/gi, "A keep is on hold");
   s = s.replace(/KEEP on hold/gi, "A keep is on hold");
   s = s.replace(/exotic green/gi, "exotic freezes are fine");
   s = s.replace(/\btick\s*·/gi, "");
-  s = s.replace(/\s*[·—-]\s*/g, ". ");
+  s = s.replace(/\s*[·—]\s*/g, ". ");
+  s = s.replace(/\b(n_applied|n_schools|keep_hold_paper|LIVE_CANDIDATE|holdout_n_too_small)\b/gi, "");
+  s = s.replace(/\b\w+=\d+(?:\.\d+)?%?/g, "");
+  s = s.replace(/\(\s*\)/g, "");
   s = s.replace(/\s{2,}/g, " ");
   s = s.replace(/^[.\s]+|[.\s]+$/g, "");
-  s = s.replace(/\b(n_applied|n_schools|keep_hold_paper|LIVE_CANDIDATE|holdout_n_too_small)\b/gi, "");
+  s = s.replace(/(A keep is on hold\.\s*){2,}/gi, "A keep is on hold. ");
   s = s.replace(/\s{2,}/g, " ").replace(/^[.\s]+|[.\s]+$/g, "").trim();
   return s || EMPTY;
 }

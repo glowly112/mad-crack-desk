@@ -25,10 +25,12 @@ test("Office countries speak English and pick up a parked NZ the coverage missed
   const rows = officeCountries(STAMP.coverage, STAMP.recipes);
   const au = rows.find((r) => r.region === "AU");
   const nz = rows.find((r) => r.region === "NZ");
+  const us = rows.find((r) => r.region === "US");
   const hk = rows.find((r) => r.region === "HK");
   assert.equal(au?.name, "Australia");
   assert.equal(au?.line, "1 parked, 5 still being tested");
   assert.equal(nz?.line, "1 parked, 2 still being tested");
+  assert.equal(us?.line, "1 still being tested");
   assert.equal(hk?.line, EMPTY);
 });
 
@@ -86,4 +88,13 @@ test("Staff watching lines drop plant tokens", () => {
   assert.match(staffLine("next hole: ZA|morning|WIN"), /South Africa morning WIN/);
   assert.ok(!staffLine(STAMP.seats.find((s) => s.id === "clerk")?.now ?? "").includes("keep_hold_paper"));
   assert.ok(!staffLine("invent on · densify · hunter Geo · proving=21").includes("densify"));
+  const liveClerk =
+    "keep_hold_paper: KEEP on hold (n=1) — scoreboard KEEP(s) not LIVE_CANDIDATE this tick, first: H-20260828T020000Z-nz-morning-win-one-pick-band-2-5-4-49";
+  const clerk = staffLine(liveClerk);
+  assert.match(clerk, /A keep is on hold/);
+  assert.match(clerk, /one-pick/);
+  assert.equal((clerk.match(/A keep is on hold/g) ?? []).length, 1);
+  const bauron = staffLine("invent on · invent (densify) · proving=21 · passed=4188");
+  assert.ok(!bauron.includes("invent ()"));
+  assert.ok(!bauron.includes("passed="));
 });
