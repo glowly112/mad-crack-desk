@@ -69,10 +69,8 @@ export function CountryPack() {
         <EmptyState copy={EMPTY} />
       ) : (
         <div>
-          <div className="overflow-x-auto">
-            <div className="min-w-[36rem]" role="img" aria-label={glance}>
-              <SquareGrid holes={holes} markets={markets} />
-            </div>
+          <div role="img" aria-label={glance}>
+            <SquareGrid holes={holes} markets={markets} />
           </div>
           <p className="mt-2 text-sm text-muted">
             {emptyN} Empty of {holes.length} holes. WIN beside PLACE.
@@ -92,20 +90,16 @@ function SquareGrid({ holes, markets }: { holes: readonly HoleCell[]; markets: r
   return (
     <div className="border border-border bg-bg">
       <div
-        className="grid items-end gap-px px-2 pt-2"
-        style={{ gridTemplateColumns: `4.5rem repeat(${SQUARE_WINDOWS.length}, minmax(4.5rem, 1fr))` }}
+        className="grid grid-cols-[3.4rem_repeat(4,minmax(0,1fr))] items-end gap-px px-1.5 pt-2 sm:grid-cols-[5.75rem_repeat(4,minmax(0,1fr))] sm:px-2"
       >
         <span />
         {SQUARE_WINDOWS.map((w) => (
-          <p key={w} className="text-center font-mono text-[10px] text-subtle">
+          <p key={w} className="text-center font-mono text-[9px] leading-tight text-subtle sm:text-[10px]">
             {SQUARE_WINDOW_LABEL[w]}
           </p>
         ))}
       </div>
-      <div
-        className="grid gap-px px-2 pb-1"
-        style={{ gridTemplateColumns: `4.5rem repeat(${SQUARE_WINDOWS.length}, minmax(4.5rem, 1fr))` }}
-      >
+      <div className="grid grid-cols-[3.4rem_repeat(4,minmax(0,1fr))] gap-px px-1.5 pb-1 sm:grid-cols-[5.75rem_repeat(4,minmax(0,1fr))] sm:px-2">
         <span />
         {SQUARE_WINDOWS.map((w) => (
           <div key={`${w}-mkt`} className="flex justify-center gap-1">
@@ -122,10 +116,11 @@ function SquareGrid({ holes, markets }: { holes: readonly HoleCell[]; markets: r
         return (
           <div
             key={region}
-            className="grid items-center gap-px border-t border-border px-2 py-1.5"
-            style={{ gridTemplateColumns: `4.5rem repeat(${SQUARE_WINDOWS.length}, minmax(4.5rem, 1fr))` }}
+            className="grid grid-cols-[3.4rem_repeat(4,minmax(0,1fr))] items-center gap-px border-t border-border px-1.5 py-1.5 sm:grid-cols-[5.75rem_repeat(4,minmax(0,1fr))] sm:px-2"
           >
-            <p className="truncate text-xs">{name}</p>
+            <p className="truncate text-xs" title={name}>
+              {name}
+            </p>
             {SQUARE_WINDOWS.map((window) => (
               <div key={`${region}-${window}`} className="flex justify-center gap-1">
                 {markets.map((market) => {
