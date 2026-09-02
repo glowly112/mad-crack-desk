@@ -25,6 +25,8 @@
   --radius-xl: 1.5rem;
 
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --move: 0.2s;
+  --move-bar: 0.28s;
 }
 
 @layer base {
@@ -38,6 +40,49 @@
     -moz-osx-font-smoothing: grayscale;
     background: var(--color-bg);
     color: var(--color-fg);
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--color-fg) 22%, transparent) var(--color-elev);
+  }
+
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  html::-webkit-scrollbar-track,
+  body::-webkit-scrollbar-track {
+    background: var(--color-bg);
+  }
+
+  html::-webkit-scrollbar-thumb,
+  body::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--color-fg) 22%, var(--color-elev));
+    border-radius: 999px;
+  }
+
+  html::-webkit-scrollbar-thumb:hover,
+  body::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in oklab, var(--color-fg) 34%, var(--color-elev));
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--color-fg) 22%, transparent) var(--color-elev);
+  }
+
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: var(--color-bg);
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--color-fg) 22%, var(--color-elev));
+    border-radius: 999px;
   }
 
   body {
@@ -98,16 +143,95 @@
     background: linear-gradient(to top, var(--color-bg), transparent);
   }
 }
+.desk-scroll-wrap {
+  position: relative;
+}
+
+.desk-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.desk-scroll::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.desk-scroll-x {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.desk-scroll-y {
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.desk-track {
+  pointer-events: none;
+  position: absolute;
+  z-index: 1;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--color-fg) 6%, var(--color-elev));
+}
+
+.desk-scroll-wrap .desk-track {
+  inset-inline: 0.25rem;
+  bottom: 0;
+  height: 3px;
+}
+
+.desk-scroll-wrap-y .desk-track {
+  inset-block: 0.25rem;
+  inset-inline: auto 0;
+  width: 3px;
+  height: auto;
+}
+
+.desk-thumb {
+  height: 100%;
+  width: 100%;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--color-fg) 28%, var(--color-elev));
+  opacity: 0.4;
+  transition:
+    opacity var(--move) var(--ease-out-soft),
+    transform var(--move) var(--ease-out-soft);
+}
+
+.desk-scroll-wrap:hover .desk-thumb,
+.desk-scroll-wrap[data-lit] .desk-thumb {
+  opacity: 0.85;
+}
+
 .spark-draw {
   stroke-dasharray: 420;
   stroke-dashoffset: 420;
   animation: spark-in 0.45s var(--ease-out-soft) forwards;
 }
 .log-in {
-  animation: log-in 0.22s var(--ease-out-soft) both;
+  animation: log-in var(--move) var(--ease-out-soft) both;
 }
 .route-in {
-  animation: route-in 0.22s var(--ease-out-soft) both;
+  animation: route-in var(--move) var(--ease-out-soft) both;
+}
+.chip-pick {
+  transition:
+    background-color var(--move) var(--ease-out-soft),
+    color var(--move) var(--ease-out-soft);
+}
+.chip-on {
+  animation: chip-on var(--move) var(--ease-out-soft);
+}
+.bar-in {
+  animation: bar-in var(--move-bar) var(--ease-out-soft) both;
+}
+.stamp-tick {
+  animation: stamp-tick var(--move) var(--ease-out-soft);
+}
+.result-in {
+  animation: result-in var(--move) var(--ease-out-soft) both;
 }
 
 @keyframes spark-in {
@@ -135,6 +259,44 @@
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+@keyframes chip-on {
+  from {
+    transform: scale(0.96);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes bar-in {
+  from {
+    transform: scaleY(0.08);
+    opacity: 0.35;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@keyframes stamp-tick {
+  from {
+    opacity: 0.4;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes result-in {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 1;
   }
 }
 
@@ -194,6 +356,10 @@ html[data-size="l"] {
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+
+  html {
+    scroll-behavior: auto;
   }
 }
 

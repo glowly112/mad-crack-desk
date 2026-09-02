@@ -1,4 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
+import { DeskScroll } from "@/components/desk-scroll";
 import { LabMark, MarkSettings, NAV_MARKS } from "@/components/marks";
 import { LiveDot } from "@/components/live-dot";
 import { usePlantSource, useStamp } from "@/components/plant-context";
@@ -33,7 +34,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <LabMark className="size-6 text-fg" />
           <div>
             <p className="text-sm font-medium tracking-tight">Mad Crack Lab</p>
-            <p className="font-mono text-xs text-subtle">
+            <p key={stamp.generated} className="stamp-tick font-mono text-xs text-subtle">
               {plant.source === "oracle"
                 ? `${stamp.day} · live oracle`
                 : plant.source === "freeze"
@@ -113,11 +114,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-bg pb-[env(safe-area-inset-bottom)] md:hidden">
-        <div className="flex overflow-x-auto">
-          {NAV.map((item) => (
-            <NavLink key={item.to} {...item} active={pathActive(pathname, item.to)} compact />
-          ))}
-        </div>
+        <DeskScroll axis="x">
+          <div className="flex w-max">
+            {NAV.map((item) => (
+              <NavLink key={item.to} {...item} active={pathActive(pathname, item.to)} compact />
+            ))}
+          </div>
+        </DeskScroll>
       </nav>
     </div>
   );

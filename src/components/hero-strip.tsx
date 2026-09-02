@@ -27,8 +27,10 @@ export function HeroStrip() {
   return (
     <section className="space-y-4">
       <p className="inline-flex items-center gap-2 font-mono text-xs text-subtle">
-        <LiveDot tone={live ? "ok" : "warn"} />
-        {live ? `${stamp.generated} · live oracle` : plant.detail}
+        <LiveDot tone={live ? "ok" : "warn"} tick={stamp.generated} />
+        <span key={stamp.generated} className="stamp-tick">
+          {live ? `${stamp.generated} · live oracle` : plant.detail}
+        </span>
       </p>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
@@ -36,7 +38,10 @@ export function HeroStrip() {
           <p className="text-sm text-muted">
             {scope.lookingBack ? `${axisDay(scope.day)} production` : "Today's production"}
           </p>
-          <p className={cn("mt-1 font-mono text-5xl leading-none tracking-tight md:text-6xl", tone)}>
+          <p
+            key={scope.day}
+            className={cn("log-in mt-1 font-mono text-5xl leading-none tracking-tight md:text-6xl", tone)}
+          >
             {fmtScore(u)}
           </p>
         </div>
@@ -160,6 +165,12 @@ function DailyBars() {
             >
               {v != null ? (
                 <rect
+                  className="bar-in"
+                  style={{
+                    transformBox: "fill-box",
+                    transformOrigin: v >= 0 ? "center bottom" : "center top",
+                    animationDelay: `${Math.min(i, 10) * 22}ms`,
+                  }}
                   x={cx - barW / 2}
                   y={Math.min(yAt(v), y0)}
                   width={barW}

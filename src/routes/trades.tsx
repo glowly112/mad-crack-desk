@@ -50,8 +50,10 @@ export function Trades() {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="inline-flex items-center gap-2 font-mono text-xs text-subtle">
-          <LiveDot tone={live ? "ok" : "warn"} />
-          {live ? `${stamp.generated} · live oracle` : plant.detail}
+          <LiveDot tone={live ? "ok" : "warn"} tick={stamp.generated} />
+          <span key={stamp.generated} className="stamp-tick">
+            {live ? `${stamp.generated} · live oracle` : plant.detail}
+          </span>
         </p>
         <p className="font-mono text-xs text-subtle">
           paper {tape.paper == null ? "Empty" : fmtU(tape.paper)} · production{" "}
@@ -66,6 +68,7 @@ export function Trades() {
         count={open.length}
         fills={open}
         fuseOn={stamp.fuse_on}
+        wave={scope.day}
         open
       />
       <WaitOpenPack chips={chips} />
@@ -75,6 +78,7 @@ export function Trades() {
         count={settled.length}
         fills={settled}
         fuseOn={stamp.fuse_on}
+        wave={scope.day}
       />
     </div>
   );
@@ -86,6 +90,7 @@ function Pack({
   count,
   fills,
   fuseOn,
+  wave,
   open,
 }: {
   label: string;
@@ -93,6 +98,7 @@ function Pack({
   count: number;
   fills: readonly Fill[];
   fuseOn: boolean;
+  wave: string;
   open?: boolean;
 }) {
   return (
@@ -104,7 +110,11 @@ function Pack({
         </div>
         <p className="text-xs text-subtle">{hint}</p>
       </header>
-      {fills.length === 0 ? <EmptyState copy={EMPTY} /> : <TradeTape fills={fills} fuseOn={fuseOn} open={open} />}
+      {fills.length === 0 ? (
+        <EmptyState copy={EMPTY} />
+      ) : (
+        <TradeTape fills={fills} fuseOn={fuseOn} open={open} wave={wave} />
+      )}
     </section>
   );
 }
@@ -124,7 +134,7 @@ function WaitOpenPack({ chips }: { chips: readonly WaitOpen[] }) {
         {chips.map((chip) => (
           <li
             key={chip.id}
-            className="flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-sm border border-border bg-elev px-3 py-2"
+            className="log-in flex flex-wrap items-baseline gap-x-2 gap-y-1 rounded-sm border border-border bg-elev px-3 py-2"
           >
             <p className="text-sm text-fg">{chip.title}</p>
             <span className="rounded-sm border border-border px-1.5 py-0.5 font-mono text-[10px] text-warn">
@@ -151,19 +161,25 @@ function BookMark({ book }: { book: FillBook }) {
 function TradeTape({
   fills,
   fuseOn,
+  wave,
   open,
 }: {
   fills: readonly Fill[];
   fuseOn: boolean;
+  wave: string;
   open?: boolean;
 }) {
   return (
     <>
       <ol className="space-y-3 sm:hidden">
-        {fills.map((fill) => {
+        {fills.map((fill, i) => {
           const tape = tapePnl(fill, fuseOn);
           return (
-            <li key={fill.id} className="log-in font-mono text-xs">
+            <li
+              key={`${wave}:${fill.id}`}
+              className="log-in font-mono text-xs"
+              style={{ animationDelay: `${Math.min(i, 8) * 28}ms` }}
+            >
               <div className="flex items-baseline justify-between gap-3">
                 <span className="tabular-nums text-subtle">{fill.t}</span>
                 <span className={cn("tabular-nums", pnlTone(fill.book, tape.pnl, open))}>
@@ -181,7 +197,7 @@ function TradeTape({
                 {fill.liquidity != null ? (
                   <span className="text-subtle">liq {fmtStake(fill.liquidity)}</span>
                 ) : null}
-                <span className={cn("px-1.5", resultTone(fill.result))}>
+                <span className={cn("px-1.5", resultTone(fill.result), !open && "result-in")}>
                   {open ? fill.flight ?? "waiting result" : fill.result}
                 </span>
                 {tape.caption && !open ? <span className="text-subtle">{tape.caption}</span> : null}
@@ -205,10 +221,14 @@ function TradeTape({
           </tr>
         </thead>
         <tbody>
-          {fills.map((fill) => {
+          {fills.map((fill, i) => {
             const tape = tapePnl(fill, fuseOn);
             return (
-              <tr key={fill.id} className="log-in font-mono text-xs">
+              <tr
+                key={`${wave}:${fill.id}`}
+                className="log-in font-mono text-xs"
+                style={{ animationDelay: `${Math.min(i, 8) * 28}ms` }}
+              >
                 <td className="py-1.5 pr-3 tabular-nums text-subtle">{fill.t}</td>
                 <td className="py-1.5 pr-3 text-fg">{fill.recipe}</td>
                 <td className="py-1.5 pr-3 text-muted">{fill.side ?? "Empty"}</td>
@@ -222,7 +242,7 @@ function TradeTape({
                     {fill.liquidity == null ? "Empty" : fmtStake(fill.liquidity)}
                   </td>
                 ) : null}
-                <td className={cn("py-1.5 pr-3", resultTone(fill.result))}>
+                <td className={cn("py-1.5 pr-3", resultTone(fill.result), !open && "result-in")}>
                   {open ? fill.flight ?? "waiting result" : fill.result}
                 </td>
                 <td className="py-1.5 text-right">

@@ -17,10 +17,14 @@ export function FloorLog() {
         <EmptyState copy={EMPTY} />
       ) : (
         <ol className="min-h-0 flex-1 space-y-2 overflow-visible font-mono text-xs lg:overflow-hidden">
-          {hops.map((row) => {
+          {hops.map((row, i) => {
             const Icon = row.to === "Dead" ? MarkIssues : MarkKeep;
             return (
-              <li key={row.at + row.recipe} className="log-in flex items-start gap-2">
+              <li
+                key={row.at + row.recipe}
+                className="log-in flex items-start gap-2"
+                style={{ animationDelay: `${Math.min(i, 8) * 28}ms` }}
+              >
                 <Icon className="mt-0.5 size-3.5 shrink-0 text-subtle" />
                 <span className="w-10 shrink-0 text-subtle">{row.at}</span>
                 <span className="min-w-0 text-muted">
