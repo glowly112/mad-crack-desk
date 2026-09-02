@@ -67,7 +67,7 @@ function statusOf(cell: Record<string, unknown>): Recipe["status"] {
 function regionOf(title: string): Recipe["region"] {
   const t = title.toUpperCase();
   for (const r of REGIONS) {
-    if (t.includes(r)) return r;
+    if (new RegExp(`\\b${r}\\b`).test(t)) return r;
   }
   return "AU";
 }

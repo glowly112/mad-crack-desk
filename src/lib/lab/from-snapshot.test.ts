@@ -59,6 +59,24 @@ test("Linear snapshot overlays KEEP/measuring and never puts KEEP paper on the h
   assert.equal(live.recipes[1]?.region, "GB");
 });
 
+test("small field does not become Ireland", () => {
+  const live = applySnapshot(
+    {
+      date: "2026-09-02",
+      cells: [
+        {
+          id: "H-20260831T141500Z-us-inplay-place-smallfield",
+          title: "US in-play PLACE · one-pick small field",
+          status: "MEASURING",
+          n: 18,
+        },
+      ],
+    },
+    base(),
+  );
+  assert.equal(live.recipes[0]?.region, "US");
+});
+
 test("firm scoreboard by_status and cells overlay without inventing solids", () => {
   const live = applySnapshot(
     {
