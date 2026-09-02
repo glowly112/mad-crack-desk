@@ -1,7 +1,7 @@
 /** Display English for Office, Pipe, Health, Issues. Never invents counts. */
 
 import { EMPTY, cellName, recipePack } from "./desk.ts";
-import type { Recipe } from "./stamp.ts";
+import type { Move, Recipe, Seat } from "./stamp.ts";
 
 const REGIONS = ["AU", "GB", "IE", "US", "NZ", "ZA", "HK", "FR"] as const;
 
@@ -1056,6 +1056,162 @@ export function issueBoard(iss: { id: string; owner: string; title: string; deta
     problem: known?.problem ?? iss.title,
     next: known?.next ?? iss.fix,
   };
+}
+
+export type StaffWatchStamp = {
+  recipes: readonly Recipe[];
+  solids?: readonly Recipe[];
+  moves?: readonly Move[];
+  office?: { invent?: boolean; inventWhy?: string };
+  hunters?: readonly { id: string; note: string }[];
+  issues?: readonly { id: string; title?: string; owner?: string }[];
+};
+
+function bookLabel(raw: string, recipes: readonly Recipe[] = []): string {
+  const id = /H-[A-Za-z0-9-]+/.exec(raw)?.[0];
+  if (id) {
+    const hit = recipes.find((r) => r.id === id);
+    if (hit?.title) return hit.title;
+    const named = cellName(id);
+    if (named && named !== EMPTY) return named;
+  }
+  const titled = recipes.find((r) => r.title === raw || r.id === raw);
+  if (titled?.title) return titled.title;
+  const cell = cellName(raw);
+  if (cell && cell !== EMPTY) return cell;
+  const hole = holeName(raw);
+  return hole !== EMPTY ? hole : "";
+}
+
+function firstRecipeId(text: string): string {
+  return /(?:first:\s*)?(H-[A-Za-z0-9-]+)/i.exec(text)?.[1] ?? "";
+}
+
+function staffBookFacts(seatNow: string, stamp: StaffWatchStamp) {
+  const blob = [seatNow, stamp.office?.inventWhy ?? "", ...(stamp.hunters ?? []).map((h) => h.note)].join(" ");
+  const recipes = stamp.recipes ?? [];
+  const solids = (stamp.solids?.length ? stamp.solids : recipes.filter((r) => r.badge === "Solid")) ?? [];
+  const tape = solids[0] ?? recipes.find((r) => r.badge === "Solid") ?? null;
+  const parked = recipes.filter((r) => r.badge === "Parked" || (r.status === "KEEP" && r.badge !== "Solid"));
+  const trial = recipes.find((r) => r.status === "MEASURING") ?? null;
+  const hydeTrials = recipes.filter((r) => /hyde|cousin/i.test(`${r.id} ${r.title} ${r.why}`));
+  for (const id of blob.match(/H-hyde-[A-Za-z0-9-]+/gi) ?? []) {
+    if (!hydeTrials.some((r) => r.id === id)) {
+      hydeTrials.push({
+        id,
+        title: bookLabel(id, recipes) || "Hyde cousin",
+        region: "GB",
+        status: "MEASURING",
+        badge: "Research",
+        chip: null,
+        n: 0,
+        roi: 0,
+        freezePnl: 0,
+        why: "Hyde cousin, not the same picks",
+      });
+    }
+  }
+  const fillAdjKills = (stamp.moves ?? []).filter((m) => /fill-adj/i.test(m.why) && /dead/i.test(m.to));
+  const inventCell =
+    inventHole(stamp.office?.inventWhy ?? "") !== EMPTY
+      ? inventHole(stamp.office?.inventWhy ?? "")
+      : inventHole(seatNow) !== EMPTY
+        ? inventHole(seatNow)
+        : (() => {
+            const q = /(?:next hole|queue)\s+([A-Za-z0-9_|-]+)/i.exec(blob);
+            return q ? holeName(q[1]) : EMPTY;
+          })();
+  const densify = /\bdensify\b/i.test(blob);
+  const holdId = firstRecipeId(seatNow);
+  const holdBook = holdId ? bookLabel(holdId, recipes) : "";
+  const tapeName = tape?.title ?? "";
+  return { recipes, tape, tapeName, parked, trial, hydeTrials, fillAdjKills, inventCell, densify, holdBook };
+}
+
+function sentences(...parts: Array<string | false | null | undefined>): string {
+  const bits = parts.filter((p): p is string => typeof p === "string" && p.trim().length > 0).map((p) => p.trim());
+  return bits.length ? bits.join(" ") : EMPTY;
+}
+
+/** Each seat watches that the pipeline is the same bets. Empty if nothing. */
+export function seatWatching(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchStamp): string {
+  const now = seat.now?.trim() ?? "";
+  const f = staffBookFacts(now, stamp);
+  switch (seat.id) {
+    case "bauron": {
+      const cell = f.inventCell !== EMPTY ? f.inventCell : "";
+      if (!cell && !f.densify && !stamp.office?.invent) return now ? staffLine(now) : EMPTY;
+      return sentences(
+        cell ? `Inventing ${cell} — this cell’s bets.` : stamp.office?.invent ? "Invent is on." : "",
+        f.densify
+          ? `A densify cousin is a new book${f.tapeName ? `, not ${f.tapeName}` : ""}.`
+          : "",
+      );
+    }
+    case "igor": {
+      if (!f.tapeName) return EMPTY;
+      return `Scoring those same freeze bets as ${f.tapeName}.`;
+    }
+    case "hyde": {
+      const cousin = f.hydeTrials[0];
+      if (cousin && f.tapeName) {
+        return `The Hyde trial (${cousin.title}) is a SHARPEN cousin, not the ${f.tapeName} KEEP.`;
+      }
+      if (cousin) return `${cousin.title} is a SHARPEN cousin, not the KEEP.`;
+      if (f.tapeName) return `${f.tapeName} KEEP is the original. No Hyde SHARPEN cousin named.`;
+      return EMPTY;
+    }
+    case "clerk": {
+      if (!f.tapeName && !f.holdBook && f.fillAdjKills.length === 0) return EMPTY;
+      const stages = f.tape ? bookStages(f.tape) : [];
+      const same = stages.length > 0 && stages.filter((s) => s.key !== "live").every((s) => s.kind !== "split");
+      const live = stages.find((s) => s.key === "live");
+      const fill = f.fillAdjKills[0];
+      const fillName = fill ? bookLabel(fill.recipe, f.recipes) : "";
+      return sentences(
+        f.tapeName
+          ? same
+            ? `${f.tapeName} is the same pick set through paper, holdout, and production.`
+            : `${f.tapeName} is a split — not the same picks through the book.`
+          : "",
+        live?.kind === "empty" ? "Live Empty." : "",
+        f.holdBook && f.holdBook !== f.tapeName ? `${f.holdBook} is on hold. Not the tape.` : "",
+        fillName ? `Holdout fill-adj killed ${fillName} — not this book.` : "",
+        "A Hyde cousin is not it.",
+      );
+    }
+    case "foreman": {
+      if (!f.tapeName && !f.trial && !f.parked[0]) return EMPTY;
+      const other =
+        f.trial && f.trial.title !== f.tapeName
+          ? `${f.trial.title} is on trial, not the tape.`
+          : f.parked[0] && f.parked[0].title !== f.tapeName
+            ? `${f.parked[0].title} is parked, not the tape.`
+            : "";
+      return sentences(
+        f.tapeName ? `Tape KEEP is ${f.tapeName}.` : "",
+        other,
+        "Do not treat a Hyde cousin as a restore.",
+      );
+    }
+    case "virchow": {
+      const kill = f.fillAdjKills[0] ?? (stamp.moves ?? []).find((m) => /dead/i.test(m.to));
+      if (!kill) return EMPTY;
+      const name = bookLabel(kill.recipe, f.recipes);
+      return `${name} is dead${/fill-adj/i.test(kill.why) ? " from holdout fill-adj" : ""}. That kill is that book, not a twin of a dead school.`;
+    }
+    case "mercator": {
+      const hole = f.inventCell !== EMPTY ? f.inventCell : holeName(/next hole:\s*([^\s·,]+)/i.exec(now)?.[1] ?? "");
+      if (!hole || hole === EMPTY) return EMPTY;
+      return `Next hole is ${hole}. A hole, not a new product type.`;
+    }
+    case "curator": {
+      if (!f.tapeName) return EMPTY;
+      return `Freeze fuel for ${f.tapeName}.`;
+    }
+    default:
+      return now ? staffLine(now) : EMPTY;
+  }
 }
 
 /** Staff watching line in English. Layout stays; plant tokens do not. */

@@ -28,6 +28,7 @@ import {
   recipeStatus,
   sizeMarket,
   sizePackBoxes,
+  seatWatching,
   staffLine,
   waffleCols,
 } from "./boards.ts";
@@ -279,6 +280,75 @@ test("Issues are a problem, an owner, and a next action", () => {
   assert.equal(row.problem, "A keep is on hold this tick.");
   assert.match(row.next, /Do not arm the fuse/);
   assert.ok(!row.problem.includes("LIVE_CANDIDATE"));
+});
+
+test("Staff watching lines are same-bets, not bios", () => {
+  const line = (id: string) => {
+    const seat = STAMP.seats.find((s) => s.id === id);
+    assert.ok(seat);
+    return seatWatching(seat, STAMP);
+  };
+  assert.match(line("bauron"), /this cell/);
+  assert.match(line("bauron"), /South Africa morning WIN/);
+  assert.match(line("bauron"), /densify cousin is a new book/);
+  assert.match(line("bauron"), /GB near-off WIN/);
+  assert.match(line("igor"), /same freeze bets/);
+  assert.match(line("igor"), /GB near-off WIN/);
+  assert.match(line("hyde"), /KEEP is the original/);
+  assert.match(line("hyde"), /No Hyde SHARPEN cousin/);
+  assert.match(line("clerk"), /same pick set/);
+  assert.match(line("clerk"), /fill-adj killed/);
+  assert.match(line("clerk"), /AU near-off PLACE/);
+  assert.match(line("clerk"), /Hyde cousin is not it/);
+  assert.equal(/real betting is off/i.test(line("clerk")), false);
+  assert.match(line("foreman"), /Tape KEEP is GB near-off WIN/);
+  assert.match(line("foreman"), /on trial, not the tape/);
+  assert.match(line("foreman"), /not treat a Hyde cousin as a restore/);
+  assert.match(line("virchow"), /AU near-off PLACE is dead/);
+  assert.match(line("virchow"), /not a twin of a dead school/);
+  assert.match(line("mercator"), /Next hole is South Africa morning WIN/);
+  assert.match(line("mercator"), /not a new product type/);
+  assert.match(line("curator"), /Freeze fuel for GB near-off WIN/);
+  for (const s of STAMP.seats) {
+    const text = seatWatching(s, STAMP);
+    assert.equal(/keep_hold_paper|n_schools|n_applied|Measuring n=/.test(text), false);
+  }
+});
+
+test("Hyde names a SHARPEN cousin when the stamp does", () => {
+  const hyde = STAMP.seats.find((s) => s.id === "hyde");
+  assert.ok(hyde);
+  const text = seatWatching(
+    { ...hyde, now: "trial H-hyde-gb-nearoff-win-cousin" },
+    {
+      ...STAMP,
+      recipes: [
+        ...STAMP.recipes,
+        {
+          ...STAMP.recipes[0],
+          id: "H-hyde-gb-nearoff-win-cousin",
+          title: "GB near-off WIN · Hyde cousin",
+          badge: "Research",
+          status: "MEASURING",
+          why: "Hyde cousin, not the same picks",
+        },
+      ],
+    },
+  );
+  assert.match(text, /SHARPEN cousin/);
+  assert.match(text, /not the GB near-off WIN KEEP/);
+});
+
+test("Staff seat with nothing is Empty", () => {
+  const curator = STAMP.seats.find((s) => s.id === "curator");
+  assert.ok(curator);
+  assert.equal(
+    seatWatching(
+      { ...curator, now: "" },
+      { recipes: [], solids: [], moves: [], office: { invent: false, inventWhy: "" }, hunters: [] },
+    ),
+    EMPTY,
+  );
 });
 
 test("Staff watching lines drop plant tokens", () => {

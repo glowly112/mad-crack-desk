@@ -3,7 +3,7 @@ import { FloorLog } from "@/components/floor-log";
 import { LiveDot } from "@/components/live-dot";
 import { Portrait } from "@/components/portrait";
 import { useStamp } from "@/components/plant-context";
-import { staffLine } from "@/lib/lab/boards";
+import { seatWatching } from "@/lib/lab/boards";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/staff/")({ component: StaffIndex });
@@ -14,8 +14,7 @@ function StaffIndex() {
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl">Staff</h1>
-        <p className="mt-1 text-sm text-muted">Who is watching what.</p>
-        <p className="mt-2 text-xs text-subtle">One book: invent → paper → holdout → production → live.</p>
+        <p className="mt-1 text-sm text-muted">Who is watching the same bets.</p>
       </header>
       <ul className="divide-y divide-border border-y border-border">
         {stamp.seats.map((s) => {
@@ -31,7 +30,7 @@ function StaffIndex() {
                 <div className="min-w-0 flex-1">
                   <p>{s.name}</p>
                   <p className="text-sm text-subtle">{s.role}</p>
-                  <p className="mt-1 text-sm">{staffLine(s.now)}</p>
+                  <p className="mt-1 text-sm">{seatWatching(s, stamp)}</p>
                 </div>
                 <div className="text-right">
                   <p

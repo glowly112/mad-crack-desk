@@ -3,7 +3,7 @@ import { DetailShell } from "@/components/detail-shell";
 import { LiveDot } from "@/components/live-dot";
 import { Portrait } from "@/components/portrait";
 import { useStamp } from "@/components/plant-context";
-import { staffLine } from "@/lib/lab/boards";
+import { seatWatching } from "@/lib/lab/boards";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/staff/$id")({ component: Seat });
@@ -36,7 +36,7 @@ function Seat() {
         </span>
         <span className="text-subtle">{s.cadence}</span>
       </p>
-      <p className="text-sm">{staffLine(s.now)}</p>
+      <p className="text-sm">{seatWatching(s, stamp)}</p>
     </DetailShell>
   );
 }
