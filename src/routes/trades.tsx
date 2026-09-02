@@ -134,7 +134,7 @@ function BookMark({ book }: { book: FillBook }) {
   return (
     <span className={cn(bookTone(book))}>
       {book}
-      {badge ? <span className="ml-1.5 text-subtle">{badge}</span> : null}
+      {badge ? <span className="text-subtle"> · {badge}</span> : null}
     </span>
   );
 }
