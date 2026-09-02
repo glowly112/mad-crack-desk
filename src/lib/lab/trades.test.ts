@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   bookBadge,
+  bookedClock,
   dayTapePnl,
   fillFromRow,
   fillsOnDay,
@@ -174,6 +175,23 @@ test("paper P&L is not income; live is 0 while fuse off", () => {
   assert.ok(liveFill);
   assert.deepEqual(tapePnl(liveFill, false), { pnl: 0, caption: "fuse off" });
   assert.deepEqual(tapePnl(liveFill, true), { pnl: 4, caption: null });
+});
+
+test("booked clock is a real time, never Empty", () => {
+  assert.equal(bookedClock("2026-09-02T10:59:45Z"), "10:59:45");
+  assert.equal(bookedClock("", "14:03"), "14:03");
+  assert.equal(bookedClock(undefined, "Empty", "09:12:00"), "09:12:00");
+  const offOnly = fillFromRow({
+    pick_id: "off-1",
+    cell_id: "H-fast-gb-nearoff-win-83959Z",
+    off_time: "15:22",
+    status: "OPEN",
+    mode: "auto_dry",
+  });
+  assert.ok(offOnly);
+  assert.equal(offOnly.t, "15:22");
+  assert.notEqual(offOnly.t, "Empty");
+  assert.equal(bookedClock(offOnly.ts, offOnly.t), "15:22");
 });
 
 test("tradeCounts, stake u, and day tape Empty when no production", () => {

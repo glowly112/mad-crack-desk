@@ -23,11 +23,12 @@ function pathActive(pathname: string, to: string) {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const settingsOn = pathActive(pathname, "/settings");
+  const staffOn = pathActive(pathname, "/staff");
   const stamp = useStamp();
   const plant = usePlantSource();
 
   return (
-    <div className="min-h-dvh bg-bg text-fg md:flex">
+    <div className="flex min-h-dvh flex-col bg-bg text-fg md:flex-row">
       <aside className="sticky top-0 hidden h-dvh w-52 shrink-0 flex-col self-start border-r border-border md:flex">
         <div className="flex items-center gap-2 px-4 py-4">
           <LabMark className="size-6 text-fg" />
@@ -71,7 +72,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <div className="min-w-0 flex-1">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 md:hidden">
           <div className="flex min-w-0 items-center gap-2">
             <LabMark className="size-5 shrink-0 text-fg" />
@@ -106,7 +107,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
         <main
           key={pathname}
-          className="route-in min-w-0 overflow-x-hidden px-4 pb-28 pt-5 md:px-8 md:pb-12 md:pt-7"
+          className={
+            staffOn
+              ? "route-in flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden md:h-dvh"
+              : "route-in min-w-0 overflow-x-hidden px-4 pb-28 pt-5 md:px-8 md:pb-12 md:pt-7"
+          }
         >
           {children}
         </main>

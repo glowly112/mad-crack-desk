@@ -1067,7 +1067,7 @@ export type StaffWatchStamp = {
   issues?: readonly { id: string; title?: string; owner?: string }[];
 };
 
-function bookLabel(raw: string, recipes: readonly Recipe[] = []): string {
+export function bookLabel(raw: string, recipes: readonly Recipe[] = []): string {
   const id = /H-[A-Za-z0-9-]+/.exec(raw)?.[0];
   if (id) {
     const hit = recipes.find((r) => r.id === id);
@@ -1088,7 +1088,7 @@ function firstRecipeId(text: string): string {
   return /first:\s*([A-Za-z0-9_-]+)/i.exec(text)?.[1] ?? /H-[A-Za-z0-9-]+/.exec(text)?.[0] ?? "";
 }
 
-function staffBookFacts(seatNow: string, stamp: StaffWatchStamp) {
+export function staffBookFacts(seatNow: string, stamp: StaffWatchStamp) {
   const blob = [seatNow, stamp.office?.inventWhy ?? "", ...(stamp.hunters ?? []).map((h) => h.note)].join(" ");
   const recipes = stamp.recipes ?? [];
   const solids = (stamp.solids?.length ? stamp.solids : recipes.filter((r) => r.badge === "Solid")) ?? [];

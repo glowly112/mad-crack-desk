@@ -47,11 +47,23 @@ function num(v: unknown): number | null {
   return null;
 }
 
+/** A real clock. Never Empty. */
+export function bookedClock(...raws: Array<string | null | undefined>): string {
+  for (const raw of raws) {
+    if (!raw || raw === "Empty") continue;
+    const iso = /T(\d{2}:\d{2})(?::(\d{2}))?/.exec(raw);
+    if (iso) return iso[2] ? `${iso[1]}:${iso[2]}` : `${iso[1]}:00`;
+    const hm = /^(\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(raw.trim());
+    if (hm) {
+      const hh = hm[1].padStart(2, "0");
+      return hm[3] ? `${hh}:${hm[2]}:${hm[3]}` : `${hh}:${hm[2]}`;
+    }
+  }
+  return "";
+}
+
 function clock(ts: string): string {
-  const m = /T(\d{2}:\d{2}:\d{2})/.exec(ts);
-  if (m) return m[1];
-  if (/^\d{2}:\d{2}/.test(ts)) return ts.slice(0, 8);
-  return ts;
+  return bookedClock(ts);
 }
 
 function marketOf(title: string, odds: number | null): string {
@@ -104,7 +116,8 @@ export function fillFromRow(raw: unknown): Fill | null {
   const row = rec(raw);
   if (!row) return null;
   const id = String(row.pick_id || row.id || "").trim();
-  const ts = String(row.ts || row.settled_ts || "");
+  const ts = String(row.ts || row.settled_ts || row.off_ts || "");
+  const offTime = typeof row.off_time === "string" ? row.off_time : "";
   const cell = String(row.cell_id || row.recipeId || "").split("|")[0] ?? "";
   if (!id && !ts && !cell) return null;
   const title = cellName(cell, String(row.title || ""), id);
@@ -116,7 +129,7 @@ export function fillFromRow(raw: unknown): Fill | null {
   return {
     id: id || `${cell}:${ts}`,
     ts,
-    t: clock(ts),
+    t: clock(ts) || clock(offTime),
     day,
     recipe: title || "Empty",
     recipeId: cell,
