@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import liveSnap from "./live-snapshot.json" with { type: "json" };
-import { applyBoardResetView } from "./board-reset.ts";
+import { applyBoardResetView, isBoardResetView } from "./board-reset.ts";
 import { applySnapshot } from "./from-snapshot.ts";
 import { bootStamp, digestStamp, plantFromTape, type PlantPayload } from "./plant-boot.ts";
 import type { LiveStamp } from "./from-digest.ts";
@@ -170,15 +170,19 @@ async function trySsh(base: LiveStamp): Promise<PlantPayload | null> {
 }
 
 function fromLiveFile(base: LiveStamp): PlantPayload {
-  const stamp = applyBoardResetView(applySnapshot(liveSnap, base));
+  const snapStamp = applySnapshot(liveSnap, base);
+  const stamp = applyBoardResetView(snapStamp);
   const frozen = {
     ...stamp,
     source: "freeze" as const,
   };
+  const detail = isBoardResetView(stamp)
+    ? `board reset · frozen ${frozen.generated}`
+    : `frozen ${frozen.generated} · post-reset arms on board`;
   return {
     stamp: frozen,
     source: "freeze",
-    detail: `board reset · frozen ${frozen.generated}`,
+    detail,
   };
 }
 
@@ -202,13 +206,15 @@ export async function loadPlant(): Promise<PlantPayload> {
         } else {
           hit = http ?? ssh;
         }
-        return hit
-          ? {
-              ...hit,
-              stamp: applyBoardResetView(hit.stamp),
-              detail: hit.source === "oracle" ? "new run · board reset" : hit.detail,
-            }
-          : null;
+        if (!hit) return null;
+        const stamp = applyBoardResetView(hit.stamp);
+        const detail =
+          hit.source === "oracle"
+            ? isBoardResetView(stamp)
+              ? "new run · board reset"
+              : `live oracle · post-reset arms (${stamp.recipes.length} recipes · ${stamp.trades.length} fills)`
+            : hit.detail;
+        return { ...hit, stamp, detail };
       })(),
       new Promise<null>((resolve) => {
         setTimeout(() => resolve(null), 10_000);
