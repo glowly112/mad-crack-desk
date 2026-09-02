@@ -1,13 +1,23 @@
 import { EmptyState } from "@/components/empty-state";
 import { useStamp } from "@/components/plant-context";
-import { countryPackBoxes, countryPackLine, officeCountries, waffleCols } from "@/lib/lab/boards";
+import {
+  countryPackBoxes,
+  countryPackLine,
+  countryPile,
+  officeCountries,
+  waffleCols,
+} from "@/lib/lab/boards";
 import { EMPTY } from "@/lib/lab/desk";
+import type { CountryRow, PackBox } from "@/lib/lab/boards";
 import { cn } from "@/lib/utils";
 
-/** Treemap of waffles: outer size is the pile, inner squares are recipes. */
+/** Treemap of waffles on desktop; wrap of squares on a phone so 1-recipe cells stay readable. */
 export function CountryPack() {
   const stamp = useStamp();
   const countries = officeCountries(stamp.coverage, stamp.recipes);
+  const piled = [...countries]
+    .filter((c) => countryPile(c) > 0)
+    .sort((a, b) => countryPile(b) - countryPile(a) || a.name.localeCompare(b.name));
   const boxes = countryPackBoxes(countries);
   const line = countryPackLine(countries);
 
@@ -26,34 +36,12 @@ export function CountryPack() {
           </span>
         </p>
       </header>
-      {boxes.length === 0 ? (
+      {piled.length === 0 ? (
         <EmptyState copy={EMPTY} />
       ) : (
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
-          <div
-            className="relative aspect-[5/4] w-full min-h-56 sm:aspect-[16/9] sm:min-h-72"
-            role="img"
-            aria-label={line}
-          >
-            {boxes.map((b, i) => (
-              <article
-                key={b.region}
-                className="log-in absolute flex flex-col bg-elev p-2"
-                style={{
-                  left: `calc(${b.x}% + 2px)`,
-                  top: `calc(${b.y}% + 2px)`,
-                  width: `calc(${b.w}% - 4px)`,
-                  height: `calc(${b.h}% - 4px)`,
-                  animationDelay: `${Math.min(i, 8) * 28}ms`,
-                }}
-                aria-label={`${b.name}. ${b.line}`}
-                title={`${b.name}. ${b.line}`}
-              >
-                <Waffle parked={b.parked} testing={b.testing} />
-                <p className="mt-1.5 truncate text-xs leading-tight">{b.name}</p>
-              </article>
-            ))}
-          </div>
+          <HugPack rows={piled} line={line} />
+          <TreemapPack boxes={boxes} line={line} />
           <p className="shrink-0 text-sm text-muted lg:max-w-40">{line}</p>
         </div>
       )}
@@ -61,7 +49,71 @@ export function CountryPack() {
   );
 }
 
-function Waffle({ parked, testing }: { parked: number; testing: number }) {
+function HugPack({ rows, line }: { rows: CountryRow[]; line: string }) {
+  return (
+    <div className="flex flex-wrap items-end gap-x-5 gap-y-4 md:hidden" role="img" aria-label={line}>
+      {rows.map((c, i) => {
+        return (
+          <article
+            key={c.region}
+            className="log-in"
+            style={{ animationDelay: `${Math.min(i, 8) * 28}ms` }}
+            aria-label={`${c.name}. ${c.line}`}
+            title={`${c.name}. ${c.line}`}
+          >
+            <Waffle parked={c.parked} testing={c.testing} unit="1.25rem" />
+            <p className="mt-1.5 max-w-[7.5rem] truncate text-xs leading-tight">{c.name}</p>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+function TreemapPack({ boxes, line }: { boxes: PackBox[]; line: string }) {
+  return (
+    <div
+      className="relative hidden aspect-[16/9] min-h-80 w-full md:block"
+      role="img"
+      aria-label={line}
+    >
+      {boxes.map((b, i) => (
+        <article
+          key={b.region}
+          className="log-in absolute bg-elev"
+          style={{
+            left: `calc(${b.x}% + 2px)`,
+            top: `calc(${b.y}% + 2px)`,
+            width: `calc(${b.w}% - 4px)`,
+            height: `calc(${b.h}% - 4px)`,
+            animationDelay: `${Math.min(i, 8) * 28}ms`,
+          }}
+          aria-label={`${b.name}. ${b.line}`}
+          title={`${b.name}. ${b.line}`}
+        >
+          <div className="absolute inset-2 bottom-6">
+            <Waffle parked={b.parked} testing={b.testing} fill />
+          </div>
+          <p className="pointer-events-none absolute inset-x-2 bottom-1.5 truncate text-xs leading-tight">
+            {b.name}
+          </p>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function Waffle({
+  parked,
+  testing,
+  unit,
+  fill,
+}: {
+  parked: number;
+  testing: number;
+  unit?: string;
+  fill?: boolean;
+}) {
   const n = parked + testing;
   const cols = waffleCols(n);
   const rows = Math.ceil(n / cols);
@@ -70,17 +122,19 @@ function Waffle({ parked, testing }: { parked: number; testing: number }) {
     ...Array.from({ length: testing }, (_, i) => ({ key: `t${i}`, tone: "test" as const })),
   ];
   const gap = 3;
-  const unit = `min(calc((100cqw - ${(cols - 1) * gap}px) / ${cols}), calc((100cqh - ${(rows - 1) * gap}px) / ${rows}))`;
+  const u = fill
+    ? `min(calc((100cqw - ${(cols - 1) * gap}px) / ${cols}), calc((100cqh - ${(rows - 1) * gap}px) / ${rows}))`
+    : (unit ?? "1.25rem");
 
   return (
-    <div className="min-h-0 flex-1 [container-type:size]">
+    <div className={cn(fill && "h-full w-full [container-type:size]")}>
       <div
-        className="grid h-full w-full place-content-center"
+        className={cn("grid place-content-center", fill && "h-full w-full")}
         style={{
           gap,
           gridTemplateColumns: `repeat(${cols}, var(--u))`,
           gridAutoRows: "var(--u)",
-          ["--u" as string]: unit,
+          ["--u" as string]: u,
         }}
       >
         {cells.map((c) => (
