@@ -22,7 +22,7 @@ export function Pipe() {
       <section>
         <header className="mb-2 flex items-baseline justify-between gap-3 border-b border-border pb-2">
           <h2 className="text-sm font-medium">Stuck</h2>
-          <p className="text-xs text-subtle">Where the pile sits</p>
+          <p className="text-xs text-subtle">The bottleneck</p>
         </header>
         {board.stuck === EMPTY ? (
           <EmptyState copy={EMPTY} />
@@ -36,22 +36,31 @@ export function Pipe() {
 
       <section>
         <header className="mb-2 flex items-baseline justify-between gap-3 border-b border-border pb-2">
-          <h2 className="text-sm font-medium">Stages</h2>
+          <h2 className="text-sm font-medium">Line</h2>
           <p className="text-xs text-subtle">New ideas to live</p>
         </header>
-        <ol className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-          {board.stages.map((s) => (
-            <li key={s.key} className="log-in min-w-0">
-              <p className="text-sm text-muted">{s.label}</p>
+        <ol>
+          {board.stages.map((s, i) => (
+            <li
+              key={s.key}
+              className="log-in flex items-baseline gap-4 border-b border-border py-3"
+              style={{ animationDelay: `${Math.min(i, 8) * 28}ms` }}
+            >
+              <p className="w-6 shrink-0 font-mono text-xs text-subtle">{i + 1}</p>
+              <div className="min-w-0 flex-1">
+                <p className={cn("text-sm", s.stuck && "text-warn")}>{s.label}</p>
+                {s.stuck || s.hint ? (
+                  <p className="mt-0.5 text-xs text-subtle">{s.stuck ? "Stuck here" : s.hint}</p>
+                ) : null}
+              </div>
               <p
                 className={cn(
-                  "mt-1 font-mono text-5xl leading-none tracking-tight",
+                  "font-mono text-4xl leading-none tracking-tight tabular-nums",
                   s.stuck ? "text-warn" : "text-fg",
                 )}
               >
                 {s.count}
               </p>
-              {s.hint ? <p className="mt-2 text-xs text-subtle">{s.hint}</p> : null}
             </li>
           ))}
         </ol>

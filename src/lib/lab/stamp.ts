@@ -242,24 +242,24 @@ export const STAMP = {
   issues: [
     {
       id: "keep-hold-paper",
-      title: "KEEP on hold",
-      detail: "Scoreboard KEEP(s) not LIVE_CANDIDATE this tick. Clerk HIGH keep_hold_paper.",
+      title: "A keep is on hold this tick.",
+      detail: "The keep cannot go live this tick.",
       owner: "Clerk",
-      fix: "Inspect the KEEP gate. Do not arm the fuse. Do not mint certs.",
+      fix: "Inspect the keep gate. Do not arm the fuse.",
     },
     {
       id: "keep-not-solid",
-      title: "Research keep ≠ solid",
+      title: "Parked research is not today's production.",
       detail: "NZ morning WIN is parked. Freeze 408.67u is not today's production.",
       owner: "Hyde",
-      fix: "Holdout path. Do not treat parked pounds as income.",
+      fix: "Leave it parked. Do not treat it as income.",
     },
     {
       id: "live-subset",
-      title: "Live ⊆ paper",
-      detail: "Fuse off. 0 live orders. GB solid is wait_open.",
+      title: "Real betting is off. Nothing is live.",
+      detail: "The fuse is off. No live orders.",
       owner: "Clerk",
-      fix: "Leave fuse off until a solid is on tape.",
+      fix: "Leave the fuse off until a solid is on tape.",
     },
   ],
   seats: [
