@@ -1,12 +1,13 @@
 import { PLANT_MARKS } from "@/components/marks";
 import { useStamp } from "@/components/plant-context";
+import { parkedCount } from "@/lib/lab/desk";
 import { cn } from "@/lib/utils";
 
 export function PlantPlan() {
   const stamp = useStamp();
   const groups = [
     { id: "solid" as const, label: "Solid", count: stamp.n_solid, mute: false, hint: "Certified · the score" },
-    { id: "research" as const, label: "Research keep", count: stamp.counts.keep, mute: true, hint: "Not the score" },
+    { id: "research" as const, label: "Research keep", count: parkedCount(stamp.counts.keep, stamp.n_solid), mute: true, hint: "Parked · not the score" },
     { id: "measuring" as const, label: "Measuring", count: stamp.counts.measuring, mute: true, hint: "Research pile" },
     { id: "invent" as const, label: "Invent", count: stamp.counts.hunting, mute: false, hint: "Open gaps" },
     { id: "live" as const, label: "Live", count: 0, mute: !stamp.fuse_on, hint: stamp.fuse },

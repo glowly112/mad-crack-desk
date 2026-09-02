@@ -1,48 +1,37 @@
-import {
-  MarkFuse,
-  MarkInvent,
-  MarkIssues,
-  MarkKeep,
-  MarkMeasure,
-  MarkOffice,
-  MarkStaff,
-  MarkTrends,
-  HUNTER_MARKS,
-  PLANT_MARKS,
-} from "@/components/marks";
+import { MarkIssues, MarkKeep } from "@/components/marks";
+import { EmptyState } from "@/components/empty-state";
 import { useStamp } from "@/components/plant-context";
-
-const LOG_MARK = {
-  score: MarkTrends,
-  doer: MarkStaff,
-  invent: MarkInvent,
-  hunter: HUNTER_MARKS.residual,
-  fuse: MarkFuse,
-  keep: MarkKeep,
-  kill: MarkIssues,
-  measure: MarkMeasure,
-  plant: PLANT_MARKS.live,
-  office: MarkOffice,
-} as const;
+import { EMPTY, hopMoves } from "@/lib/lab/desk";
 
 export function FloorLog() {
   const stamp = useStamp();
+  const hops = hopMoves(stamp.moves);
+
   return (
     <section className="floor-log-pane flex min-h-0 flex-1 flex-col">
-      <h2 className="mb-2 shrink-0 text-sm font-medium text-muted">Floor log</h2>
-      <ol className="min-h-0 flex-1 space-y-2 overflow-visible font-mono text-xs lg:overflow-hidden">
-        {stamp.floorLog.map((row) => {
-          const Icon = LOG_MARK[row.kind as keyof typeof LOG_MARK];
-          if (!Icon) return null;
-          return (
-            <li key={row.t + row.line} className="log-in flex items-start gap-2">
-              <Icon className="mt-0.5 size-3.5 shrink-0 text-subtle" />
-              <span className="w-10 shrink-0 text-subtle">{row.t}</span>
-              <span className="min-w-0 text-muted">{row.line}</span>
-            </li>
-          );
-        })}
-      </ol>
+      <header className="mb-2 flex items-baseline justify-between">
+        <h2 className="text-sm font-medium text-muted">Floor log</h2>
+        <p className="text-xs text-subtle">State hops</p>
+      </header>
+      {hops.length === 0 ? (
+        <EmptyState copy={EMPTY} />
+      ) : (
+        <ol className="min-h-0 flex-1 space-y-2 overflow-visible font-mono text-xs lg:overflow-hidden">
+          {hops.map((row) => {
+            const Icon = row.to === "Dead" ? MarkIssues : MarkKeep;
+            return (
+              <li key={row.at + row.recipe} className="log-in flex items-start gap-2">
+                <Icon className="mt-0.5 size-3.5 shrink-0 text-subtle" />
+                <span className="w-10 shrink-0 text-subtle">{row.at}</span>
+                <span className="min-w-0 text-muted">
+                  {row.recipe} · {row.from} → {row.to}
+                  <span className="block text-subtle">{row.why}</span>
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      )}
     </section>
   );
 }

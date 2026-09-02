@@ -148,16 +148,21 @@ test("garbage or error payload leaves the digest stamp", () => {
   assert.equal(live.counts.keep, boot.counts.keep);
 });
 
-test("plant live snapshot is oracle, score stays empty while solids 0", () => {
+test("plant live snapshot is oracle, score stays empty when day_u is null", () => {
   const live = applySnapshot(snap, base());
   assert.equal(live.source, "oracle");
-  assert.equal(live.counts.keep, 2);
-  assert.equal(live.counts.measuring, 17);
-  assert.equal(live.n_solid, 0);
+  assert.equal(live.counts.keep, 3);
+  assert.equal(live.counts.measuring, 21);
+  assert.equal(live.n_solid, 1);
+  assert.equal(live.pipe.certified, 1);
+  assert.equal(live.pipe.certified, live.n_solid);
   assert.equal(live.fuse_on, false);
   assert.equal(live.hero.day_u, null);
-  assert.equal(live.researchKeepGbp, 444.02);
-  assert.equal(live.generated, "20260829T123147Z");
+  assert.equal(live.researchKeepGbp, 408.67);
+  assert.equal(live.generated, "20260902T101756Z");
+  assert.equal(live.recipes[0]?.badge, "Solid");
+  assert.equal(live.recipes[0]?.chip, "Waiting for races");
+  assert.equal(live.recipes[1]?.badge, "Parked");
   assert.equal(
     productionScore({ n_solid: live.n_solid, day_u: live.hero.day_u, researchKeepGbp: live.researchKeepGbp }),
     null,

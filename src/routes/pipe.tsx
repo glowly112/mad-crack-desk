@@ -10,7 +10,7 @@ const STAGES = [
   { key: "pitched", label: "Pitched", hint: "Invent cells" },
   { key: "proving", label: "Proving", hint: "Measuring pile" },
   { key: "closed", label: "Closed", hint: "Out of window" },
-  { key: "certified", label: "Certified", hint: "The score" },
+  { key: "certified", label: "Certified", hint: "Solid · the score" },
   { key: "scaling", label: "Scaling", hint: "Live ⊆ paper" },
 ] as const;
 

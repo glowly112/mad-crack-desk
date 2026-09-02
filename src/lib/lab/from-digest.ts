@@ -154,7 +154,7 @@ export function applyDigest(digest: Digest, base: typeof STAMP = STAMP) {
     },
     counts: {
       keep: digest.board.keep,
-      certified: Number(base.counts.certified),
+      certified: parsed.n_solid,
       measuring: digest.board.measuring,
       hunting: Number(base.counts.hunting),
       kill: digest.board.kill,
@@ -162,9 +162,10 @@ export function applyDigest(digest: Digest, base: typeof STAMP = STAMP) {
     },
     pipe: {
       pitched: pipeFrom.pitched ?? base.pipe.pitched,
-      proving: pipeFrom.proving ?? base.pipe.proving,
+      proving: pipeFrom.proving ?? digest.board.measuring,
       closed: pipeFrom.closed ?? base.pipe.closed,
-      certified: pipeFrom.certified ?? base.pipe.certified,
+      // Certified on Pipe is the score (solids), not invent-pipeline certified=0.
+      certified: parsed.n_solid,
       scaling: pipeFrom.scaling ?? base.pipe.scaling,
     },
     office: {

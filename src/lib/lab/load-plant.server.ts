@@ -37,6 +37,10 @@ function snapshotUrls(): string[] {
   return out;
 }
 
+function sshKey(): string | undefined {
+  return process.env.ORACLE_SSH_KEY?.trim() || process.env.MULTIBOT_SSH_ORACLE_HRBOT_KEY?.trim();
+}
+
 function httpHeaders(): Record<string, string> {
   const raw = process.env.ORACLE_BASIC_AUTH?.trim();
   if (!raw) return {};
@@ -50,7 +54,11 @@ async function tryHttp(base: LiveStamp): Promise<PlantPayload | null> {
   const hits = await Promise.all(
     snapshotUrls().map(async (url) => {
       try {
-        const res = await fetch(url, { signal: AbortSignal.timeout(800), headers });
+        const bust = url.includes("?") ? `${url}&t=${Date.now()}` : `${url}?t=${Date.now()}`;
+        const res = await fetch(bust, {
+          signal: AbortSignal.timeout(3000),
+          headers: { ...headers, Accept: "application/json", "Cache-Control": "no-cache" },
+        });
         if (!res.ok) return null;
         const snap = (await res.json()) as unknown;
         const stamp = applySnapshot(snap, base);
@@ -65,7 +73,7 @@ async function tryHttp(base: LiveStamp): Promise<PlantPayload | null> {
 }
 
 async function trySsh(base: LiveStamp): Promise<PlantPayload | null> {
-  const key = process.env.ORACLE_SSH_KEY?.trim();
+  const key = sshKey();
   if (!key) return null;
   let cleanup: () => Promise<void> = async () => {};
   try {
@@ -94,14 +102,14 @@ async function trySsh(base: LiveStamp): Promise<PlantPayload | null> {
         "-o",
         "ConnectTimeout=4",
         host,
-        "cat $HOME/bbb/data/firm/lab/latest/scoreboard.json",
+        "python3 -c \"import json,pathlib;p=pathlib.Path.home()/'bbb/data/firm/lab/latest';d=json.loads((p/'plant_digest.json').read_text());s=json.loads((p/'scoreboard.json').read_text());d['cells']=s.get('cells');d['summary']=s.get('summary',d.get('summary'));d['truth']=s.get('truth');print(json.dumps(d))\"",
       ],
-      { timeout: 6000, maxBuffer: 2 * 1024 * 1024 },
+      { timeout: 8000, maxBuffer: 4 * 1024 * 1024 },
     );
     const sb = JSON.parse(String(stdout)) as unknown;
     const stamp = applySnapshot(sb, base);
     if (stamp.source !== "oracle") return null;
-    return { stamp, source: "oracle", detail: "ssh scoreboard" };
+    return { stamp, source: "oracle", detail: "ssh plant digest" };
   } catch {
     return null;
   } finally {
@@ -111,7 +119,15 @@ async function trySsh(base: LiveStamp): Promise<PlantPayload | null> {
 
 function fromLiveFile(base: LiveStamp): PlantPayload {
   const stamp = applySnapshot(liveSnap, base);
-  return plantFromTape(stamp.source === "oracle" ? stamp : base);
+  const frozen = {
+    ...stamp,
+    source: "freeze" as const,
+  };
+  return {
+    stamp: frozen,
+    source: "freeze",
+    detail: `oracle unreachable · frozen ${frozen.generated}`,
+  };
 }
 
 export async function loadPlant(): Promise<PlantPayload> {
@@ -120,7 +136,7 @@ export async function loadPlant(): Promise<PlantPayload> {
     const remote = Promise.race([
       (async () => (await tryHttp(base)) ?? (await trySsh(base)))(),
       new Promise<null>((resolve) => {
-        setTimeout(() => resolve(null), 1200);
+        setTimeout(() => resolve(null), 8000);
       }),
     ]);
     return (await remote) ?? fromLiveFile(base);

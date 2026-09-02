@@ -5,4 +5,4 @@ Operator floor for the plant. Display only: KEEP / measuring / fuse / staff. Doe
 - Repo: [glowly112/mad-crack-desk](https://github.com/glowly112/mad-crack-desk)
 - Live: [mcldesk.vercel.app](https://mcldesk.vercel.app)
 
-Floor numbers come from the plant stamp. Live lab snapshot when the console key is present, otherwise the last plant-published tape. Solids 0 → production score stays —.
+Floor numbers come from the current plant stamp. Live digest when the plant answers; otherwise a frozen snapshot labelled as such. `paper_live_day_u` null → production score is Empty. Freeze KEEP £ is not income.

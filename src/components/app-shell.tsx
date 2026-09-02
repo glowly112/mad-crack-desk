@@ -34,7 +34,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div>
             <p className="text-sm font-medium tracking-tight">Mad Crack Lab</p>
             <p className="font-mono text-xs text-subtle">
-              {plant.source === "oracle" ? `${stamp.day} · oracle` : plant.detail}
+              {plant.source === "oracle"
+                ? `${stamp.day} · live oracle`
+                : plant.source === "freeze"
+                  ? `frozen ${stamp.generated}`
+                  : plant.detail}
             </p>
           </div>
         </div>
@@ -74,7 +78,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="min-w-0">
               <p className="text-sm font-medium">Mad Crack Lab</p>
               <p className="truncate font-mono text-xs text-subtle">
-                {plant.source === "oracle" ? `${stamp.day} · oracle` : plant.detail}
+                {plant.source === "oracle"
+                  ? `${stamp.day} · live oracle`
+                  : plant.source === "freeze"
+                    ? `frozen ${stamp.generated}`
+                    : plant.detail}
               </p>
             </div>
           </div>
