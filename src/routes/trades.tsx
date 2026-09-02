@@ -46,8 +46,31 @@ export function Trades() {
 
 function TradeTape({ fills, fuseOn }: { fills: readonly Fill[]; fuseOn: boolean }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[720px] border-collapse text-left">
+    <>
+      <ol className="space-y-3 sm:hidden">
+        {fills.map((fill) => {
+          const tape = tapePnl(fill, fuseOn);
+          return (
+            <li key={fill.id} className="log-in font-mono text-xs">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="tabular-nums text-subtle">{fill.t}</span>
+                <span className={cn("tabular-nums", pnlTone(fill.book, tape.pnl))}>
+                  {tape.pnl == null ? "Empty" : fmtGbp(tape.pnl)}
+                </span>
+              </div>
+              <p className="mt-0.5 text-fg">{fill.recipe}</p>
+              <p className="mt-0.5 text-muted">
+                <span>{fill.market}</span>
+                <span className={cn("px-1.5", bookTone(fill.book))}>{fill.book}</span>
+                <span>{fmtStake(fill.stake)}</span>
+                <span className={cn("px-1.5", resultTone(fill.result))}>{fill.result}</span>
+                {tape.caption ? <span className="text-subtle">{tape.caption}</span> : null}
+              </p>
+            </li>
+          );
+        })}
+      </ol>
+      <table className="hidden w-full border-collapse text-left sm:table">
         <thead>
           <tr className="font-mono text-[10px] uppercase tracking-wide text-subtle">
             <th className="pb-2 pr-3 font-medium">Time</th>
@@ -83,7 +106,7 @@ function TradeTape({ fills, fuseOn }: { fills: readonly Fill[]; fuseOn: boolean 
           })}
         </tbody>
       </table>
-    </div>
+    </>
   );
 }
 

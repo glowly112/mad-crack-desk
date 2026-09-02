@@ -20,11 +20,14 @@ s = json.loads((p / "scoreboard.json").read_text())
 d["cells"] = s.get("cells")
 d["summary"] = s.get("summary", d.get("summary"))
 d["truth"] = s.get("truth")
-day = d.get("date") or d.get("day") or s.get("date")
+day = d.get("date") or d.get("day") or s.get("date") or s.get("day")
+if day:
+    d["date"] = day
+    d["day"] = day
 book = pathlib.Path.home() / "bbb/data/firm/live_ledger/book.jsonl"
 fills = []
 keys = ("pick_id","ts","settled_ts","cell_id","mode","status","odds","stake_gbp","paper_stake_gbp","paper_pnl_gbp","placed_result","certified_keep","gate_verdict","side","lab_status")
-if book.exists():
+if book.exists() and day:
     for line in book.read_text().splitlines()[-4000:]:
         if not line.strip():
             continue
@@ -129,7 +132,7 @@ async function trySsh(base: LiveStamp): Promise<PlantPayload | null> {
         "-o",
         "ConnectTimeout=4",
         host,
-        `python3 -c ${JSON.stringify(SSH_DIGEST)}`,
+        `python3 -c 'import base64;exec(base64.b64decode("${Buffer.from(SSH_DIGEST).toString("base64")}").decode())'`,
       ],
       { timeout: 8000, maxBuffer: 4 * 1024 * 1024 },
     );
