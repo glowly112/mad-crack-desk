@@ -1,22 +1,30 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { EmptyState } from "@/components/empty-state";
 import { ownerId, Portrait } from "@/components/portrait";
 import { useStamp } from "@/components/plant-context";
+import { issueBoard } from "@/lib/lab/boards";
+import { EMPTY } from "@/lib/lab/desk";
 
 export const Route = createFileRoute("/issues/")({ component: IssuesIndex });
 
 function IssuesIndex() {
   const stamp = useStamp();
+  const rows = stamp.issues.map(issueBoard);
+
   return (
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl">Issues</h1>
-        <p className="mt-1 text-sm text-muted">Inefficiencies with an owner and a next fix.</p>
+        <p className="mt-1 text-sm text-muted">Things to fix.</p>
       </header>
-      <ol className="divide-y divide-border border-y border-border">
-          {stamp.issues.map((iss, i) => {
+      {rows.length === 0 ? (
+        <EmptyState copy={EMPTY} />
+      ) : (
+        <ol>
+          {rows.map((iss) => {
             const id = ownerId(iss.owner);
             return (
-              <li key={iss.id}>
+              <li key={iss.id} className="border-b border-border">
                 <Link
                   to="/issues/$id"
                   params={{ id: iss.id }}
@@ -24,18 +32,17 @@ function IssuesIndex() {
                 >
                   {id ? <Portrait id={id} name={iss.owner} size="sm" /> : null}
                   <div className="min-w-0">
-                    <p className="font-mono text-xs text-subtle">
-                      {String(i + 1).padStart(2, "0")} · {iss.owner}
+                    <p className="text-sm">{iss.problem}</p>
+                    <p className="mt-1 text-xs text-subtle">
+                      {iss.owner} · {iss.next}
                     </p>
-                    <h3 className="mt-1 text-base">{iss.title}</h3>
-                    <p className="mt-1 text-sm text-muted">{iss.detail}</p>
-                    <p className="mt-2 text-sm">{iss.fix}</p>
                   </div>
                 </Link>
               </li>
             );
           })}
         </ol>
+      )}
     </div>
   );
 }

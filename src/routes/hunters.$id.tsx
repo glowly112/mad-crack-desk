@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { DetailShell } from "@/components/detail-shell";
 import { HUNTER_MARKS } from "@/components/marks";
-import { LiveDot } from "@/components/live-dot";
 import { useStamp } from "@/components/plant-context";
+import { hunterName, hunterWork } from "@/lib/lab/boards";
+import { EMPTY } from "@/lib/lab/desk";
 
 export const Route = createFileRoute("/hunters/$id")({ component: Hunter });
 
@@ -13,23 +14,19 @@ function Hunter() {
   if (!h) {
     return (
       <DetailShell backTo="/office" backLabel="Office">
-        <p className="text-sm text-subtle">No hunter on this stamp for that id.</p>
+        <p className="text-sm text-subtle">{EMPTY}</p>
       </DetailShell>
     );
   }
   const Icon = HUNTER_MARKS[h.id as keyof typeof HUNTER_MARKS];
-  const off = h.state !== "FLOWING";
+  const work = hunterWork(h.note);
   return (
     <DetailShell backTo="/office" backLabel="Office">
       <div className="flex items-center gap-3">
         {Icon ? <Icon className="size-8 text-muted" /> : null}
-        <h1 className="text-2xl capitalize">{h.id}</h1>
+        <h1 className="text-2xl">{hunterName(h.id)}</h1>
       </div>
-      <p className="flex items-center gap-2 font-mono text-sm">
-        <LiveDot tone={off ? "warn" : "ok"} />
-        <span className={off ? "text-muted" : "text-up"}>{h.state}</span>
-      </p>
-      <p className="text-sm">{h.note}</p>
+      <p className="text-sm">{work}</p>
     </DetailShell>
   );
 }

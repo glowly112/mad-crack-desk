@@ -3,6 +3,7 @@ import { FloorLog } from "@/components/floor-log";
 import { LiveDot } from "@/components/live-dot";
 import { Portrait } from "@/components/portrait";
 import { useStamp } from "@/components/plant-context";
+import { staffLine } from "@/lib/lab/boards";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/staff/")({ component: StaffIndex });
@@ -13,9 +14,7 @@ function StaffIndex() {
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl">Staff</h1>
-        <p className="mt-1 text-sm text-muted">
-          Watching lines, not bios. Invent rails: pin occupied cells, then one open gap.
-        </p>
+        <p className="mt-1 text-sm text-muted">Who is watching what.</p>
       </header>
       <ul className="divide-y divide-border border-y border-border">
         {stamp.seats.map((s) => {
@@ -31,7 +30,7 @@ function StaffIndex() {
                 <div className="min-w-0 flex-1">
                   <p>{s.name}</p>
                   <p className="text-sm text-subtle">{s.role}</p>
-                  <p className="mt-1 text-sm">{s.now}</p>
+                  <p className="mt-1 text-sm">{staffLine(s.now)}</p>
                 </div>
                 <div className="text-right">
                   <p

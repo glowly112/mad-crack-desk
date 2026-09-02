@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { DetailShell } from "@/components/detail-shell";
 import { useStamp } from "@/components/plant-context";
+import { recipeStatus } from "@/lib/lab/boards";
+import { EMPTY } from "@/lib/lab/desk";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/holdings/$id")({ component: Holding });
@@ -12,7 +14,7 @@ function Holding() {
   if (!r) {
     return (
       <DetailShell backTo="/" backLabel="Floor">
-        <p className="text-sm text-subtle">No holding on this stamp for that id.</p>
+        <p className="text-sm text-subtle">{EMPTY}</p>
       </DetailShell>
     );
   }
@@ -22,16 +24,14 @@ function Holding() {
       <h1 className="text-2xl">{r.title}</h1>
       <dl className="divide-y divide-border border-y border-border text-sm">
         <Row k="Region" v={r.region} />
-        <Row k="Status" v={r.status} />
-        <Row k="Badge" v={r.badge} />
-        <Row k="n" v={String(r.n)} />
+        <Row k="Status" v={recipeStatus(r)} />
+        <Row k="Races" v={String(r.n)} />
         <Row
-          k="ROI"
+          k="Paper ROI"
           v={`${r.roi >= 0 ? "+" : ""}${r.roi.toFixed(1)}%`}
           tone={r.roi >= 0 ? "up" : "bad"}
         />
       </dl>
-      <p className="text-sm">{r.why}</p>
     </DetailShell>
   );
 }

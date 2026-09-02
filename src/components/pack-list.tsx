@@ -1,8 +1,8 @@
 import { Link } from "@tanstack/react-router";
-import { MarkKeep, MarkMeasure, MarkSolid } from "@/components/marks";
+import { MarkSolid } from "@/components/marks";
 import { EmptyState } from "@/components/empty-state";
 import { useStamp } from "@/components/plant-context";
-import { EMPTY, SOLID_EMPTY, parkedCount, recipePack, solidRows } from "@/lib/lab/desk";
+import { SOLID_EMPTY, solidRows } from "@/lib/lab/desk";
 import type { Recipe } from "@/lib/lab/stamp";
 import { cn } from "@/lib/utils";
 
@@ -20,36 +20,6 @@ export function PackList() {
       empty={SOLID_EMPTY}
       rows={solids}
     />
-  );
-}
-
-/** Office backstage: parked research and the proving pile. Not Floor. */
-export function BackstagePacks() {
-  const stamp = useStamp();
-  const pack = recipePack(stamp.recipes);
-
-  return (
-    <section className="space-y-8">
-      <Group
-        icon={MarkKeep}
-        label="Research keep"
-        hint="Parked · not income"
-        count={parkedCount(stamp.counts.keep, stamp.n_solid)}
-        empty={EMPTY}
-        rows={pack.keeps}
-        quiet
-      />
-      <Group
-        icon={MarkMeasure}
-        label="Proving"
-        hint="Measuring pile"
-        count={stamp.counts.measuring}
-        empty={EMPTY}
-        rows={pack.proving}
-        quiet
-        mute
-      />
-    </section>
   );
 }
 
