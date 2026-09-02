@@ -230,11 +230,11 @@ export function sizeMarket(
 
 export type SizeBox = MarketCountry & { x: number; y: number; w: number; h: number };
 
-/** Treemap area ∝ measured n. Empty and n=0 keep a tiny cell so they stay in the market. */
+/** Treemap area ∝ measured n. x/y/w/h are percents of the market box, so height is 100. */
 export function sizePackBoxes(
   countries: readonly MarketCountry[],
   width = 100,
-  height = 52,
+  height = 100,
 ): SizeBox[] {
   const items = countries.map((c) => ({ ...c, value: Math.max(c.n, 1) }));
   if (!items.length || width <= 0 || height <= 0) return [];

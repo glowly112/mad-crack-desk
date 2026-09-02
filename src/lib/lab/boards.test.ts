@@ -94,6 +94,8 @@ test("country size is measured n, not a recipe count, and HK stays Empty", () =>
   assert.ok(gbBox && auBox && hkBox);
   assert.ok(gbBox.w * gbBox.h > auBox.w * auBox.h);
   assert.equal(hkBox.empty, true);
+  const packed = boxes.reduce((s, b) => s + b.w * b.h, 0);
+  assert.ok(Math.abs(packed - 100 * 100) < 0.01);
   assert.equal(capitalisingLine(STAMP.counts), "1 solid of 161 cells. 126 killed.");
   assert.match(marketGlance(market, STAMP.counts), /Hong Kong Empty/);
 });
