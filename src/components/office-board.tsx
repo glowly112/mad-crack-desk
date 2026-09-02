@@ -5,7 +5,14 @@ import { HUNTER_MARKS } from "@/components/marks";
 import { LiveDot } from "@/components/live-dot";
 import { ownerId, Portrait } from "@/components/portrait";
 import { useStamp } from "@/components/plant-context";
-import { factorySquares, issueBoard, officeWorkers, pipeBoard, recipeStatus } from "@/lib/lab/boards";
+import {
+  factorySquares,
+  issueBoard,
+  officeWorkers,
+  pipeBoard,
+  recipeStatus,
+  waffleCols,
+} from "@/lib/lab/boards";
 import { EMPTY, recipePack } from "@/lib/lab/desk";
 import type { Recipe } from "@/lib/lab/stamp";
 import { cn } from "@/lib/utils";
@@ -85,29 +92,41 @@ export function FactoryLine() {
       {squares.length === 0 ? (
         <EmptyState copy={EMPTY} />
       ) : (
-        <div className="flex flex-wrap gap-[3px]" role="img" aria-label={glance}>
-          {squares.map((sq, i) => (
-            <span
-              key={sq.id}
-              className={cn("log-in size-3.5 rounded-[2px]", STAGE_SQ[sq.key] ?? "bg-muted")}
-              style={{ animationDelay: `${Math.min(i, 20) * 12}ms` }}
-              title={sq.label}
-            />
-          ))}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+          <div
+            className="grid gap-[3px]"
+            role="img"
+            aria-label={glance}
+            style={{
+              gridTemplateColumns: `repeat(${Math.max(waffleCols(squares.length), 8)}, 1rem)`,
+            }}
+          >
+            {squares.map((sq, i) => (
+              <span
+                key={sq.id}
+                className={cn("log-in size-4 rounded-[2px]", STAGE_SQ[sq.key] ?? "bg-muted")}
+                style={{ animationDelay: `${Math.min(i, 20) * 12}ms` }}
+                title={sq.label}
+              />
+            ))}
+          </div>
+          <ol className="flex flex-col gap-1.5">
+            {board.stages.map((s) => (
+              <li key={s.key} className="flex items-baseline gap-1.5 text-xs">
+                <span
+                  className={cn(
+                    "inline-block size-2 translate-y-px rounded-[1px]",
+                    STAGE_SQ[s.key] ?? "bg-muted",
+                  )}
+                  aria-hidden
+                />
+                <span className="text-muted">{s.label}</span>
+                <span className="font-mono text-subtle">{s.count === 0 ? EMPTY : s.count}</span>
+              </li>
+            ))}
+          </ol>
         </div>
       )}
-      <ol className="flex flex-wrap gap-x-5 gap-y-2">
-        {board.stages.map((s) => (
-          <li key={s.key} className="flex items-baseline gap-1.5 text-xs">
-            <span
-              className={cn("inline-block size-2 translate-y-px rounded-[1px]", STAGE_SQ[s.key] ?? "bg-muted")}
-              aria-hidden
-            />
-            <span className="text-muted">{s.label}</span>
-            <span className="font-mono text-subtle">{s.count === 0 ? EMPTY : s.count}</span>
-          </li>
-        ))}
-      </ol>
     </section>
   );
 }
