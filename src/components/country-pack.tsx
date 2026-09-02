@@ -39,10 +39,10 @@ export function CountryPack() {
       {piled.length === 0 ? (
         <EmptyState copy={EMPTY} />
       ) : (
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
+        <div>
           <HugPack rows={piled} line={line} />
           <TreemapPack boxes={boxes} line={line} />
-          <p className="shrink-0 text-sm text-muted lg:max-w-40">{line}</p>
+          <p className="mt-2 text-sm text-muted">{line}</p>
         </div>
       )}
     </section>
@@ -73,7 +73,7 @@ function HugPack({ rows, line }: { rows: CountryRow[]; line: string }) {
 function TreemapPack({ boxes, line }: { boxes: PackBox[]; line: string }) {
   return (
     <div
-      className="relative hidden aspect-[16/9] min-h-80 w-full md:block"
+      className="relative hidden aspect-[2/1] w-full md:block"
       role="img"
       aria-label={line}
     >

@@ -109,7 +109,7 @@ type AreaNode = CountryRow & { value: number; area: number };
 export function countryPackBoxes(
   rows: readonly CountryRow[],
   width = 100,
-  height = 62,
+  height = 100,
 ): PackBox[] {
   const items = [...rows]
     .filter((r) => countryPile(r) > 0)
