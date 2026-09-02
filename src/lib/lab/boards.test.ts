@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  countryMarket,
   countryPackBoxes,
   countryPackLine,
   countrySentence,
@@ -44,10 +45,6 @@ test("country pack sizes Australia over a one-recipe market and omits Empty", ()
   const au = boxes.find((b) => b.region === "AU");
   const us = boxes.find((b) => b.region === "US");
   assert.ok(au && us);
-  assert.equal(
-    boxes.some((b) => b.region === "HK" || b.line === EMPTY),
-    false,
-  );
   const auArea = au.w * au.h;
   const usArea = us.w * us.h;
   assert.ok(usArea > 0);
@@ -56,6 +53,17 @@ test("country pack sizes Australia over a one-recipe market and omits Empty", ()
   assert.equal(waffleCols(1), 1);
   assert.equal(countryPackLine(rows), "Australia is the pile. Hong Kong Empty.");
   assert.equal(countryPackLine([]), EMPTY);
+});
+
+test("the market keeps every stamp region, including Empty Hong Kong", () => {
+  const rows = officeCountries(STAMP.coverage, STAMP.recipes);
+  const market = countryMarket(rows);
+  assert.deepEqual(
+    [...new Set(market.map((r) => r.region))].sort(),
+    ["AU", "FR", "GB", "HK", "IE", "NZ", "US", "ZA"],
+  );
+  assert.equal(market[0]?.region, "AU");
+  assert.ok(market.some((r) => r.region === "HK" && r.line === EMPTY));
 });
 
 test("recipe status drops holdout_n_too_small", () => {

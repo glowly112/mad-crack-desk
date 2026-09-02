@@ -89,6 +89,17 @@ export function waffleCols(n: number): number {
   return Math.max(1, Math.ceil(Math.sqrt(Math.max(0, n))));
 }
 
+/** Every region in one market. Pile first, Empty last — never dropped. */
+export function countryMarket(rows: readonly CountryRow[]): CountryRow[] {
+  return [...rows].sort((a, b) => {
+    const pa = countryPile(a);
+    const pb = countryPile(b);
+    if (pa === 0 && pb > 0) return 1;
+    if (pb === 0 && pa > 0) return -1;
+    return pb - pa || a.name.localeCompare(b.name);
+  });
+}
+
 /** `Australia is the pile. Hong Kong Empty.` Empty markets stay Empty. */
 export function countryPackLine(rows: readonly CountryRow[]): string {
   const piled = [...rows]
