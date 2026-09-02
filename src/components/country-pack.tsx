@@ -32,6 +32,45 @@ const TONE_LABEL: Record<MarketSquare["tone"], string> = {
   parked: "parked",
 };
 
+/** Morning board square: empty holes visible. No mill roll-up or invent lines. */
+export function FloorSquare() {
+  const stamp = useStamp();
+  const huntNotes = [stamp.office.inventWhy, ...stamp.hunters.map((h) => h.note)];
+  const holes = racingSquare({
+    recipes: stamp.recipes,
+    coverage: stamp.coverage,
+    moves: stamp.moves,
+    floorLog: stamp.floorLog,
+    huntNotes,
+    namedHoles: stamp.holes,
+  });
+  const markets = plantMarkets(holes.map((h) => h.market));
+  const emptyN = holes.filter((h) => h.tone === "empty").length;
+  const glance = `${emptyN} empty of ${holes.length} holes on the square`;
+
+  return (
+    <section>
+      <header className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-border pb-2">
+        <h2 className="text-sm font-medium text-muted">The square</h2>
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-subtle">
+          <LegendDot tone="empty" label="Empty" />
+          <LegendDot tone="win" label="solid" />
+          <LegendDot tone="parked" label="parked" />
+          <LegendDot tone="loss" label="killed" />
+        </p>
+      </header>
+      {holes.length === 0 ? (
+        <EmptyState copy={EMPTY} />
+      ) : (
+        <div role="img" aria-label={glance}>
+          <SquareGrid holes={holes} markets={markets} />
+          <p className="mt-2 text-sm text-muted">{glance}</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
 /** Whole racing square: country × window × WIN beside PLACE. Empty is area. */
 export function CountryPack() {
   const stamp = useStamp();

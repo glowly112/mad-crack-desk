@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
+import { FloorLog } from "@/components/floor-log";
 import { Portrait } from "@/components/portrait";
 import { useStamp } from "@/components/plant-context";
 import { EMPTY } from "@/lib/lab/desk";
@@ -34,31 +35,36 @@ export function StaffDesk({ selectedId }: { selectedId?: string }) {
   }, [openId]);
 
   return (
-    <div className="flex min-h-0 flex-1 overflow-hidden md:h-full">
-      <aside
-        className={cn(
-          "flex w-full shrink-0 flex-col border-border md:w-72 md:border-r",
-          openId && "hidden md:flex",
-        )}
-      >
-        <header className="border-b border-border px-4 py-4">
-          <h1 className="text-2xl">Staff</h1>
-          <p className="mt-1 text-sm text-muted">Who is watching the same bets.</p>
-        </header>
-        <ul className="min-h-0 flex-1 overflow-y-auto">
-          {stamp.seats.map((s) => (
-            <SeatRow key={`${s.id}:${tick}`} seat={s} selected={s.id === openId} />
-          ))}
-        </ul>
-      </aside>
-      <section
-        className={cn(
-          "flex min-w-0 flex-1 flex-col",
-          !openId && "hidden md:flex",
-        )}
-      >
-        {seat ? <Thread seat={seat} showBack={!desktop} /> : <p className="p-6 text-sm text-subtle">{EMPTY}</p>}
-      </section>
+    <div className="flex min-h-0 flex-1 flex-col md:h-full">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <aside
+          className={cn(
+            "flex w-full shrink-0 flex-col border-border md:w-72 md:border-r",
+            openId && "hidden md:flex",
+          )}
+        >
+          <header className="border-b border-border px-4 py-4">
+            <h1 className="text-2xl">Staff</h1>
+            <p className="mt-1 text-sm text-muted">Who is watching the same bets.</p>
+          </header>
+          <ul className="min-h-0 flex-1 overflow-y-auto">
+            {stamp.seats.map((s) => (
+              <SeatRow key={`${s.id}:${tick}`} seat={s} selected={s.id === openId} />
+            ))}
+          </ul>
+        </aside>
+        <section
+          className={cn(
+            "flex min-w-0 flex-1 flex-col",
+            !openId && "hidden md:flex",
+          )}
+        >
+          {seat ? <Thread seat={seat} showBack={!desktop} /> : <p className="p-6 text-sm text-subtle">{EMPTY}</p>}
+        </section>
+      </div>
+      <div className="shrink-0 border-t border-border px-4 py-6 md:px-6">
+        <FloorLog />
+      </div>
     </div>
   );
 }

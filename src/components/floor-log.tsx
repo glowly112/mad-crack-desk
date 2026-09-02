@@ -1,7 +1,8 @@
 import { MarkIssues, MarkKeep } from "@/components/marks";
 import { EmptyState } from "@/components/empty-state";
 import { useStamp } from "@/components/plant-context";
-import { EMPTY, hopMoves } from "@/lib/lab/desk";
+import { EMPTY, hopMoves, strategyMark } from "@/lib/lab/desk";
+import { hopVoice } from "@/lib/lab/staff-voice";
 
 export function FloorLog() {
   const stamp = useStamp();
@@ -9,16 +10,17 @@ export function FloorLog() {
 
   return (
     <section>
-      <header className="mb-2 flex items-baseline justify-between">
+      <header className="mb-2 flex items-baseline justify-between gap-3 border-b border-border pb-2">
         <h2 className="text-sm font-medium text-muted">State hops</h2>
         <p className="text-xs text-subtle">Mill tape</p>
       </header>
       {hops.length === 0 ? (
         <EmptyState copy={EMPTY} />
       ) : (
-        <ol className="space-y-2 font-mono text-xs">
+        <ol className="space-y-3">
           {hops.map((row, i) => {
             const Icon = row.to === "Dead" ? MarkIssues : MarkKeep;
+            const line = hopVoice(row);
             return (
               <li
                 key={row.at + row.recipe}
@@ -26,11 +28,12 @@ export function FloorLog() {
                 style={{ animationDelay: `${Math.min(i, 8) * 28}ms` }}
               >
                 <Icon className="mt-0.5 size-3.5 shrink-0 text-subtle" />
-                <span className="w-10 shrink-0 text-subtle">{row.at}</span>
-                <span className="min-w-0 text-muted">
-                  {row.recipe} · {row.from} → {row.to}
-                  <span className="block text-subtle">{row.why}</span>
-                </span>
+                <div className="min-w-0">
+                  <p className="text-sm">
+                    <span className="font-mono text-xs text-subtle">{row.at}</span>
+                    {line ? ` · ${line}` : ` · ${strategyMark(row.recipe)}`}
+                  </p>
+                </div>
               </li>
             );
           })}

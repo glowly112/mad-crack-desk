@@ -4,6 +4,7 @@ import { useDayScope } from "@/components/day-scope";
 import { LiveDot } from "@/components/live-dot";
 import { usePlantSource, useStamp } from "@/components/plant-context";
 import { EmptyState } from "@/components/empty-state";
+import { racingSquare } from "@/lib/lab/boards";
 import {
   axisDay,
   dailyDomain,
@@ -11,10 +12,7 @@ import {
   EMPTY,
   floorDayValue,
   floorFacts,
-  hopMoves,
-  hopTally,
   seriesWindow,
-  strategyMark,
   type FloorFact,
   type FloorFactId,
 } from "@/lib/lab/desk";
@@ -25,11 +23,19 @@ export function PlantPane() {
   const plant = usePlantSource();
   const scope = useDayScope();
   const [fact, setFact] = useState<FloorFactId>("paper");
-  const facts = floorFacts(stamp, scope);
+  const huntNotes = [stamp.office.inventWhy, ...stamp.hunters.map((h) => h.note)];
+  const holes = racingSquare({
+    recipes: stamp.recipes,
+    coverage: stamp.coverage,
+    moves: stamp.moves,
+    floorLog: stamp.floorLog,
+    huntNotes,
+    namedHoles: stamp.holes,
+  });
+  const emptyHoles = holes.filter((h) => h.tone === "empty").length;
+  const facts = floorFacts(stamp, scope, emptyHoles);
   const selected = facts.find((f) => f.id === fact) ?? facts[0];
   const live = plant.source === "oracle";
-  const hops = hopMoves(stamp.moves);
-  const tally = hopTally(stamp.moves);
 
   return (
     <section className="space-y-4">
@@ -50,33 +56,11 @@ export function PlantPane() {
         <header className="mb-2 flex items-baseline justify-between gap-3">
           <h2 className="text-sm font-medium text-muted">{selected?.label ?? "Paper"}</h2>
           <p className="font-mono text-xs text-subtle">
-            {selected?.kind === "count" ? "count / day" : "u / day"}
+            {selected?.kind === "count" ? "on the square" : "u / day"}
           </p>
         </header>
         <DayChips days={stamp.trends.map((t) => t.day)} />
         <DailyBars fact={fact} />
-      </div>
-
-      <div>
-        <p className="font-mono text-xs text-subtle">
-          Moved ·{" "}
-          {tally.length ? tally.map((t) => `${t.label} ${t.n}`).join(" · ") : EMPTY}
-        </p>
-        {hops.length ? (
-          <ul className="mt-2 space-y-1">
-            {hops.map((h) => (
-              <li key={`${h.at}-${h.recipe}-${h.to}`} className="flex min-w-0 flex-wrap gap-x-3 text-xs">
-                <span className="font-mono text-subtle">{h.at}</span>
-                <span>{strategyMark(h.recipe)}</span>
-                <span className="text-subtle">
-                  {h.from} → {h.to}
-                </span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <EmptyState copy={EMPTY} />
-        )}
       </div>
     </section>
   );
@@ -98,6 +82,12 @@ function FactCell({
         ? "text-up"
         : "text-bad"
       : "text-fg";
+  const display =
+    fact.kind === "u"
+      ? fmtScore(fact.value)
+      : fact.value == null
+        ? EMPTY
+        : String(fact.value);
   return (
     <button
       type="button"
@@ -111,7 +101,7 @@ function FactCell({
     >
       <p className="text-xs text-muted">{fact.label}</p>
       <p key={`${fact.id}-${fact.value}`} className={cn("log-in mt-1 font-mono text-2xl leading-none tracking-tight", tone)}>
-        {fact.kind === "u" ? fmtScore(fact.value) : fact.value == null ? EMPTY : String(fact.value)}
+        {display}
       </p>
       <p className="mt-1.5 text-[10px] text-subtle">{fact.hint}</p>
     </button>
@@ -132,7 +122,7 @@ function DailyBars({ fact }: { fact: FloorFactId }) {
     .map((d) => stamp.trends.find((t) => t.day === d))
     .filter(Boolean) as typeof stamp.trends;
   const nums = series.map((p) => floorDayValue(fact, p));
-  const vacant = nums.every((v) => v == null);
+  const vacant = fact === "holes" || nums.every((v) => v == null);
   if (vacant) {
     return (
       <div className="mt-3">
@@ -157,7 +147,6 @@ function DailyBars({ fact }: { fact: FloorFactId }) {
   const yAt = (v: number) => padT + innerH - ((v - lo) / span) * innerH;
   const y0 = yAt(0);
   const yTicks = dailyTicks([lo, hi]);
-  const unit = fact === "solids" || fact === "tape" ? "" : "u";
 
   return (
     <div>
@@ -167,11 +156,9 @@ function DailyBars({ fact }: { fact: FloorFactId }) {
         role="img"
         aria-label={`Daily ${fact}. Empty days stay Empty.`}
       >
-        {unit ? (
-          <text x={4} y={12} className="fill-subtle font-mono" fontSize="9">
-            {unit}
-          </text>
-        ) : null}
+        <text x={4} y={12} className="fill-subtle font-mono" fontSize="9">
+          u
+        </text>
         {yTicks.map((tick) => (
           <g key={`y-${tick}`}>
             <line
@@ -240,4 +227,3 @@ function DailyBars({ fact }: { fact: FloorFactId }) {
     </div>
   );
 }
-

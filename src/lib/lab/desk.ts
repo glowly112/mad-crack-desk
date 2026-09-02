@@ -31,7 +31,22 @@ export type NextAction = {
   action: string;
 };
 
-/** Clerk line on Floor only when KEEP is on hold and the fuse is off. Never a fake card. */
+/** Clerk slang → one English line on Floor. Fuse stays off. */
+export function floorNextLine(stamp: {
+  fuse_on: boolean;
+  topBlocker?: NextAction | null;
+}): string | null {
+  if (stamp.fuse_on) return null;
+  const b = stamp.topBlocker;
+  if (!b) return null;
+  const blob = `${b.id} ${b.title} ${b.action}`.toLowerCase();
+  if (/keep-hold|keep on hold|fuse off|live_candidate/.test(blob)) {
+    return "Today's certified pick cannot go live yet. The fuse stays off.";
+  }
+  return null;
+}
+
+/** @deprecated use floorNextLine */
 export function floorNextAction(stamp: {
   fuse_on: boolean;
   topBlocker?: NextAction | null;
@@ -61,7 +76,7 @@ export function productionTicks(domain: [number, number]): number[] {
   return dailyTicks(domain);
 }
 
-export type FloorFactId = "paper" | "solids" | "tape" | "production" | "live";
+export type FloorFactId = "holes" | "paper" | "production" | "live";
 
 export type FloorFact = {
   id: FloorFactId;
@@ -111,15 +126,15 @@ export function hopTally(moves: readonly Move[]): { label: string; n: number }[]
 export function floorDayValue(id: FloorFactId, point: TrendPoint | undefined): number | null {
   if (!point) return null;
   if (id === "paper") return point.paper_live_day_u;
-  if (id === "solids" || id === "tape") return point.n_solid;
   if (id === "production") return point.factory_day_pnl_u;
   return null;
 }
 
-/** Independent Floor facts. No aim, behind, or remaining. */
+/** Independent Floor facts. No aim, mill, or quota language. */
 export function floorFacts(
   stamp: FloorStamp,
   scope: { day: string; lookingBack: boolean },
+  emptyHoles: number,
 ): FloorFact[] {
   const trend = stamp.trends.find((t) => t.day === scope.day);
   const paper = scope.lookingBack
@@ -129,26 +144,17 @@ export function floorFacts(
         day_u: stamp.hero.day_u,
         researchKeepGbp: stamp.researchKeepGbp,
       });
-  const solids = scope.lookingBack ? (trend?.n_solid ?? 0) : stamp.n_solid;
-  const tape = scope.lookingBack ? (trend?.n_solid ?? 0) : floorTapeWaiting(stamp);
   const production = trend?.factory_day_pnl_u ?? null;
   const dayHint = scope.lookingBack ? axisDay(scope.day) : "today";
   return [
+    {
+      id: "holes",
+      label: "Empty holes",
+      hint: "on the square",
+      value: emptyHoles,
+      kind: "count",
+    },
     { id: "paper", label: "Paper", hint: dayHint, value: paper, kind: "u" },
-    {
-      id: "solids",
-      label: "Solids",
-      hint: "certified",
-      value: solids > 0 ? solids : null,
-      kind: "count",
-    },
-    {
-      id: "tape",
-      label: "Tape",
-      hint: scope.lookingBack ? "on tape" : "waiting",
-      value: tape > 0 ? tape : null,
-      kind: "count",
-    },
     { id: "production", label: "Production", hint: dayHint, value: production, kind: "u" },
     {
       id: "live",

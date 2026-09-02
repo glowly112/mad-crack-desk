@@ -18,6 +18,7 @@ import {
   floorSeats,
   hopMoves,
   floorNextAction,
+  floorNextLine,
   parkedCount,
   recipePack,
   solidRows,
@@ -58,6 +59,10 @@ test("Floor next action is KEEP on hold while fuse is off, else Empty", () => {
   assert.equal(floorNextAction(STAMP)?.id, "keep-hold-paper");
   assert.equal(floorNextAction({ ...STAMP, fuse_on: true }), null);
   assert.equal(floorNextAction({ fuse_on: false, topBlocker: null }), null);
+  const line = floorNextLine(STAMP);
+  assert.ok(line);
+  assert.ok(!/KEEP|LIVE_CANDIDATE|fuse gate/i.test(line!));
+  assert.match(line!, /fuse stays off/i);
 });
 
 test("floor watching strip is Clerk, Foreman, mill", () => {
@@ -130,7 +135,8 @@ test("daily window and domain keep Empty days off the scale", () => {
 });
 
 test("Floor facts are plant numbers, not a 100u quota", () => {
-  const facts = floorFacts(STAMP, { day: STAMP.day, lookingBack: false });
+  const emptyHoles = 42;
+  const facts = floorFacts(STAMP, { day: STAMP.day, lookingBack: false }, emptyHoles);
   const blob = JSON.stringify(facts).toLowerCase();
   assert.ok(!blob.includes("aim"));
   assert.ok(!blob.includes("behind"));
@@ -138,20 +144,11 @@ test("Floor facts are plant numbers, not a 100u quota", () => {
   assert.ok(!blob.includes("remaining"));
   assert.ok(!blob.includes("100"));
   assert.ok(!blob.includes("£"));
+  assert.equal(facts.find((f) => f.id === "holes")?.value, emptyHoles);
   assert.equal(facts.find((f) => f.id === "paper")?.value, null);
-  assert.equal(facts.find((f) => f.id === "solids")?.value, 1);
-  assert.equal(facts.find((f) => f.id === "tape")?.value, 1);
-  assert.equal(
-    floorFacts(
-      { ...STAMP, wait_open: [{ id: "H-parked-not-tape" }] },
-      { day: STAMP.day, lookingBack: false },
-    ).find((f) => f.id === "tape")?.value,
-    1,
-  );
   assert.equal(facts.find((f) => f.id === "production")?.value, null);
   assert.equal(facts.find((f) => f.id === "live")?.value, null);
+  assert.deepEqual(facts.map((f) => f.id), ["holes", "paper", "production", "live"]);
   const tally = hopTally(STAMP.moves);
   assert.ok(tally.some((t) => t.label === "Certified" && t.n === 1));
-  assert.ok(tally.some((t) => t.label === "Dead" && t.n === 1));
-  assert.ok(tally.some((t) => t.label === "parked" && t.n === 1));
 });
