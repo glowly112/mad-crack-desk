@@ -9,6 +9,7 @@ import {
   issueBoard,
   officeCountries,
   officeWorkers,
+  factorySquares,
   pipeBoard,
   recipeStatus,
   staffLine,
@@ -86,6 +87,11 @@ test("Pipe stages are the factory line; Live is 0 while fuse is off", () => {
   assert.match(board.stuck, /Live is off/);
   assert.ok(!board.stuck.includes("Invent"));
   assert.ok(!board.stuck.includes("⊆"));
+  const squares = factorySquares(board.stages);
+  assert.equal(squares.filter((s) => s.key === "proving").length, 21);
+  assert.equal(squares.filter((s) => s.key === "certified").length, 1);
+  assert.equal(squares.filter((s) => s.key === "live").length, 0);
+  assert.equal(squares.length, 12 + 21 + 1 + 1);
 });
 
 test("Health rows are sentences, not RED/AMBER/GREEN", () => {

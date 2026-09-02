@@ -5,7 +5,7 @@ import { HUNTER_MARKS } from "@/components/marks";
 import { LiveDot } from "@/components/live-dot";
 import { ownerId, Portrait } from "@/components/portrait";
 import { useStamp } from "@/components/plant-context";
-import { issueBoard, officeWorkers, pipeBoard, recipeStatus } from "@/lib/lab/boards";
+import { factorySquares, issueBoard, officeWorkers, pipeBoard, recipeStatus } from "@/lib/lab/boards";
 import { EMPTY, recipePack } from "@/lib/lab/desk";
 import type { Recipe } from "@/lib/lab/stamp";
 import { cn } from "@/lib/utils";
@@ -51,10 +51,22 @@ export function ThingsToFix() {
   );
 }
 
-/** Factory line: stuck sentence + five stage counts. */
+const STAGE_SQ: Record<string, string> = {
+  pitched: "bg-muted",
+  proving: "bg-warn",
+  closed: "bg-subtle",
+  certified: "bg-fg",
+  live: "bg-up",
+};
+
+/** Factory line: stuck sentence + a pile of unit squares. Numbers stay quiet. */
 export function FactoryLine() {
   const stamp = useStamp();
   const board = pipeBoard(stamp.pipe, stamp.fuse_on);
+  const squares = factorySquares(board.stages);
+  const glance = board.stages
+    .map((s) => `${s.label} ${s.count === 0 ? EMPTY : s.count}`)
+    .join(". ");
 
   return (
     <section className="space-y-5">
@@ -70,19 +82,29 @@ export function FactoryLine() {
           <span>{board.stuck}</span>
         </p>
       )}
-      <ol className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+      {squares.length === 0 ? (
+        <EmptyState copy={EMPTY} />
+      ) : (
+        <div className="flex flex-wrap gap-[3px]" role="img" aria-label={glance}>
+          {squares.map((sq, i) => (
+            <span
+              key={sq.id}
+              className={cn("log-in size-3.5 rounded-[2px]", STAGE_SQ[sq.key] ?? "bg-muted")}
+              style={{ animationDelay: `${Math.min(i, 20) * 12}ms` }}
+              title={sq.label}
+            />
+          ))}
+        </div>
+      )}
+      <ol className="flex flex-wrap gap-x-5 gap-y-2">
         {board.stages.map((s) => (
-          <li key={s.key} className="log-in min-w-0">
-            <p className="text-sm text-muted">{s.label}</p>
-            <p
-              className={cn(
-                "mt-1 font-mono text-5xl leading-none tracking-tight",
-                s.stuck ? "text-warn" : "text-fg",
-              )}
-            >
-              {s.count}
-            </p>
-            {s.hint ? <p className="mt-2 text-xs text-subtle">{s.hint}</p> : null}
+          <li key={s.key} className="flex items-baseline gap-1.5 text-xs">
+            <span
+              className={cn("inline-block size-2 translate-y-px rounded-[1px]", STAGE_SQ[s.key] ?? "bg-muted")}
+              aria-hidden
+            />
+            <span className="text-muted">{s.label}</span>
+            <span className="font-mono text-subtle">{s.count === 0 ? EMPTY : s.count}</span>
           </li>
         ))}
       </ol>

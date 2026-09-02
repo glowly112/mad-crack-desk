@@ -342,6 +342,20 @@ export function pipeBoard(
   return { stages: marked, stuck: bits.length ? `${bits.join(". ")}.` : EMPTY };
 }
 
+export type FactorySquare = { id: string; key: string; label: string };
+
+/** One unit square per recipe in a stage. Count 0 — including Live while the fuse is off — adds none. */
+export function factorySquares(stages: readonly PipeStage[]): FactorySquare[] {
+  const out: FactorySquare[] = [];
+  for (const s of stages) {
+    const n = Number.isFinite(s.count) ? Math.max(0, Math.floor(s.count)) : 0;
+    for (let i = 0; i < n; i++) {
+      out.push({ id: `${s.key}-${i}`, key: s.key, label: s.label });
+    }
+  }
+  return out;
+}
+
 export type HealthGroup = "broken" | "watching" | "fine";
 
 export type HealthRow = {
