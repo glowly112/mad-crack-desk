@@ -5,10 +5,12 @@ import type { LiveStamp } from "./from-digest.ts";
 
 const REGIONS_LIST = ["AU", "GB", "IE", "US", "NZ", "ZA", "HK", "FR"] as const;
 
-export function isBoardResetView(
-  stamp: Pick<LiveStamp, "n_solid" | "recipes" | "trades">,
-): boolean {
-  return stamp.n_solid === 0 && stamp.recipes.length === 0 && stamp.trades.length === 0;
+export function isBoardResetView(stamp: {
+  n_solid?: number;
+  recipes?: readonly unknown[];
+  trades?: readonly unknown[];
+}): boolean {
+  return stamp.n_solid === 0 && (stamp.recipes?.length ?? 0) === 0 && (stamp.trades?.length ?? 0) === 0;
 }
 
 /** Strip legacy tape, recipes, and fills from whatever poll returned — desk shows a fresh hunt. */
@@ -86,8 +88,8 @@ export function applyBoardResetView(stamp: LiveStamp): LiveStamp {
           action: "Inspect the KEEP gate. Do not arm the fuse.",
         }
       : null,
-    issues: stamp.issues.filter((i) => i.id === "keep-hold-paper" || i.id === "live-subset"),
-  };
+    issues: stamp.issues.filter((i) => i.id === "keep-hold-paper"),
+  } as unknown as LiveStamp;
 }
 
 function boardResetSeatNow(seatId: string): string {

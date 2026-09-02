@@ -2,12 +2,13 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { floorRacingSquare } from "./boards.ts";
 import { applyBoardResetView, isBoardResetView } from "./board-reset.ts";
+import type { LiveStamp } from "./from-digest.ts";
 import { STAMP } from "./stamp.ts";
 import { EMPTY } from "./desk.ts";
 import { seatBubbles } from "./staff-voice.ts";
 
 test("board reset view is empty tape and empty recipes", () => {
-  const reset = applyBoardResetView(STAMP as import("./from-digest.ts").LiveStamp);
+  const reset = applyBoardResetView(STAMP as unknown as LiveStamp);
   assert.equal(isBoardResetView(reset), true);
   assert.equal(reset.n_solid, 0);
   assert.equal(reset.trades.length, 0);
@@ -21,7 +22,7 @@ test("board reset view is empty tape and empty recipes", () => {
 });
 
 test("floor square is 64 empty holes on board reset", () => {
-  const reset = applyBoardResetView(STAMP as import("./from-digest.ts").LiveStamp);
+  const reset = applyBoardResetView(STAMP as unknown as LiveStamp);
   const holes = floorRacingSquare({ namedHoles: reset.holes });
   assert.equal(holes.length, 64);
   assert.equal(holes.filter((h) => h.tone === "empty").length, 64);
@@ -29,7 +30,7 @@ test("floor square is 64 empty holes on board reset", () => {
 });
 
 test("staff on board reset watches empty square, not Britain tape", () => {
-  const reset = applyBoardResetView(STAMP as import("./from-digest.ts").LiveStamp);
+  const reset = applyBoardResetView(STAMP as unknown as LiveStamp);
   const clerk = seatBubbles(reset.seats.find((s) => s.id === "clerk")!, reset).map((b) => b.text).join(" ");
   assert.match(clerk, /empty/i);
   assert.ok(!clerk.includes("Britain · near-off"));
