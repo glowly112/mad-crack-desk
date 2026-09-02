@@ -23,6 +23,26 @@ export function parkedCount(keep: number, n_solid: number): number {
   return Math.max(0, keep - n_solid);
 }
 
+export type NextAction = {
+  id: string;
+  title: string;
+  owner: string;
+  action: string;
+};
+
+/** Clerk line on Floor only when KEEP is on hold and the fuse is off. Never a fake card. */
+export function floorNextAction(stamp: {
+  fuse_on: boolean;
+  topBlocker?: NextAction | null;
+}): NextAction | null {
+  if (stamp.fuse_on) return null;
+  const b = stamp.topBlocker;
+  if (!b) return null;
+  const blob = `${b.id} ${b.title} ${b.action}`.toLowerCase();
+  if (/keep-hold|keep on hold|fuse off/.test(blob)) return b;
+  return null;
+}
+
 const HOP_TO = new Set(["Certified", "Solid", "Research keep", "Dead", "Parked"]);
 
 /** State hops only — not proving ticks. */

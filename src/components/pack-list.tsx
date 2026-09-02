@@ -6,21 +6,30 @@ import { EMPTY, SOLID_EMPTY, parkedCount, recipePack, solidRows } from "@/lib/la
 import type { Recipe } from "@/lib/lab/stamp";
 import { cn } from "@/lib/utils";
 
+/** Floor morning board: solids only. */
 export function PackList() {
   const stamp = useStamp();
-  const pack = recipePack(stamp.recipes);
   const solids = solidRows(stamp.recipes, stamp.n_solid);
 
   return (
+    <Group
+      icon={MarkSolid}
+      label="Solid"
+      hint="Production tape"
+      count={stamp.n_solid}
+      empty={SOLID_EMPTY}
+      rows={solids}
+    />
+  );
+}
+
+/** Office backstage: parked research and the proving pile. Not Floor. */
+export function BackstagePacks() {
+  const stamp = useStamp();
+  const pack = recipePack(stamp.recipes);
+
+  return (
     <section className="space-y-8">
-      <Group
-        icon={MarkSolid}
-        label="Solid"
-        hint="Production tape"
-        count={stamp.n_solid}
-        empty={SOLID_EMPTY}
-        rows={solids}
-      />
       <Group
         icon={MarkKeep}
         label="Research keep"

@@ -10,6 +10,7 @@ import {
   dayWindow,
   floorSeats,
   hopMoves,
+  floorNextAction,
   parkedCount,
   recipePack,
   solidRows,
@@ -44,6 +45,12 @@ test("floor log hops are state changes, not proving ticks", () => {
   assert.ok(hops.some((m) => m.to === "Certified"));
   assert.ok(hops.some((m) => m.to === "Dead"));
   assert.ok(hops.every((m) => m.from !== "Proving" || m.to !== "Proving"));
+});
+
+test("Floor next action is KEEP on hold while fuse is off, else Empty", () => {
+  assert.equal(floorNextAction(STAMP)?.id, "keep-hold-paper");
+  assert.equal(floorNextAction({ ...STAMP, fuse_on: true }), null);
+  assert.equal(floorNextAction({ fuse_on: false, topBlocker: null }), null);
 });
 
 test("floor watching strip is Clerk, Foreman, mill", () => {

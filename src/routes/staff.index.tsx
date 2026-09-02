@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { FloorLog } from "@/components/floor-log";
 import { LiveDot } from "@/components/live-dot";
 import { Portrait } from "@/components/portrait";
 import { useStamp } from "@/components/plant-context";
@@ -51,6 +52,7 @@ function StaffIndex() {
           );
         })}
       </ul>
+      <FloorLog />
     </div>
   );
 }

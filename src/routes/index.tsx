@@ -1,61 +1,53 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { BettingStrip } from "@/components/betting-strip";
-import { FloorLog } from "@/components/floor-log";
+import { EmptyState } from "@/components/empty-state";
 import { HeroStrip, ScoreChart } from "@/components/hero-strip";
 import { PackList } from "@/components/pack-list";
 import { Portrait } from "@/components/portrait";
-import { StaffStrip } from "@/components/staff-strip";
 import { useStamp } from "@/components/plant-context";
-import { parkedCount } from "@/lib/lab/desk";
-import { fmtU } from "@/lib/utils";
+import { EMPTY, floorNextAction } from "@/lib/lab/desk";
 
 export const Route = createFileRoute("/")({ component: Floor });
 
 function Floor() {
   const stamp = useStamp();
+  const next = floorNextAction(stamp);
+
   return (
     <div className="floor-desk grid grid-cols-1 gap-8 lg:grid-cols-12">
-      <div className="space-y-6 lg:col-span-7 lg:row-start-1">
+      <div className="space-y-6 lg:col-span-7">
         <HeroStrip />
         <BettingStrip loud />
-        <p className="font-mono text-xs text-subtle">
-          Keep {stamp.counts.keep} · parked {parkedCount(stamp.counts.keep, stamp.n_solid)} · proving{" "}
-          {stamp.counts.measuring} · freeze {fmtU(stamp.researchKeepGbp)} · not income
-        </p>
-      </div>
-
-      <div className="floor-rail gap-8 lg:col-span-5 lg:row-span-2 lg:row-start-1">
-        <ScoreChart />
-        <FloorLog />
-      </div>
-
-      <div className="space-y-8 lg:col-span-7 lg:row-start-2">
-        <aside className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-warn/30 bg-elev px-4 py-3">
-          <Link
-            to="/issues/$id"
-            params={{ id: stamp.topBlocker.id }}
-            className="flex min-w-0 items-start gap-3 transition-transform duration-150 ease-out active:scale-[0.96]"
-          >
-            <Portrait id="clerk" name="Clerk" size="sm" />
-            <div>
-              <p className="text-xs text-warn">Action required</p>
-              <p className="text-sm">{stamp.topBlocker.title}</p>
-              <p className="text-xs text-subtle">
-                {stamp.topBlocker.owner} · {stamp.topBlocker.action}
-              </p>
-            </div>
-          </Link>
-          <Link
-            to="/issues"
-            className="rounded-sm border border-border px-3 py-2 text-sm text-fg transition-transform duration-150 ease-out active:scale-[0.96]"
-          >
-            Issues
-          </Link>
-        </aside>
-
-        <StaffStrip />
+        <NextActionLine next={next} />
         <PackList />
       </div>
+      <div className="min-w-0 lg:col-span-5">
+        <ScoreChart />
+      </div>
     </div>
+  );
+}
+
+function NextActionLine({ next }: { next: ReturnType<typeof floorNextAction> }) {
+  return (
+    <section>
+      <header className="mb-2 flex items-baseline justify-between gap-3 border-b border-border pb-2">
+        <h2 className="text-sm font-medium">Next</h2>
+        <p className="text-xs text-subtle">Clerk</p>
+      </header>
+      {next ? (
+        <div className="flex min-w-0 items-start gap-3">
+          <Portrait id="clerk" name="Clerk" size="sm" />
+          <div>
+            <p className="text-sm">{next.title}</p>
+            <p className="text-xs text-subtle">
+              {next.owner} · {next.action}
+            </p>
+          </div>
+        </div>
+      ) : (
+        <EmptyState copy={EMPTY} />
+      )}
+    </section>
   );
 }

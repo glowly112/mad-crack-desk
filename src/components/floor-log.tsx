@@ -8,15 +8,15 @@ export function FloorLog() {
   const hops = hopMoves(stamp.moves);
 
   return (
-    <section className="floor-log-pane flex min-h-0 flex-1 flex-col">
+    <section>
       <header className="mb-2 flex items-baseline justify-between">
-        <h2 className="text-sm font-medium text-muted">Floor log</h2>
-        <p className="text-xs text-subtle">State hops</p>
+        <h2 className="text-sm font-medium text-muted">State hops</h2>
+        <p className="text-xs text-subtle">Mill tape</p>
       </header>
       {hops.length === 0 ? (
         <EmptyState copy={EMPTY} />
       ) : (
-        <ol className="min-h-0 flex-1 space-y-2 overflow-visible font-mono text-xs lg:overflow-hidden">
+        <ol className="space-y-2 font-mono text-xs">
           {hops.map((row, i) => {
             const Icon = row.to === "Dead" ? MarkIssues : MarkKeep;
             return (

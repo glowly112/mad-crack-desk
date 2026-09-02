@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { HUNTER_MARKS } from "@/components/marks";
 import { LiveDot } from "@/components/live-dot";
+import { BackstagePacks } from "@/components/pack-list";
 import { useStamp } from "@/components/plant-context";
 import { cn } from "@/lib/utils";
 
@@ -81,6 +82,8 @@ export function Office() {
           ))}
         </ul>
       </section>
+
+      <BackstagePacks />
     </div>
   );
 }
