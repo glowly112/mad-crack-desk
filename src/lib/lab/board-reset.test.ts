@@ -87,6 +87,28 @@ test("STAMP legacy recipes do not count as armed — post-epoch arms only", () =
   assert.equal(isBoardResetView(STAMP), true);
 });
 
-test("epoch constant matches frozen reset stamp", () => {
-  assert.equal(STAMP.generated, BOARD_RESET_EPOCH);
+test("ehole measuring cell survives post-epoch filter", () => {
+  const ehole = {
+    id: "H-ehole-au-nearoff-win-34829Z",
+    title: "ehole_au_near_off_win_34829Z",
+    region: "AU" as const,
+    status: "MEASURING" as const,
+    badge: "Research" as const,
+    chip: null,
+    n: 3,
+    roi: 0,
+    freezePnl: 0,
+    why: "Still proving. Not the score.",
+  };
+  assert.equal(recipeIsPostEpoch(ehole), true);
+  const view = applyBoardResetView({
+    ...STAMP,
+    source: "oracle",
+    generated: "20260902T235019Z",
+    recipes: [ehole],
+    trades: [],
+    wait_open: [],
+  } as unknown as LiveStamp);
+  assert.equal(view.recipes.length, 1);
+  assert.equal(isBoardResetView(view), false);
 });

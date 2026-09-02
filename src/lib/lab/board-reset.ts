@@ -20,11 +20,18 @@ function isPostEpochCompact(epoch: string): boolean {
   return epoch.toUpperCase() >= BOARD_RESET_EPOCH;
 }
 
-/** Recipe armed on the board after reset — run stamp in id, or live oracle cell. */
+/** Recipe armed on the board after reset — run stamp in id, ehole invent, or live poll. */
 export function recipeIsPostEpoch(recipe: Recipe): boolean {
   const fromId = compactEpoch(recipe.id);
   if (fromId) return isPostEpochCompact(fromId);
+  if (/^H-ehole-/i.test(recipe.id) || /^ehole_/i.test(recipe.title)) return true;
+  if (/H-20260902T/i.test(recipe.id)) return true;
   return false;
+}
+
+function stampGeneratedPostEpoch(stamp: LiveStamp): boolean {
+  const g = compactEpoch(stamp.generated);
+  return g ? isPostEpochCompact(g) : false;
 }
 
 export function fillIsPostEpoch(fill: Fill): boolean {
@@ -68,6 +75,9 @@ function filterWaitOpen(
 
 /** Drop legacy tape, recipes, and fills — keep post-epoch plant facts. */
 export function filterPreEpochLeftovers(stamp: LiveStamp): LiveStamp {
+  if (stamp.source === "oracle" && stampGeneratedPostEpoch(stamp)) {
+    return stamp;
+  }
   const recipes = stamp.recipes.filter(recipeIsPostEpoch);
   const solids = recipes.filter((r) => r.badge === "Solid");
   const trades = stamp.trades.filter(fillIsPostEpoch);

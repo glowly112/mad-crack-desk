@@ -2,11 +2,12 @@ import type { LiveStamp } from "./from-digest.ts";
 import { cellName } from "./desk.ts";
 import type { Badge, Chip, Recipe } from "./stamp.ts";
 import { parseFills, parseWaitOpen } from "./trades.ts";
+import { parseHole } from "./boards.ts";
 
 const REGIONS = ["AU", "GB", "IE", "US", "NZ", "ZA", "HK", "FR"] as const;
 const BADGES: Badge[] = ["Solid", "Research", "Parked", "Dead"];
 const CHIPS: Chip[] = ["Waiting for races", "Booking", "On tape today"];
-const RECIPE_CAP = 8;
+const RECIPE_CAP = 16;
 
 function rec(v: unknown): Record<string, unknown> | null {
   return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
@@ -105,7 +106,7 @@ function recipesFromCells(cells: Record<string, unknown>[]): Recipe[] {
   const measuring: Recipe[] = [];
   for (const c of cells) {
     const status = statusOf(c);
-    if (status !== "KEEP" && status !== "MEASURING") continue;
+    if (status !== "KEEP" && status !== "MEASURING" && status !== "HUNTING") continue;
     const score = rec(c.score) ?? {};
     const stats = rec(c.stats) ?? {};
     const id = String(c.id || c.title || "").trim();
@@ -139,6 +140,41 @@ function recipesFromCells(cells: Record<string, unknown>[]): Recipe[] {
   return [...keep, ...measuring].slice(0, RECIPE_CAP);
 }
 
+function holeFromCell(c: Record<string, unknown>): LiveStamp["holes"][number] | null {
+  const status = statusOf(c);
+  if (status !== "KEEP" && status !== "MEASURING" && status !== "HUNTING") return null;
+  const id = String(c.id || "");
+  const title = String(c.title || "");
+  const blob = `${title} ${id}`
+    .replace(/^ehole_/i, "")
+    .replace(/^H-ehole-/i, "")
+    .replace(/_/g, " ")
+    .replace(/-/g, " ");
+  const parsed = parseHole(blob);
+  if (!parsed) return null;
+  const tone = status === "HUNTING" ? "hunt" : status === "KEEP" ? "parked" : "idea";
+  return {
+    region: parsed.region,
+    window: parsed.window,
+    market: parsed.market,
+    tone,
+  };
+}
+
+function holesFromCells(cells: Record<string, unknown>[]): LiveStamp["holes"] {
+  const out: LiveStamp["holes"] = [];
+  const seen = new Set<string>();
+  for (const c of cells) {
+    const hole = holeFromCell(c);
+    if (!hole) continue;
+    const key = `${hole.region}|${hole.window}|${hole.market}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(hole);
+  }
+  return out;
+}
+
 /**
  * Overlay a live oracle snapshot (Linear / local_api / firm scoreboard) onto a
  * digest-applied stamp. Never treats KEEP paper (pnlTotal) as the production score.
@@ -154,6 +190,7 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
 
   const truth = rec(snap.truth) ?? {};
   const summary = rec(snap.summary) ?? snap;
+  const cliff = rec(summary.settled_total_cliff);
   const by = rec(summary.by_status) ?? {};
   const liveMoney = rec(snap.liveMoney) ?? rec(snap.live_fast);
   const boardUx = rec(snap.boardUx) ?? rec(snap.board_ux);
@@ -198,6 +235,8 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
   const recipes = recipesFromCells(cellsOf(snap));
   const solids = recipes.filter((r) => r.badge === "Solid");
   const n_solid = nSolidExplicit ?? (recipes.length ? solids.length : base.n_solid);
+  const cellList = cellsOf(snap);
+  const namedHoles = holesFromCells(cellList);
 
   const date =
     typeof snap.date === "string" && snap.date
@@ -208,8 +247,11 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
   const generated =
     (typeof snap.generatedAt === "string" && snap.generatedAt) ||
     (typeof snap.generated_at_utc === "string" && snap.generated_at_utc) ||
+    (typeof cliff?.new_ts === "string" && cliff.new_ts) ||
     (typeof snap.ts === "string" && snap.ts) ||
     base.generated;
+
+  const plantOracle = isPlantSnap(opened);
 
   const trends = base.trends.map((t) => {
     if (t.day !== date) return t;
@@ -252,13 +294,15 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
       certified: n_solid,
       scaling: int(pipeline?.scaling) ?? int(scaling?.n_scaling) ?? base.pipe.scaling,
     },
-    recipes: recipes.length ? recipes : base.recipes,
-    solids: recipes.length ? solids : n_solid > 0 ? base.solids : [],
+    recipes: plantOracle ? recipes : recipes.length ? recipes : base.recipes,
+    solids: plantOracle ? solids : recipes.length ? solids : n_solid > 0 ? base.solids : [],
     seats: overlaySeats(base.seats, snap),
     trends,
     trades: Array.isArray(snap.fills) ? parseFills(snap.fills) : base.trades,
     wait_open: Array.isArray(snap.wait_open) ? parseWaitOpen(snap.wait_open) : (base.wait_open ?? []),
-    holes: holesFromSnap(snap) ?? base.holes,
+    holes: plantOracle
+      ? holesFromSnap(snap) ?? (namedHoles.length ? namedHoles : [])
+      : holesFromSnap(snap) ?? (namedHoles.length ? namedHoles : base.holes),
     office: {
       ...base.office,
       rejects: rejectsFromSnap(snap) ?? base.office.rejects,

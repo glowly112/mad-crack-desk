@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import liveSnap from "./live-snapshot.json" with { type: "json" };
 import { applyBoardResetView, isBoardResetView } from "./board-reset.ts";
 import { applySnapshot } from "./from-snapshot.ts";
+import { readLocalOraclePlant } from "./oracle-local-plant.ts";
 import { bootStamp, digestStamp, plantFromTape, type PlantPayload } from "./plant-boot.ts";
 import type { LiveStamp } from "./from-digest.ts";
 
@@ -101,6 +102,14 @@ function httpHeaders(): Record<string, string> {
   return { Authorization: `Basic ${token}` };
 }
 
+async function tryLocal(base: LiveStamp): Promise<PlantPayload | null> {
+  const snap = await readLocalOraclePlant();
+  if (!snap) return null;
+  const stamp = applySnapshot(snap, base);
+  if (stamp.source !== "oracle") return null;
+  return { stamp, source: "oracle", detail: "local oracle scoreboard" };
+}
+
 async function tryHttp(base: LiveStamp): Promise<PlantPayload | null> {
   const headers = httpHeaders();
   const hits = await Promise.all(
@@ -191,8 +200,8 @@ export async function loadPlant(): Promise<PlantPayload> {
     const base = digestStamp();
     const remote = Promise.race([
       (async () => {
-        const [http, ssh] = await Promise.all([tryHttp(base), trySsh(base)]);
-        let hit: PlantPayload | null = null;
+        const [local, http, ssh] = await Promise.all([tryLocal(base), tryHttp(base), trySsh(base)]);
+        let hit: PlantPayload | null = local;
         if (http && ssh) {
           const trades =
             http.stamp.trades.length === 0 && ssh.stamp.trades.length > 0
@@ -203,8 +212,21 @@ export async function loadPlant(): Promise<PlantPayload> {
               ? ssh.stamp.wait_open
               : (http.stamp.wait_open ?? []);
           hit = { ...http, stamp: { ...http.stamp, trades, wait_open } };
-        } else {
+        } else if (!hit) {
           hit = http ?? ssh;
+        } else if (http || ssh) {
+          const remote = http ?? ssh!;
+          hit = {
+            ...hit,
+            stamp: {
+              ...hit.stamp,
+              trades: hit.stamp.trades.length ? hit.stamp.trades : remote.stamp.trades,
+              wait_open:
+                (hit.stamp.wait_open?.length ?? 0) > 0
+                  ? hit.stamp.wait_open
+                  : remote.stamp.wait_open,
+            },
+          };
         }
         if (!hit) return null;
         const stamp = applyBoardResetView(hit.stamp);

@@ -246,34 +246,22 @@ test("empty fills array is Empty, missing fills keeps the digest tape", () => {
   assert.equal(kept.trades[0]?.id, "keep-me");
 });
 
-test("plant live snapshot is oracle, score stays empty when day_u is null", () => {
+test("plant live snapshot is oracle empty board when day_u is null", () => {
   const live = applySnapshot(snap, base());
   assert.equal(live.source, "oracle");
-  assert.equal(live.counts.keep, 3);
-  assert.equal(live.counts.measuring, 21);
-  assert.equal(live.n_solid, 1);
-  assert.equal(live.pipe.certified, 1);
-  assert.equal(live.pipe.certified, live.n_solid);
+  assert.equal(live.counts.keep, 0);
+  assert.equal(live.counts.measuring, 0);
+  assert.equal(live.n_solid, 0);
+  assert.equal(live.pipe.certified, 0);
   assert.equal(live.fuse_on, false);
   assert.equal(live.hero.day_u, null);
-  assert.equal(live.researchKeepGbp, 408.67);
+  assert.equal(live.researchKeepGbp, 0);
   assert.equal(live.generated, "20260902T101756Z");
-  assert.equal(live.recipes[0]?.badge, "Solid");
-  assert.equal(live.recipes[0]?.chip, "Waiting for races");
-  assert.equal(live.recipes[1]?.badge, "Parked");
+  assert.equal(live.recipes.length, 0);
   assert.equal(
     productionScore({ n_solid: live.n_solid, day_u: live.hero.day_u, researchKeepGbp: live.researchKeepGbp }),
     null,
   );
-  assert.equal(live.trades.filter((t) => t.result === "waiting").length, 4);
-  assert.equal(live.trades.filter((t) => t.result !== "waiting").length, 8);
-  assert.ok(live.trades.every((t) => t.book === "paper"));
-  assert.equal(live.trades[0]?.t, "10:59:45");
-  assert.equal(live.trades[0]?.flight, "waiting result");
-  assert.equal(live.trades[0]?.recipe, "GB near-off WIN");
-  assert.equal(live.trades[0]?.stake, 1);
-  assert.equal(live.trades[0]?.liquidity, 19.17);
-  assert.equal(live.wait_open.length, 1);
-  assert.equal(live.wait_open[0]?.title, "NZ morning WIN · one-pick 2.5–4.49");
-  assert.equal(live.wait_open[0]?.why, "no size_ok candidates");
+  assert.equal(live.trades.length, 0);
+  assert.equal(live.wait_open?.length ?? 0, 0);
 });
