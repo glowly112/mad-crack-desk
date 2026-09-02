@@ -4,5 +4,6 @@ export function productionScore(input: {
   researchKeepGbp: number;
 }): number | null {
   if (input.n_solid <= 0) return null;
+  if (input.day_u == null) return null;
   return input.day_u;
 }

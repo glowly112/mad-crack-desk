@@ -18,6 +18,14 @@ export const DEFAULT_PREFS: Prefs = {
   size: "m",
 };
 
+/** Browser chrome / PWA status bar — must match each theme bg. */
+export const THEME_COLOR: Record<Theme, string> = {
+  charcoal: "#0a0a0b",
+  paper: "#f7f0e3",
+  night: "#06080f",
+  lab: "#041208",
+};
+
 export const PREFS_KEY = "mcl.prefs";
 
 function oneOf<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
@@ -44,6 +52,10 @@ export function applyPrefs(prefs: Prefs, el: HTMLElement = document.documentElem
   el.dataset.theme = prefs.theme;
   el.dataset.font = prefs.font;
   el.dataset.size = prefs.size;
+  if (typeof document !== "undefined") {
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", THEME_COLOR[prefs.theme]);
+  }
 }
 
 export function readStoredPrefs(): Prefs {

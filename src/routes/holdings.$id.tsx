@@ -1,7 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { DetailShell } from "@/components/detail-shell";
 import { useStamp } from "@/components/plant-context";
-import { cn } from "@/lib/utils";
+import { BookStageLine } from "@/components/book-stages";
+import { bookStages, recipeStatus } from "@/lib/lab/boards";
+import { EMPTY, strategyMark } from "@/lib/lab/desk";
+import { cn, fmtU } from "@/lib/utils";
 
 export const Route = createFileRoute("/holdings/$id")({ component: Holding });
 
@@ -12,26 +15,35 @@ function Holding() {
   if (!r) {
     return (
       <DetailShell backTo="/" backLabel="Floor">
-        <p className="text-sm text-subtle">No holding on this stamp for that id.</p>
+        <p className="text-sm text-subtle">{EMPTY}</p>
       </DetailShell>
     );
   }
+  const stages = bookStages(r);
   return (
     <DetailShell backTo="/" backLabel="Floor">
-      <p className="font-mono text-xs text-subtle">{r.id}</p>
-      <h1 className="text-2xl">{r.title}</h1>
-      <dl className="divide-y divide-border border-y border-border text-sm">
+      <h1 className="text-2xl">{strategyMark(r.title, r.id)}</h1>
+      <p className="mt-2 text-xs text-subtle">One book</p>
+      <BookStageLine recipe={r} />
+      <dl className="mt-4 divide-y divide-border border-y border-border text-sm">
         <Row k="Region" v={r.region} />
-        <Row k="Status" v={r.status} />
-        <Row k="Badge" v={r.badge} />
-        <Row k="n" v={String(r.n)} />
-        <Row
-          k="ROI"
-          v={`${r.roi >= 0 ? "+" : ""}${r.roi.toFixed(1)}%`}
-          tone={r.roi >= 0 ? "up" : "bad"}
-        />
+        <Row k="Status" v={recipeStatus(r)} />
+        {stages.map((s) => (
+          <Row
+            key={s.key}
+            k={s.label}
+            v={
+              s.kind === "empty"
+                ? EMPTY
+                : s.kind === "split"
+                  ? s.mark
+                  : s.n != null
+                    ? `n=${s.n} · ${s.key === "paper" ? fmtU(s.u) : EMPTY}`
+                    : s.mark
+            }
+          />
+        ))}
       </dl>
-      <p className="text-sm">{r.why}</p>
     </DetailShell>
   );
 }

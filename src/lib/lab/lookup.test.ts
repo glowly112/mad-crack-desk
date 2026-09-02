@@ -2,10 +2,11 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { hunterById, issueById, recipeById, seatById } from "./lookup.ts";
 
-test("recipe lookup returns the parked AU keep by id", () => {
-  const r = recipeById("H-fast-au-nearoff-place");
-  assert.equal(r?.title, "AU near-off place");
-  assert.match(r?.why ?? "", /Hyde HOLD/);
+test("recipe lookup returns the certified GB solid by id", () => {
+  const r = recipeById("H-fast-gb-nearoff-win-83959Z");
+  assert.equal(r?.title, "GB near-off WIN");
+  assert.equal(r?.badge, "Solid");
+  assert.match(r?.why ?? "", /Certified keep/);
 });
 
 test("missing recipe id is empty, not a throw", () => {

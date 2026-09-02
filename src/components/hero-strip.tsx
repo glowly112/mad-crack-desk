@@ -1,128 +1,229 @@
-import { useStamp } from "@/components/plant-context";
-import { productionScore } from "@/lib/lab/hero";
-import type { LiveStamp } from "@/lib/lab/from-digest";
-import { fmtU } from "@/lib/utils";
+import { useState } from "react";
+import { DayChips } from "@/components/day-chips";
+import { useDayScope } from "@/components/day-scope";
+import { LiveDot } from "@/components/live-dot";
+import { usePlantSource, useStamp } from "@/components/plant-context";
+import { EmptyState } from "@/components/empty-state";
+import { racingSquare } from "@/lib/lab/boards";
+import {
+  axisDay,
+  dailyDomain,
+  dailyTicks,
+  EMPTY,
+  floorDayValue,
+  floorFacts,
+  seriesWindow,
+  type FloorFact,
+  type FloorFactId,
+} from "@/lib/lab/desk";
+import { cn, fmtScore } from "@/lib/utils";
 
-export function HeroStrip() {
+export function PlantPane() {
   const stamp = useStamp();
-  const u = productionScore({
-    n_solid: stamp.n_solid,
-    day_u: stamp.hero.day_u,
-    researchKeepGbp: stamp.researchKeepGbp,
+  const plant = usePlantSource();
+  const scope = useDayScope();
+  const [fact, setFact] = useState<FloorFactId>("paper");
+  const huntNotes = [stamp.office.inventWhy, ...stamp.hunters.map((h) => h.note)];
+  const holes = racingSquare({
+    recipes: stamp.recipes,
+    coverage: stamp.coverage,
+    moves: stamp.moves,
+    floorLog: stamp.floorLog,
+    huntNotes,
+    namedHoles: stamp.holes,
   });
-  const tone = u == null ? "text-muted" : u >= 0 ? "text-up" : "text-bad";
+  const emptyHoles = holes.filter((h) => h.tone === "empty").length;
+  const facts = floorFacts(stamp, scope, emptyHoles);
+  const selected = facts.find((f) => f.id === fact) ?? facts[0];
+  const live = plant.source === "oracle";
 
   return (
-    <section>
-      <p className="text-sm text-muted">{stamp.hero.label}</p>
-      <p className={`mt-1 font-mono text-6xl leading-none tracking-tight md:text-7xl ${tone}`}>
-        {fmtU(u)}
+    <section className="space-y-4">
+      <p className="inline-flex items-center gap-2 font-mono text-xs text-subtle">
+        <LiveDot tone={live ? "ok" : "warn"} tick={stamp.generated} />
+        <span key={stamp.generated} className="stamp-tick">
+          {live ? `${stamp.generated} · live oracle` : plant.detail}
+        </span>
       </p>
-      <p className="mt-3 text-sm text-subtle">
-        Aim £{stamp.hero.aim_u}/day · {stamp.hero.aim_vs} · solids {stamp.n_solid}
-      </p>
+
+      <div role="tablist" aria-label="Plant" className="flex flex-wrap border-b border-border">
+        {facts.map((f) => (
+          <FactCell key={f.id} fact={f} on={f.id === fact} onPick={() => setFact(f.id)} />
+        ))}
+      </div>
+
+      <div>
+        <header className="mb-2 flex items-baseline justify-between gap-3">
+          <h2 className="text-sm font-medium text-muted">{selected?.label ?? "Paper"}</h2>
+          <p className="font-mono text-xs text-subtle">
+            {selected?.kind === "count" ? "on the square" : "u / day"}
+          </p>
+        </header>
+        <DayChips days={stamp.trends.map((t) => t.day)} />
+        <DailyBars fact={fact} />
+      </div>
     </section>
   );
 }
 
-export function ScoreChart() {
+function FactCell({
+  fact,
+  on,
+  onPick,
+}: {
+  fact: FloorFact;
+  on: boolean;
+  onPick: () => void;
+}) {
+  const empty = fact.value == null;
+  const tone =
+    fact.kind === "u" && !empty
+      ? fact.value! >= 0
+        ? "text-up"
+        : "text-bad"
+      : "text-fg";
+  const display =
+    fact.kind === "u"
+      ? fmtScore(fact.value)
+      : fact.value == null
+        ? EMPTY
+        : String(fact.value);
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={on}
+      onClick={onPick}
+      className={cn(
+        "min-w-[7rem] flex-1 border-r border-border px-3 py-3 text-left last:border-r-0",
+        on && "shadow-[inset_0_-2px_0_0_var(--color-fg)]",
+      )}
+    >
+      <p className="text-xs text-muted">{fact.label}</p>
+      <p key={`${fact.id}-${fact.value}`} className={cn("log-in mt-1 font-mono text-2xl leading-none tracking-tight", tone)}>
+        {display}
+      </p>
+      <p className="mt-1.5 text-[10px] text-subtle">{fact.hint}</p>
+    </button>
+  );
+}
+
+function DailyBars({ fact }: { fact: FloorFactId }) {
   const stamp = useStamp();
-  return (
-    <section>
-      <h2 className="mb-2 text-sm font-medium text-muted">Production</h2>
-      <Spark series={stamp.trends} />
-    </section>
+  const scope = useDayScope();
+  const days = stamp.trends.map((t) => t.day);
+  const points = seriesWindow(days, scope.day, (d) =>
+    floorDayValue(
+      fact,
+      stamp.trends.find((t) => t.day === d),
+    ),
   );
-}
+  const series = points
+    .map((d) => stamp.trends.find((t) => t.day === d))
+    .filter(Boolean) as typeof stamp.trends;
+  const nums = series.map((p) => floorDayValue(fact, p));
+  const vacant = fact === "holes" || nums.every((v) => v == null);
+  if (vacant) {
+    return (
+      <div className="mt-3">
+        <EmptyState copy={EMPTY} />
+        <p className="mt-1 font-mono text-[10px] text-subtle">one bar · Empty stays Empty</p>
+      </div>
+    );
+  }
 
-function Spark({ series }: { series: LiveStamp["trends"] }) {
-  const w = 360;
-  const h = 176;
-  const padL = 36;
-  const padR = 8;
-  const padT = 10;
-  const padB = 24;
+  const w = 640;
+  const h = 200;
+  const padL = 34;
+  const padR = 10;
+  const padT = 16;
+  const padB = 28;
   const innerW = w - padL - padR;
   const innerH = h - padT - padB;
-  const nums = series.map((p) => p.paper_live_day_u);
-  const present = nums.filter((v): v is number => v != null);
-  const lo = Math.min(0, ...present, -1);
-  const hi = Math.max(0, ...present, 1);
+  const [lo, hi] = dailyDomain(nums);
   const span = hi - lo || 1;
-  const xAt = (i: number) => padL + (i / Math.max(1, nums.length - 1)) * innerW;
+  const slot = innerW / Math.max(1, series.length);
+  const xAt = (i: number) => padL + i * slot + slot / 2;
   const yAt = (v: number) => padT + innerH - ((v - lo) / span) * innerH;
-  const pts = nums
-    .map((v, i) => (v == null ? null : `${xAt(i).toFixed(1)},${yAt(v).toFixed(1)}`))
-    .filter((p): p is string => p != null);
-  const yTicks = [hi, 0, lo].filter((v, i, a) => a.indexOf(v) === i);
-  const xTicks = [0, Math.floor((series.length - 1) / 2), series.length - 1];
+  const y0 = yAt(0);
+  const yTicks = dailyTicks([lo, hi]);
 
   return (
-    <svg
-      viewBox={`0 0 ${w} ${h}`}
-      className="h-44 w-full max-w-full min-w-0 text-subtle"
-      role="img"
-      aria-label="Paper live day units from 19 Aug to 29 Aug"
-    >
-      {yTicks.map((tick) => (
-        <g key={`y-${tick}`}>
-          <line
-            x1={padL}
-            x2={w - padR}
-            y1={yAt(tick)}
-            y2={yAt(tick)}
-            stroke="currentColor"
-            strokeOpacity={tick === 0 ? 0.4 : 0.16}
-            strokeDasharray={tick === 0 ? "3 4" : undefined}
-          />
-          <text
-            x={padL - 6}
-            y={yAt(tick) + 3}
-            textAnchor="end"
-            className="fill-subtle font-mono"
-            fontSize="9"
-          >
-            {tick === 0 ? "0" : tick.toFixed(0)}
-          </text>
-        </g>
-      ))}
-      <line
-        x1={padL}
-        x2={padL}
-        y1={padT}
-        y2={h - padB}
-        stroke="currentColor"
-        strokeOpacity="0.28"
-      />
-      <line
-        x1={padL}
-        x2={w - padR}
-        y1={h - padB}
-        y2={h - padB}
-        stroke="currentColor"
-        strokeOpacity="0.28"
-      />
-      {xTicks.map((i) => (
-        <text
-          key={`x-${series[i].day}`}
-          x={xAt(i)}
-          y={h - 6}
-          textAnchor={i === 0 ? "start" : i === series.length - 1 ? "end" : "middle"}
-          className="fill-subtle font-mono"
-          fontSize="9"
-        >
-          {series[i].day.slice(8)}
+    <div>
+      <svg
+        viewBox={`0 0 ${w} ${h}`}
+        className="h-52 w-full max-w-full min-w-0 text-subtle"
+        role="img"
+        aria-label={`Daily ${fact}. Empty days stay Empty.`}
+      >
+        <text x={4} y={12} className="fill-subtle font-mono" fontSize="9">
+          u
         </text>
-      ))}
-      {pts.length > 1 ? (
-        <polyline
-          fill="none"
-          stroke="var(--color-up)"
-          strokeWidth="1.5"
-          className="spark-draw"
-          points={pts.join(" ")}
-        />
-      ) : null}
-    </svg>
+        {yTicks.map((tick) => (
+          <g key={`y-${tick}`}>
+            <line
+              x1={padL}
+              x2={w - padR}
+              y1={yAt(tick)}
+              y2={yAt(tick)}
+              stroke="currentColor"
+              strokeOpacity={tick === 0 ? 0.4 : 0.16}
+              strokeDasharray={tick === 0 ? "2 4" : undefined}
+            />
+            <text
+              x={padL - 5}
+              y={yAt(tick) + 3}
+              textAnchor="end"
+              className="fill-subtle font-mono"
+              fontSize="9"
+            >
+              {tick === 0 ? "0" : tick.toFixed(0)}
+            </text>
+          </g>
+        ))}
+        {series.map((p, i) => {
+          const selected = p.day === scope.day;
+          const v = floorDayValue(fact, p);
+          const cx = xAt(i);
+          const barW = Math.max(6, slot * 0.55);
+          return (
+            <g
+              key={p.day}
+              role="button"
+              tabIndex={0}
+              className="cursor-pointer"
+              onClick={() => scope.setDay(p.day)}
+            >
+              {v != null ? (
+                <rect
+                  className="bar-in"
+                  style={{
+                    transformBox: "fill-box",
+                    transformOrigin: v >= 0 ? "center bottom" : "center top",
+                    animationDelay: `${Math.min(i, 10) * 22}ms`,
+                  }}
+                  x={cx - barW / 2}
+                  y={Math.min(yAt(v), y0)}
+                  width={barW}
+                  height={Math.max(2, Math.abs(yAt(v) - y0))}
+                  fill={v >= 0 ? "var(--color-up)" : "var(--color-bad)"}
+                  opacity={selected ? 1 : 0.72}
+                />
+              ) : null}
+              <text
+                x={cx}
+                y={h - 8}
+                textAnchor="middle"
+                className={selected ? "fill-fg font-mono" : "fill-subtle font-mono"}
+                fontSize="8"
+              >
+                {i === 0 || i === series.length - 1 || selected ? axisDay(p.day) : String(Number(p.day.slice(8)))}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+      <p className="mt-1 font-mono text-[10px] text-subtle">one bar · Empty stays Empty</p>
+    </div>
   );
 }

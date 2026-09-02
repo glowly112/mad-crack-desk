@@ -5,7 +5,7 @@ export function DetailShell({
   backLabel,
   children,
 }: {
-  backTo: "/" | "/office" | "/staff" | "/moves" | "/issues" | "/pipe" | "/health";
+  backTo: "/" | "/office" | "/staff" | "/moves" | "/trades" | "/issues" | "/pipe" | "/health";
   backLabel: string;
   children: React.ReactNode;
 }) {

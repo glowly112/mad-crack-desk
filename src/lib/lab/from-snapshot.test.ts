@@ -59,6 +59,24 @@ test("Linear snapshot overlays KEEP/measuring and never puts KEEP paper on the h
   assert.equal(live.recipes[1]?.region, "GB");
 });
 
+test("small field does not become Ireland", () => {
+  const live = applySnapshot(
+    {
+      date: "2026-09-02",
+      cells: [
+        {
+          id: "H-20260831T141500Z-us-inplay-place-smallfield",
+          title: "US in-play PLACE · one-pick small field",
+          status: "MEASURING",
+          n: 18,
+        },
+      ],
+    },
+    base(),
+  );
+  assert.equal(live.recipes[0]?.region, "US");
+});
+
 test("firm scoreboard by_status and cells overlay without inventing solids", () => {
   const live = applySnapshot(
     {
@@ -117,6 +135,32 @@ test("live_on without place_on does not open the fuse", () => {
   assert.equal(live.fuse_on, false);
 });
 
+test("Solid recipes lead the tape even when the scoreboard lists a parked keep first", () => {
+  const live = applySnapshot(
+    {
+      truth: { keep: 2, measuring: 0, dropped: 0 },
+      n_solid: 1,
+      paper_live_day_u: null,
+      cells: [
+        { id: "parked_nz", title: "NZ morning win", status: "KEEP", keep_badge: "Parked", n: 68 },
+        {
+          id: "solid_gb",
+          title: "GB win near-off",
+          status: "KEEP",
+          keep_badge: "Solid",
+          status_chip: "Waiting for races",
+          certified: true,
+          n: 76,
+        },
+      ],
+    },
+    base(),
+  );
+  assert.equal(live.recipes[0]?.id, "solid_gb");
+  assert.equal(live.recipes[0]?.badge, "Solid");
+  assert.equal(live.recipes[1]?.badge, "Parked");
+});
+
 test("boardUx n_solid and paperLive day_u pass through; KEEP count is not solids", () => {
   const live = applySnapshot(
     {
@@ -148,18 +192,88 @@ test("garbage or error payload leaves the digest stamp", () => {
   assert.equal(live.counts.keep, boot.counts.keep);
 });
 
-test("plant live snapshot is oracle, score stays empty while solids 0", () => {
+test("fills overlay lists today's paper tape and does not invent production", () => {
+  const live = applySnapshot(
+    {
+      truth: { keep: 2 },
+      fills: [
+        {
+          pick_id: "nz-1",
+          ts: "2026-09-02T00:07:45Z",
+          cell_id: "H-20260828T020000Z-nz-morning-win-one-pick-band-2-5-4-49",
+          mode: "auto_dry",
+          status: "SETTLED",
+          odds: 3.35,
+          stake_gbp: 2,
+          paper_pnl_gbp: -2,
+          placed_result: false,
+          certified_keep: false,
+        },
+      ],
+    },
+    base(),
+  );
+  assert.equal(live.trades.length, 1);
+  assert.equal(live.trades[0]?.book, "paper");
+  assert.equal(live.trades[0]?.recipe, "NZ morning WIN · one-pick 2.5–4.49");
+  assert.deepEqual(
+    live.trades.filter((t) => t.book === "production" || t.book === "live"),
+    [],
+  );
+});
+
+test("empty fills array is Empty, missing fills keeps the digest tape", () => {
+  const withTape = applySnapshot(
+    {
+      truth: { keep: 2 },
+      fills: [
+        {
+          pick_id: "keep-me",
+          ts: "2026-09-02T00:00:00Z",
+          cell_id: "H-20260828T020000Z-nz-morning-win-one-pick-band-2-5-4-49",
+          mode: "auto_dry",
+          status: "OPEN",
+        },
+      ],
+    },
+    base(),
+  );
+  assert.equal(withTape.trades.length, 1);
+  const cleared = applySnapshot({ truth: { keep: 2 }, fills: [] }, withTape);
+  assert.deepEqual(cleared.trades, []);
+  const kept = applySnapshot({ truth: { keep: 2 } }, withTape);
+  assert.equal(kept.trades.length, 1);
+  assert.equal(kept.trades[0]?.id, "keep-me");
+});
+
+test("plant live snapshot is oracle, score stays empty when day_u is null", () => {
   const live = applySnapshot(snap, base());
   assert.equal(live.source, "oracle");
-  assert.equal(live.counts.keep, 2);
-  assert.equal(live.counts.measuring, 17);
-  assert.equal(live.n_solid, 0);
+  assert.equal(live.counts.keep, 3);
+  assert.equal(live.counts.measuring, 21);
+  assert.equal(live.n_solid, 1);
+  assert.equal(live.pipe.certified, 1);
+  assert.equal(live.pipe.certified, live.n_solid);
   assert.equal(live.fuse_on, false);
   assert.equal(live.hero.day_u, null);
-  assert.equal(live.researchKeepGbp, 444.02);
-  assert.equal(live.generated, "20260829T123147Z");
+  assert.equal(live.researchKeepGbp, 408.67);
+  assert.equal(live.generated, "20260902T101756Z");
+  assert.equal(live.recipes[0]?.badge, "Solid");
+  assert.equal(live.recipes[0]?.chip, "Waiting for races");
+  assert.equal(live.recipes[1]?.badge, "Parked");
   assert.equal(
     productionScore({ n_solid: live.n_solid, day_u: live.hero.day_u, researchKeepGbp: live.researchKeepGbp }),
     null,
   );
+  assert.equal(live.trades.filter((t) => t.result === "waiting").length, 4);
+  assert.equal(live.trades.filter((t) => t.result !== "waiting").length, 8);
+  assert.ok(live.trades.every((t) => t.book === "paper"));
+  assert.equal(live.trades[0]?.t, "10:59:45");
+  assert.equal(live.trades[0]?.flight, "waiting result");
+  assert.equal(live.trades[0]?.recipe, "GB near-off WIN");
+  assert.equal(live.trades[0]?.stake, 1);
+  assert.equal(live.trades[0]?.liquidity, 19.17);
+  assert.equal(live.wait_open.length, 1);
+  assert.equal(live.wait_open[0]?.title, "NZ morning WIN · one-pick 2.5–4.49");
+  assert.equal(live.wait_open[0]?.why, "no size_ok candidates");
 });

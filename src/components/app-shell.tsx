@@ -1,4 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
+import { DeskScroll } from "@/components/desk-scroll";
 import { LabMark, MarkSettings, NAV_MARKS } from "@/components/marks";
 import { LiveDot } from "@/components/live-dot";
 import { usePlantSource, useStamp } from "@/components/plant-context";
@@ -6,35 +7,39 @@ import { cn } from "@/lib/utils";
 
 const NAV = [
   { to: "/", label: "Floor" },
-  { to: "/moves", label: "Moves" },
+  { to: "/trades", label: "Trades" },
   { to: "/office", label: "Office" },
-  { to: "/pipe", label: "Pipe" },
   { to: "/health", label: "Health" },
-  { to: "/issues", label: "Issues" },
   { to: "/staff", label: "Staff" },
   { to: "/trends", label: "Trends" },
 ] as const;
 
 function pathActive(pathname: string, to: string) {
   if (to === "/") return pathname === "/";
+  if (to === "/office") return pathname === "/office" || pathname.startsWith("/issues/");
   return pathname === to || pathname.startsWith(`${to}/`);
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const settingsOn = pathActive(pathname, "/settings");
+  const staffOn = pathActive(pathname, "/staff");
   const stamp = useStamp();
   const plant = usePlantSource();
 
   return (
-    <div className="min-h-dvh bg-bg text-fg md:flex">
-      <aside className="hidden w-52 shrink-0 flex-col border-r border-border md:flex">
+    <div className="flex min-h-dvh flex-col bg-bg text-fg md:flex-row">
+      <aside className="sticky top-0 hidden h-dvh w-52 shrink-0 flex-col self-start border-r border-border md:flex">
         <div className="flex items-center gap-2 px-4 py-4">
           <LabMark className="size-6 text-fg" />
           <div>
             <p className="text-sm font-medium tracking-tight">Mad Crack Lab</p>
-            <p className="font-mono text-xs text-subtle">
-              {plant.source === "oracle" ? `${stamp.day} · oracle` : plant.detail}
+            <p key={stamp.generated} className="stamp-tick font-mono text-xs text-subtle">
+              {plant.source === "oracle"
+                ? `${stamp.day} · live oracle`
+                : plant.source === "freeze"
+                  ? `frozen ${stamp.generated}`
+                  : plant.detail}
             </p>
           </div>
         </div>
@@ -67,14 +72,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <div className="min-w-0 flex-1">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 md:hidden">
           <div className="flex min-w-0 items-center gap-2">
             <LabMark className="size-5 shrink-0 text-fg" />
             <div className="min-w-0">
               <p className="text-sm font-medium">Mad Crack Lab</p>
               <p className="truncate font-mono text-xs text-subtle">
-                {plant.source === "oracle" ? `${stamp.day} · oracle` : plant.detail}
+                {plant.source === "oracle"
+                  ? `${stamp.day} · live oracle`
+                  : plant.source === "freeze"
+                    ? `frozen ${stamp.generated}`
+                    : plant.detail}
               </p>
             </div>
           </div>
@@ -98,18 +107,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
         <main
           key={pathname}
-          className="route-in min-w-0 overflow-x-hidden px-4 pb-28 pt-5 md:px-8 md:pb-12 md:pt-7"
+          className={
+            staffOn
+              ? "route-in flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden md:h-dvh"
+              : "route-in min-w-0 overflow-x-hidden px-4 pb-28 pt-5 md:px-8 md:pb-12 md:pt-7"
+          }
         >
           {children}
         </main>
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-bg pb-[env(safe-area-inset-bottom)] md:hidden">
-        <div className="flex overflow-x-auto">
-          {NAV.map((item) => (
-            <NavLink key={item.to} {...item} active={pathActive(pathname, item.to)} compact />
-          ))}
-        </div>
+        <DeskScroll axis="x">
+          <div className="flex w-max">
+            {NAV.map((item) => (
+              <NavLink key={item.to} {...item} active={pathActive(pathname, item.to)} compact />
+            ))}
+          </div>
+        </DeskScroll>
       </nav>
     </div>
   );

@@ -15,12 +15,17 @@ export function digestStamp(): LiveStamp {
 }
 
 export function bootStamp(): LiveStamp {
-  return applySnapshot(liveSnap, digestStamp());
+  const live = applySnapshot(liveSnap, digestStamp());
+  // Baked file is a snapshot, not a live poll — never pretend it is oracle.
+  return { ...live, source: "freeze" };
 }
 
 export function plantFromTape(stamp: LiveStamp): PlantPayload {
   if (stamp.source === "oracle") {
     return { stamp, source: "oracle", detail: "plant snapshot" };
+  }
+  if (stamp.source === "freeze") {
+    return { stamp, source: "freeze", detail: `oracle unreachable · frozen ${stamp.generated}` };
   }
   return { stamp, source: "digest", detail: "oracle unreachable · plant digest" };
 }

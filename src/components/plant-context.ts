@@ -13,7 +13,12 @@ export type PlantState = {
 export const plantInitial: PlantState = {
   stamp: boot,
   source: boot.source,
-  detail: boot.source === "oracle" ? "plant snapshot" : "plant digest",
+  detail:
+    boot.source === "oracle"
+      ? "plant snapshot"
+      : boot.source === "freeze"
+        ? `oracle unreachable · frozen ${boot.generated}`
+        : "plant digest",
 };
 
 export const PlantCtx = createContext<PlantState>(plantInitial);
