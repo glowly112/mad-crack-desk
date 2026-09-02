@@ -1,66 +1,77 @@
 import { EmptyState } from "@/components/empty-state";
 import { useStamp } from "@/components/plant-context";
-import { capitalisingLine, marketGlance, sizeMarket, sizePackBoxes, waffleCols } from "@/lib/lab/boards";
+import {
+  capitalisingLine,
+  countryMarket,
+  inventHole,
+  officeCountries,
+  plantCells,
+} from "@/lib/lab/boards";
 import { EMPTY } from "@/lib/lab/desk";
-import type { MarketSquare, SizeBox } from "@/lib/lab/boards";
+import type { CountryRow, MarketSquare } from "@/lib/lab/boards";
 import { cn } from "@/lib/utils";
 
 const TONE: Record<MarketSquare["tone"], string> = {
-  win: "bg-fg",
+  empty: "bg-elev ring-1 ring-inset ring-border-strong",
+  hunt: "bg-muted/35",
   idea: "bg-warn",
+  win: "bg-fg",
   loss: "bg-bad",
   parked: "bg-muted",
 };
 
 const TONE_LABEL: Record<MarketSquare["tone"], string> = {
-  win: "solid",
+  empty: "unused",
+  hunt: "looking",
   idea: "still being tested",
+  win: "solid",
   loss: "killed",
   parked: "parked",
 };
 
-/** One market sized by measured n. Colour is win / idea / loss / parked. */
+/** One plant waffle of stamp cells, then eight countries as occupied vs Empty. */
 export function CountryPack() {
   const stamp = useStamp();
-  const countries = sizeMarket(stamp.coverage, stamp.recipes, stamp.moves, stamp.floorLog);
-  const boxes = sizePackBoxes(countries);
-  const glance = marketGlance(countries, stamp.counts);
+  const squares = plantCells(stamp.counts);
+  const countries = countryMarket(officeCountries(stamp.coverage, stamp.recipes));
   const cap = capitalisingLine(stamp.counts);
+  const hole = inventHole(stamp.office.inventWhy);
+  const glance = `${cap}${hole !== EMPTY ? ` Looking at ${hole}.` : ""}`;
 
   return (
     <section>
       <header className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-border pb-2">
         <h2 className="text-sm font-medium text-muted">By country</h2>
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-subtle">
-          <LegendDot tone="win" label="solid" />
+          <LegendDot tone="empty" label="unused" />
+          <LegendDot tone="hunt" label="looking" />
+          <LegendDot tone="loss" label="killed" />
           <LegendDot tone="idea" label="still being tested" />
           <LegendDot tone="parked" label="parked" />
-          <LegendDot tone="loss" label="killed" />
+          <LegendDot tone="win" label="solid" />
         </p>
       </header>
-      {boxes.length === 0 ? (
+      {squares.length === 0 ? (
         <EmptyState copy={EMPTY} />
       ) : (
         <div>
           <div
-            className="relative aspect-[2/1] min-h-56 w-full border border-border bg-elev"
+            className="grid gap-[3px] border border-border bg-bg p-3"
             role="img"
             aria-label={glance}
+            style={{ gridTemplateColumns: "repeat(auto-fill, minmax(0.7rem, 1fr))" }}
           >
-            {boxes.map((b, i) => (
-              <Cluster key={b.region} box={b} delay={i} />
+            {squares.map((s) => (
+              <span
+                key={s.id}
+                title={TONE_LABEL[s.tone]}
+                className={cn("aspect-square rounded-[2px]", TONE[s.tone])}
+              />
             ))}
           </div>
           <p className="mt-2 text-sm text-muted">{cap}</p>
-          {countries.some((c) => c.empty) ? (
-            <p className="mt-0.5 text-xs text-subtle">
-              {countries
-                .filter((c) => c.empty)
-                .map((c) => `${c.name} Empty`)
-                .join(". ")}
-              .
-            </p>
-          ) : null}
+          {hole !== EMPTY ? <p className="mt-0.5 text-xs text-subtle">Looking at {hole}.</p> : null}
+          <CountryRowList rows={countries} />
         </div>
       )}
     </section>
@@ -76,50 +87,18 @@ function LegendDot({ tone, label }: { tone: MarketSquare["tone"]; label: string 
   );
 }
 
-function Cluster({ box, delay }: { box: SizeBox; delay: number }) {
-  const sizeLine = box.empty ? EMPTY : box.caption || (box.n > 0 ? `n=${box.n}` : "n=0");
+function CountryRowList({ rows }: { rows: readonly CountryRow[] }) {
+  if (!rows.length) return null;
   return (
-    <article
-      className="log-in absolute min-w-0 overflow-hidden bg-bg px-2 py-1.5"
-      style={{
-        left: `calc(${box.x}% + 1px)`,
-        top: `calc(${box.y}% + 1px)`,
-        width: `calc(${box.w}% - 2px)`,
-        height: `calc(${box.h}% - 2px)`,
-        animationDelay: `${Math.min(delay, 8) * 28}ms`,
-      }}
-      aria-label={`${box.name}. ${sizeLine}`}
-      title={`${box.name} · ${sizeLine}`}
-    >
-      {box.empty ? (
-        <p className="font-mono text-[10px] text-muted">{EMPTY}</p>
-      ) : (
-        <Waffle squares={box.squares} />
-      )}
-      <p className="mt-1 truncate text-xs leading-tight">{box.name}</p>
-      <p className="truncate font-mono text-[10px] text-subtle">{sizeLine}</p>
-    </article>
-  );
-}
-
-function Waffle({ squares }: { squares: MarketSquare[] }) {
-  if (!squares.length) return null;
-  const cols = waffleCols(squares.length);
-  return (
-    <div
-      className="grid gap-[3px]"
-      style={{
-        gridTemplateColumns: `repeat(${cols}, 0.9rem)`,
-        gridAutoRows: "0.9rem",
-      }}
-    >
-      {squares.map((s) => (
-        <span
-          key={s.id}
-          title={TONE_LABEL[s.tone]}
-          className={cn("block rounded-[2px]", TONE[s.tone])}
-        />
+    <ol className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
+      {rows.map((row) => (
+        <li key={row.region} className="min-w-0">
+          <p className="truncate text-xs">{row.name}</p>
+          <p className={cn("mt-0.5 font-mono text-[10px] leading-snug", row.line === EMPTY ? "text-muted" : "text-subtle")}>
+            {row.line}
+          </p>
+        </li>
       ))}
-    </div>
+    </ol>
   );
 }

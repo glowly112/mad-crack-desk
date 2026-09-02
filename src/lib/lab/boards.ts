@@ -39,6 +39,13 @@ export function holeName(raw: string): string {
   return named && named !== EMPTY ? expandCountry(named) : EMPTY;
 }
 
+/** Caption a named invent hole. Never extra squares. */
+export function inventHole(why: string): string {
+  const m = why.match(/(?:next hole|queue)\s+([A-Za-z0-9_|-]+)/i);
+  if (!m) return EMPTY;
+  return holeName(m[1]);
+}
+
 /** `1 parked, 5 still being tested`. Both empty → Empty. */
 export function countrySentence(parked: number, testing: number): string {
   const bits: string[] = [];
@@ -114,9 +121,50 @@ export function countryPackLine(rows: readonly CountryRow[]): string {
   return bits.length ? `${bits.join(". ")}.` : EMPTY;
 }
 
-export type MarketTone = "idea" | "win" | "loss" | "parked";
+export type MarketTone = "empty" | "hunt" | "idea" | "win" | "loss" | "parked";
 
 export type MarketSquare = { id: string; tone: MarketTone };
+
+export type PlantCounts = {
+  cells: number;
+  certified: number;
+  keep: number;
+  measuring: number;
+  hunting: number;
+  kill: number;
+};
+
+/** Honest buckets from stamp.counts. Leftover only if cells > the named buckets. */
+export function plantCellBuckets(counts: PlantCounts) {
+  const win = Math.max(0, counts.certified);
+  const parked = Math.max(0, counts.keep - win);
+  const idea = Math.max(0, counts.measuring);
+  const hunt = Math.max(0, counts.hunting);
+  const loss = Math.max(0, counts.kill);
+  const used = win + parked + idea + hunt + loss;
+  const empty = Math.max(0, counts.cells - used);
+  return { empty, hunt, idea, parked, win, loss, used };
+}
+
+/**
+ * One square per counted cell. Untouched leftover, hunting, and kill first
+ * so unused + rejected dominate. Occupied recipes stay the small filled set.
+ * Never invents a per-country split or an exchange size.
+ */
+export function plantCells(counts: PlantCounts): MarketSquare[] {
+  const b = plantCellBuckets(counts);
+  const out: MarketSquare[] = [];
+  const push = (n: number, tone: MarketTone, key: string) => {
+    for (let i = 0; i < n; i++) out.push({ id: `${key}-${i}`, tone });
+  };
+  push(b.empty, "empty", "empty");
+  push(b.hunt, "hunt", "hunt");
+  push(b.loss, "loss", "kill");
+  push(b.idea, "idea", "idea");
+  push(b.parked, "parked", "parked");
+  push(b.win, "win", "solid");
+  return out;
+}
 
 export type MarketCountry = {
   region: string;

@@ -14,7 +14,10 @@ import {
   officeCountries,
   officeWorkers,
   factorySquares,
+  inventHole,
   pipeBoard,
+  plantCellBuckets,
+  plantCells,
   recipeStatus,
   sizeMarket,
   sizePackBoxes,
@@ -98,6 +101,25 @@ test("country size is measured n, not a recipe count, and HK stays Empty", () =>
   assert.ok(Math.abs(packed - 100 * 100) < 0.01);
   assert.equal(capitalisingLine(STAMP.counts), "1 solid of 161 cells. 126 killed.");
   assert.match(marketGlance(market, STAMP.counts), /Hong Kong Empty/);
+});
+
+test("the plant waffle is stamp cells: unused leftover, hunting, kill, then the small occupied set", () => {
+  const buckets = plantCellBuckets(STAMP.counts);
+  const squares = plantCells(STAMP.counts);
+  assert.equal(buckets.win, 1);
+  assert.equal(buckets.parked, 2);
+  assert.equal(buckets.idea, 21);
+  assert.equal(buckets.hunt, 12);
+  assert.equal(buckets.loss, 126);
+  assert.equal(buckets.empty, 0);
+  assert.equal(squares.length, 3 + 21 + 12 + 126);
+  assert.equal(squares.filter((s) => s.tone === "loss").length, 126);
+  assert.equal(squares.filter((s) => s.tone === "win").length, 1);
+  assert.ok(buckets.loss + buckets.hunt + buckets.empty > buckets.win + buckets.parked + buckets.idea);
+  const leftover = plantCellBuckets({ ...STAMP.counts, cells: 180 });
+  assert.equal(leftover.empty, 180 - leftover.used);
+  assert.equal(inventHole(STAMP.office.inventWhy), "South Africa morning WIN");
+  assert.equal(inventHole("invent off"), EMPTY);
 });
 
 test("recipe status drops holdout_n_too_small", () => {
