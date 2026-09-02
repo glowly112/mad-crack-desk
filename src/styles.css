@@ -180,8 +180,8 @@
 
 .desk-scroll-wrap .desk-track {
   inset-inline: 0.25rem;
-  bottom: 0;
-  height: 3px;
+  bottom: 1px;
+  height: 4px;
 }
 
 .desk-scroll-wrap-y .desk-track {
