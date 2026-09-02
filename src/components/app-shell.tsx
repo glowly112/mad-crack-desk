@@ -28,7 +28,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-dvh bg-bg text-fg md:flex">
-      <aside className="hidden w-52 shrink-0 flex-col border-r border-border md:flex">
+      <aside className="sticky top-0 hidden h-dvh w-52 shrink-0 flex-col self-start border-r border-border md:flex">
         <div className="flex items-center gap-2 px-4 py-4">
           <LabMark className="size-6 text-fg" />
           <div>
