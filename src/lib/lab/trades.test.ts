@@ -1,15 +1,18 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  bookBadge,
   dayTapePnl,
   fillFromRow,
   fillsOnDay,
   fmtStake,
   openFills,
   parseFills,
+  parseWaitOpen,
   settledFills,
   tapePnl,
   tradeCounts,
+  waitOpenChips,
 } from "./trades.ts";
 
 const nzLost = {
@@ -56,6 +59,7 @@ const gbOpen = {
   certified_keep: true,
   gate_verdict: "LIVE_CANDIDATE",
   side: "BACK",
+  atb_size_gbp: 19.17,
 };
 
 test("auto_dry SETTLED maps to paper, not production or live", () => {
@@ -79,8 +83,40 @@ test("OPEN auto_dry is waiting result, not a settled ticket", () => {
   assert.equal(fill.flight, "waiting result");
   assert.equal(fill.recipe, "GB near-off WIN");
   assert.equal(fill.side, "BACK");
+  assert.equal(fill.stake, 1);
+  assert.equal(fill.liquidity, 19.17);
+  assert.equal(fill.flight, "waiting result");
   assert.equal(fill.pnl, null);
+  assert.equal(bookBadge(fill.book), "No money");
   assert.deepEqual(tapePnl(fill, false), { pnl: null, caption: "waiting result" });
+});
+
+test("atb is liquidity, never unmatched; wait_open is a chip not a ticket", () => {
+  const fill = fillFromRow({ ...gbOpen, unmatched_size: 4, unmatched: 4 });
+  assert.equal(fill?.flight, "waiting result");
+  assert.equal(fill?.liquidity, 19.17);
+  assert.deepEqual(parseWaitOpen(null), []);
+  assert.deepEqual(parseWaitOpen([]), []);
+  const chips = parseWaitOpen([
+    {
+      cell_id: "H-20260828T020000Z-nz-morning-win-one-pick-band-2-5-4-49",
+      mode: "wait_open",
+      reasons: ["no_open_size_ok_candidates"],
+    },
+    { cell_id: "H-fast-gb-nearoff-win-83959Z", mode: "auto_dry" },
+  ]);
+  assert.equal(chips.length, 1);
+  assert.equal(chips[0]?.title, "NZ morning WIN · one-pick 2.5–4.49");
+  assert.equal(chips[0]?.why, "no size_ok candidates");
+  const open = openFills(parseFills([gbOpen]));
+  assert.equal(waitOpenChips(chips, open).length, 1);
+  assert.deepEqual(
+    waitOpenChips(
+      [{ id: gbOpen.cell_id, title: "GB near-off WIN", why: null }],
+      open,
+    ),
+    [],
+  );
 });
 
 test("live + certified_keep is production; live alone is live", () => {
@@ -143,8 +179,9 @@ test("paper P&L is not income; live is 0 while fuse off", () => {
 test("tradeCounts, stake u, and day tape Empty when no production", () => {
   const fills = parseFills([nzLost, auWon]);
   assert.deepEqual(tradeCounts(fills), { paper: 2, production: 0, live: 0 });
-  assert.equal(fmtStake(2), "2u");
+  assert.equal(fmtStake(1), "1u");
   assert.equal(fmtStake(null), "Empty");
+  assert.equal(fillFromRow(nzLost)?.stake, 1);
   const tape = dayTapePnl(fills, false);
   assert.equal(tape.production, null);
   assert.equal(tape.live, 0);

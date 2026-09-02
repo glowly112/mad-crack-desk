@@ -6,6 +6,15 @@ export type FillBook = "paper" | "production" | "live";
 export type FillResult = "won" | "lost" | "void" | "waiting";
 export type Flight = "waiting result" | "unmatched" | "in-play" | "waiting for races";
 
+/** Hero stake on the tape. Envelope stake_gbp / paper_stake is not the unit. */
+export const HERO_U = 1;
+
+export type WaitOpen = {
+  id: string;
+  title: string;
+  why: string | null;
+};
+
 export type Fill = {
   id: string;
   ts: string;
@@ -20,8 +29,8 @@ export type Fill = {
   stake: number | null;
   result: FillResult;
   flight: Flight | null;
-  unmatched: number | null;
-  off: string | null;
+  /** Available-to-bet size. Liquidity — never unmatched. */
+  liquidity: number | null;
   pnl: number | null;
 };
 
@@ -75,16 +84,20 @@ function resultOf(row: Record<string, unknown>): FillResult {
 function flightOf(row: Record<string, unknown>): Flight | null {
   const status = String(row.status || "").toUpperCase();
   if (status === "SETTLED" || status === "VOID") return null;
-  if (num(row.unmatched) || num(row.unmatched_size)) return "unmatched";
-  if (row.in_play === true || /in.?play/i.test(String(row.phase ?? ""))) return "in-play";
-  if (/wait_open|waiting for races/i.test(`${row.gate_verdict ?? ""} ${row.chip ?? ""}`)) {
-    return "waiting for races";
-  }
+  // OPEN is booked intent waiting freeze result — not unmatched-at-exchange.
+  // atb_size is liquidity, never a fill status.
   if (status === "UNMATCHED") return "unmatched";
+  if (row.in_play === true || /in.?play/i.test(String(row.phase ?? ""))) return "in-play";
   if (status === "OPEN" || status === "PENDING" || status === "WAITING" || row.placed_result == null) {
     return "waiting result";
   }
   return null;
+}
+
+function heroStake(row: Record<string, unknown>): number | null {
+  const envelope = num(row.stake_gbp) ?? num(row.paper_stake_gbp);
+  if (envelope == null) return null;
+  return HERO_U;
 }
 
 export function fillFromRow(raw: unknown): Fill | null {
@@ -111,11 +124,10 @@ export function fillFromRow(raw: unknown): Fill | null {
     book: bookOf(row),
     side: typeof row.side === "string" && row.side ? String(row.side).toUpperCase() : null,
     odds,
-    stake: num(row.stake_gbp) ?? num(row.paper_stake_gbp),
+    stake: heroStake(row),
     result: resultOf(row),
     flight: flightOf(row),
-    unmatched: num(row.unmatched) ?? num(row.unmatched_size),
-    off: clock(String(row.off_ts || row.off_time || "")) || null,
+    liquidity: num(row.atb_size_gbp),
     pnl,
   };
 }
@@ -155,6 +167,43 @@ export function tapePnl(fill: Fill, fuseOn: boolean): { pnl: number | null; capt
 export function fmtStake(n: number | null): string {
   if (n == null) return "Empty";
   return Number.isInteger(n) ? `${n}u` : `${n.toFixed(2)}u`;
+}
+
+export function fmtOdds(n: number | null): string {
+  if (n == null) return "Empty";
+  return Number.isInteger(n) ? String(n) : String(n);
+}
+
+export function bookBadge(book: FillBook): string | null {
+  if (book === "paper" || book === "live") return "No money";
+  return null;
+}
+
+export function parseWaitOpen(raw: unknown): WaitOpen[] {
+  if (!Array.isArray(raw)) return [];
+  const out: WaitOpen[] = [];
+  const seen = new Set<string>();
+  for (const row of raw) {
+    const recs = rec(row);
+    if (!recs) continue;
+    const blob = `${recs.mode ?? ""} ${recs.chip ?? ""} ${recs.live_gate ?? ""}`.toLowerCase();
+    if (!blob.includes("wait_open")) continue;
+    const id = String(recs.cell_id || recs.id || "").trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    const reasons = Array.isArray(recs.reasons) ? recs.reasons.map((x) => String(x)) : [];
+    let why: string | null = null;
+    if (reasons.includes("no_open_size_ok_candidates")) why = "no size_ok candidates";
+    else if (reasons[0]) why = reasons[0].replace(/_/g, " ");
+    out.push({ id, title: cellName(id, String(recs.title || "")), why });
+  }
+  return out;
+}
+
+/** Recipe armed with no fill. Never a ticket. Hide recipes that already have an OPEN row. */
+export function waitOpenChips(waitOpen: readonly WaitOpen[], open: readonly Fill[]): WaitOpen[] {
+  const ids = new Set(open.map((f) => f.recipeId));
+  return waitOpen.filter((w) => !ids.has(w.id));
 }
 
 export function fillsOnDay(fills: readonly Fill[], day: string): Fill[] {

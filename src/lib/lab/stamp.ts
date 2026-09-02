@@ -45,8 +45,8 @@ export type Seat = {
   cadence: string;
 };
 
-export type { Fill, FillBook, FillResult } from "./trades.ts";
-import type { Fill } from "./trades.ts";
+export type { Fill, FillBook, FillResult, WaitOpen } from "./trades.ts";
+import type { Fill, WaitOpen } from "./trades.ts";
 
 export const STAMP = {
   day: "2026-09-02",
@@ -273,6 +273,7 @@ export const STAMP = {
     { id: "curator", name: "Curator", role: "Freezes", status: "GREEN", now: "Geo / WIPD / exotic green", cadence: "cron" },
   ] satisfies Seat[],
   trades: [] as Fill[],
+  wait_open: [] as WaitOpen[],
   trends: [
     { day: "2026-08-19", paper_live_day_u: -63.56, n_solid: 1, n_keep: 3, n_measuring: 48, n_dropped: 12, factory_day_pnl_u: -12.4 },
     { day: "2026-08-20", paper_live_day_u: 0.4, n_solid: 1, n_keep: 3, n_measuring: 40, n_dropped: 18, factory_day_pnl_u: -8.1 },

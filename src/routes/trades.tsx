@@ -6,15 +6,19 @@ import { LiveDot } from "@/components/live-dot";
 import { usePlantSource, useStamp } from "@/components/plant-context";
 import { axisDay, EMPTY } from "@/lib/lab/desk";
 import {
+  bookBadge,
   dayTapePnl,
   fillsOnDay,
+  fmtOdds,
   fmtStake,
   openFills,
   settledFills,
   tapePnl,
+  waitOpenChips,
   type Fill,
   type FillBook,
   type FillResult,
+  type WaitOpen,
 } from "@/lib/lab/trades";
 import { cn, fmtU } from "@/lib/utils";
 
@@ -27,6 +31,7 @@ export function Trades() {
   const dayFills = fillsOnDay(stamp.trades, scope.day);
   const open = openFills(dayFills);
   const settled = settledFills(dayFills);
+  const chips = scope.lookingBack ? [] : waitOpenChips(stamp.wait_open ?? [], open);
   const tape = dayTapePnl(settled, stamp.fuse_on);
   const live = plant.source === "oracle";
   const days = stamp.trends.map((t) => t.day);
@@ -36,8 +41,8 @@ export function Trades() {
       <header>
         <h1 className="text-2xl">Trades</h1>
         <p className="mt-1 max-w-xl text-sm text-muted">
-          Open first, then the day's settled tape. Paper is not income. Live is 0 while the fuse is
-          off.
+          Open first — booked tickets still in flight, then recipes waiting for races. Then the
+          day's settled tape. Paper is not income. Live is 0 while the fuse is off.
         </p>
       </header>
 
@@ -60,6 +65,7 @@ export function Trades() {
         hint={scope.lookingBack ? axisDay(scope.day) : "In flight"}
         count={open.length}
         fills={open}
+        chips={chips}
         fuseOn={stamp.fuse_on}
         open
       />
@@ -79,6 +85,7 @@ function Pack({
   hint,
   count,
   fills,
+  chips,
   fuseOn,
   open,
 }: {
@@ -86,9 +93,11 @@ function Pack({
   hint: string;
   count: number;
   fills: readonly Fill[];
+  chips?: readonly WaitOpen[];
   fuseOn: boolean;
   open?: boolean;
 }) {
+  const vacant = fills.length === 0 && (chips?.length ?? 0) === 0;
   return (
     <section>
       <header className="mb-2 flex items-baseline justify-between gap-3 border-b border-border pb-2">
@@ -98,8 +107,35 @@ function Pack({
         </div>
         <p className="text-xs text-subtle">{hint}</p>
       </header>
-      {fills.length === 0 ? <EmptyState copy={EMPTY} /> : <TradeTape fills={fills} fuseOn={fuseOn} open={open} />}
+      {chips && chips.length > 0 ? <WaitOpenRow chips={chips} /> : null}
+      {vacant ? <EmptyState copy={EMPTY} /> : fills.length ? <TradeTape fills={fills} fuseOn={fuseOn} open={open} /> : null}
     </section>
+  );
+}
+
+function WaitOpenRow({ chips }: { chips: readonly WaitOpen[] }) {
+  return (
+    <ul className="mb-3 space-y-2">
+      {chips.map((chip) => (
+        <li key={chip.id} className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <p className="text-sm text-fg">{chip.title}</p>
+          <span className="rounded-sm border border-border px-1.5 py-0.5 font-mono text-[10px] text-warn">
+            waiting for races
+          </span>
+          {chip.why ? <span className="font-mono text-[10px] text-subtle">{chip.why}</span> : null}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function BookMark({ book }: { book: FillBook }) {
+  const badge = bookBadge(book);
+  return (
+    <span className={cn(bookTone(book))}>
+      {book}
+      {badge ? <span className="ml-1.5 text-subtle">{badge}</span> : null}
+    </span>
   );
 }
 
@@ -127,10 +163,15 @@ function TradeTape({
               </div>
               <p className="mt-0.5 text-fg">{fill.recipe}</p>
               <p className="mt-0.5 text-muted">
-                <span>{fill.market}</span>
-                {fill.side ? <span className="px-1.5">{fill.side}</span> : null}
-                <span className={cn("px-1.5", bookTone(fill.book))}>{fill.book}</span>
+                {fill.side ? <span>{fill.side}</span> : null}
+                <span className="px-1.5">{fmtOdds(fill.odds)}</span>
                 <span>{fmtStake(fill.stake)}</span>
+                <span className="px-1.5">
+                  <BookMark book={fill.book} />
+                </span>
+                {fill.liquidity != null ? (
+                  <span className="text-subtle">liq {fmtStake(fill.liquidity)}</span>
+                ) : null}
                 <span className={cn("px-1.5", resultTone(fill.result))}>
                   {open ? fill.flight ?? "waiting result" : fill.result}
                 </span>
@@ -143,12 +184,13 @@ function TradeTape({
       <table className="hidden w-full border-collapse text-left sm:table">
         <thead>
           <tr className="font-mono text-[10px] uppercase tracking-wide text-subtle">
-            <th className="pb-2 pr-3 font-medium">Time</th>
+            <th className="pb-2 pr-3 font-medium">Booked</th>
             <th className="pb-2 pr-3 font-medium">Recipe</th>
-            <th className="pb-2 pr-3 font-medium">Market</th>
             <th className="pb-2 pr-3 font-medium">Side</th>
-            <th className="pb-2 pr-3 font-medium">Book</th>
+            <th className="pb-2 pr-3 font-medium">Odds</th>
             <th className="pb-2 pr-3 text-right font-medium">Stake</th>
+            <th className="pb-2 pr-3 font-medium">Book</th>
+            {open ? <th className="pb-2 pr-3 font-medium">Liquidity</th> : null}
             <th className="pb-2 pr-3 font-medium">{open ? "Status" : "Result"}</th>
             <th className="pb-2 text-right font-medium">P&amp;L</th>
           </tr>
@@ -160,10 +202,17 @@ function TradeTape({
               <tr key={fill.id} className="log-in font-mono text-xs">
                 <td className="py-1.5 pr-3 tabular-nums text-subtle">{fill.t}</td>
                 <td className="py-1.5 pr-3 text-fg">{fill.recipe}</td>
-                <td className="py-1.5 pr-3 text-muted">{fill.market}</td>
                 <td className="py-1.5 pr-3 text-muted">{fill.side ?? "Empty"}</td>
-                <td className={cn("py-1.5 pr-3", bookTone(fill.book))}>{fill.book}</td>
+                <td className="py-1.5 pr-3 tabular-nums text-muted">{fmtOdds(fill.odds)}</td>
                 <td className="py-1.5 pr-3 text-right tabular-nums text-muted">{fmtStake(fill.stake)}</td>
+                <td className="py-1.5 pr-3">
+                  <BookMark book={fill.book} />
+                </td>
+                {open ? (
+                  <td className="py-1.5 pr-3 tabular-nums text-subtle">
+                    {fill.liquidity == null ? "Empty" : fmtStake(fill.liquidity)}
+                  </td>
+                ) : null}
                 <td className={cn("py-1.5 pr-3", resultTone(fill.result))}>
                   {open ? fill.flight ?? "waiting result" : fill.result}
                 </td>

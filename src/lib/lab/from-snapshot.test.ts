@@ -253,4 +253,9 @@ test("plant live snapshot is oracle, score stays empty when day_u is null", () =
   assert.equal(live.trades[0]?.t, "10:59:45");
   assert.equal(live.trades[0]?.flight, "waiting result");
   assert.equal(live.trades[0]?.recipe, "GB near-off WIN");
+  assert.equal(live.trades[0]?.stake, 1);
+  assert.equal(live.trades[0]?.liquidity, 19.17);
+  assert.equal(live.wait_open.length, 1);
+  assert.equal(live.wait_open[0]?.title, "NZ morning WIN · one-pick 2.5–4.49");
+  assert.equal(live.wait_open[0]?.why, "no size_ok candidates");
 });

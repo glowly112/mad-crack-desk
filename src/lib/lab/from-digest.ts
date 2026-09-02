@@ -181,6 +181,7 @@ export function applyDigest(digest: Digest, base: typeof STAMP = STAMP) {
     recipes: base.recipes.map((r) => ({ ...r })) as Recipe[],
     solids: [...base.solids] as Recipe[],
     trades: [...(base.trades ?? [])],
+    wait_open: [...(base.wait_open ?? [])],
   };
 }
 

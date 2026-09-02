@@ -50,6 +50,16 @@ fills = []
 for dte in sorted(by):
     fills.extend(by[dte][-80:])
 d["fills"] = fills
+wait_open = []
+lf = pathlib.Path.home() / "bbb/data/firm/lab/latest/live_fast_auto.json"
+if lf.exists():
+    try:
+        for r in json.loads(lf.read_text()).get("path_runs") or []:
+            if r.get("mode") == "wait_open" and r.get("cell_id"):
+                wait_open.append({"cell_id": r.get("cell_id"), "mode": "wait_open", "reasons": r.get("reasons"), "gate_verdict": r.get("gate_verdict")})
+    except Exception:
+        pass
+d["wait_open"] = wait_open
 print(json.dumps(d))
 `.trim();
 
@@ -177,8 +187,16 @@ export async function loadPlant(): Promise<PlantPayload> {
     const remote = Promise.race([
       (async () => {
         const [http, ssh] = await Promise.all([tryHttp(base), trySsh(base)]);
-        if (http && ssh && http.stamp.trades.length === 0 && ssh.stamp.trades.length > 0) {
-          return { ...http, stamp: { ...http.stamp, trades: ssh.stamp.trades } };
+        if (http && ssh) {
+          const trades =
+            http.stamp.trades.length === 0 && ssh.stamp.trades.length > 0
+              ? ssh.stamp.trades
+              : http.stamp.trades;
+          const wait_open =
+            (http.stamp.wait_open?.length ?? 0) === 0 && (ssh.stamp.wait_open?.length ?? 0) > 0
+              ? ssh.stamp.wait_open
+              : (http.stamp.wait_open ?? []);
+          return { ...http, stamp: { ...http.stamp, trades, wait_open } };
         }
         return http ?? ssh;
       })(),

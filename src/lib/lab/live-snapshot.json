@@ -198,7 +198,8 @@
       "gate_verdict": "LIVE_CANDIDATE",
       "side": "BACK",
       "lab_status": "KEEP",
-      "date": "2026-09-02"
+      "date": "2026-09-02",
+      "atb_size_gbp": 19.17
     },
     {
       "pick_id": "H-fast-gb-nearoff-win-83959Z|1.261796533|87607230|BACK|2026-09-02",
@@ -216,7 +217,8 @@
       "gate_verdict": "LIVE_CANDIDATE",
       "side": "BACK",
       "lab_status": "KEEP",
-      "date": "2026-09-02"
+      "date": "2026-09-02",
+      "atb_size_gbp": 14.35
     },
     {
       "pick_id": "H-fast-gb-nearoff-win-83959Z|1.261796533|58787924|BACK|2026-09-02",
@@ -234,7 +236,8 @@
       "gate_verdict": "LIVE_CANDIDATE",
       "side": "BACK",
       "lab_status": "KEEP",
-      "date": "2026-09-02"
+      "date": "2026-09-02",
+      "atb_size_gbp": 28.48
     },
     {
       "pick_id": "H-fast-gb-nearoff-win-83959Z|1.261796533|78060257|BACK|2026-09-02",
@@ -252,7 +255,16 @@
       "gate_verdict": "LIVE_CANDIDATE",
       "side": "BACK",
       "lab_status": "KEEP",
-      "date": "2026-09-02"
+      "date": "2026-09-02",
+      "atb_size_gbp": 25.1
+    }
+  ],
+  "wait_open": [
+    {
+      "cell_id": "H-20260828T020000Z-nz-morning-win-one-pick-band-2-5-4-49",
+      "mode": "wait_open",
+      "reasons": ["no_open_size_ok_candidates", "freeze_dry_bets_empty_or_all_settled"],
+      "gate_verdict": "HOLD_PAPER"
     }
   ],
   "cells": [
