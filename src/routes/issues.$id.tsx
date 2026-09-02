@@ -12,7 +12,7 @@ function Issue() {
   const raw = issueById(id);
   if (!raw) {
     return (
-      <DetailShell backTo="/issues" backLabel="Issues">
+      <DetailShell backTo="/office" backLabel="Office">
         <p className="text-sm text-subtle">{EMPTY}</p>
       </DetailShell>
     );
@@ -20,7 +20,7 @@ function Issue() {
   const iss = issueBoard(raw);
   const face = ownerId(iss.owner);
   return (
-    <DetailShell backTo="/issues" backLabel="Issues">
+    <DetailShell backTo="/office" backLabel="Office">
       <div className="flex items-center gap-3">
         {face ? <Portrait id={face} name={iss.owner} /> : null}
         <div>

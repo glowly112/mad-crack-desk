@@ -9,15 +9,14 @@ const NAV = [
   { to: "/", label: "Floor" },
   { to: "/trades", label: "Trades" },
   { to: "/office", label: "Office" },
-  { to: "/pipe", label: "Pipe" },
   { to: "/health", label: "Health" },
-  { to: "/issues", label: "Issues" },
   { to: "/staff", label: "Staff" },
   { to: "/trends", label: "Trends" },
 ] as const;
 
 function pathActive(pathname: string, to: string) {
   if (to === "/") return pathname === "/";
+  if (to === "/office") return pathname === "/office" || pathname.startsWith("/issues/");
   return pathname === to || pathname.startsWith(`${to}/`);
 }
 
