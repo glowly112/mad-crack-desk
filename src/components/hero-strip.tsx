@@ -68,7 +68,7 @@ export function ScoreChart() {
   const stamp = useStamp();
   const days = stamp.trends.map((t) => t.day);
   return (
-    <section>
+    <section className="min-w-0">
       <header className="mb-2 flex items-baseline justify-between gap-3">
         <h2 className="text-sm font-medium text-muted">Production</h2>
         <p className="font-mono text-xs text-subtle">u / day · aim {fmtAim(stamp.hero.aim_u)}</p>

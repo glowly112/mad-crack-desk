@@ -40,6 +40,7 @@ export function DeskScroll({
     const el = scroller.current;
     if (!el) return;
     measure();
+    const frame = window.requestAnimationFrame(measure);
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     if (el.firstElementChild) ro.observe(el.firstElementChild);
@@ -51,6 +52,7 @@ export function DeskScroll({
     };
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => {
+      window.cancelAnimationFrame(frame);
       ro.disconnect();
       el.removeEventListener("scroll", onScroll);
       window.clearTimeout(fade.current);
