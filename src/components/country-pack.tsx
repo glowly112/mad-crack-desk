@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 
 const TONE: Record<MarketSquare["tone"], string> = {
   empty: "bg-elev ring-1 ring-inset ring-border-strong",
-  hunt: "bg-muted/35",
+  hunt: "bg-subtle",
   idea: "bg-warn",
   win: "bg-fg",
   loss: "bg-bad",
@@ -35,7 +35,10 @@ export function CountryPack() {
   const squares = plantCells(stamp.counts);
   const countries = countryMarket(officeCountries(stamp.coverage, stamp.recipes));
   const cap = capitalisingLine(stamp.counts);
-  const hole = inventHole(stamp.office.inventWhy);
+  const hole =
+    [stamp.office.inventWhy, ...stamp.hunters.map((h) => h.note)]
+      .map(inventHole)
+      .find((n) => n !== EMPTY) ?? EMPTY;
   const glance = `${cap}${hole !== EMPTY ? ` Looking at ${hole}.` : ""}`;
 
   return (
