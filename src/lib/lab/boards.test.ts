@@ -89,8 +89,11 @@ test("country size is measured n, not a recipe count, and HK stays Empty", () =>
   const boxes = sizePackBoxes(market);
   const gbBox = boxes.find((b) => b.region === "GB");
   const auBox = boxes.find((b) => b.region === "AU");
-  assert.ok(gbBox && auBox);
+  const hkBox = boxes.find((b) => b.region === "HK");
+  assert.equal(boxes.length, 8);
+  assert.ok(gbBox && auBox && hkBox);
   assert.ok(gbBox.w * gbBox.h > auBox.w * auBox.h);
+  assert.equal(hkBox.empty, true);
   assert.equal(capitalisingLine(STAMP.counts), "1 solid of 161 cells. 126 killed.");
   assert.match(marketGlance(market, STAMP.counts), /Hong Kong Empty/);
 });

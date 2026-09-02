@@ -12,6 +12,13 @@ const TONE: Record<MarketSquare["tone"], string> = {
   parked: "bg-muted",
 };
 
+const TONE_LABEL: Record<MarketSquare["tone"], string> = {
+  win: "solid",
+  idea: "still being tested",
+  loss: "killed",
+  parked: "parked",
+};
+
 /** One market sized by measured n. Colour is win / idea / loss / parked. */
 export function CountryPack() {
   const stamp = useStamp();
@@ -36,7 +43,7 @@ export function CountryPack() {
       ) : (
         <div>
           <div
-            className="relative aspect-[2/1] w-full border border-border bg-elev"
+            className="relative aspect-[2/1] min-h-56 w-full border border-border bg-elev"
             role="img"
             aria-label={glance}
           >
@@ -70,9 +77,10 @@ function LegendDot({ tone, label }: { tone: MarketSquare["tone"]; label: string 
 }
 
 function Cluster({ box, delay }: { box: SizeBox; delay: number }) {
+  const sizeLine = box.empty ? EMPTY : box.caption || (box.n > 0 ? `n=${box.n}` : "n=0");
   return (
     <article
-      className="log-in absolute min-w-0 px-2 py-1.5"
+      className="log-in absolute min-w-0 overflow-hidden bg-bg px-2 py-1.5"
       style={{
         left: `calc(${box.x}% + 1px)`,
         top: `calc(${box.y}% + 1px)`,
@@ -80,16 +88,16 @@ function Cluster({ box, delay }: { box: SizeBox; delay: number }) {
         height: `calc(${box.h}% - 2px)`,
         animationDelay: `${Math.min(delay, 8) * 28}ms`,
       }}
-      aria-label={`${box.name}. ${box.empty ? EMPTY : box.caption || `n=${box.n}`}`}
-      title={`${box.name}${box.caption ? ` · ${box.caption}` : ""}`}
+      aria-label={`${box.name}. ${sizeLine}`}
+      title={`${box.name} · ${sizeLine}`}
     >
       {box.empty ? (
-        <p className="text-xs text-subtle">{EMPTY}</p>
+        <p className="font-mono text-[10px] text-muted">{EMPTY}</p>
       ) : (
         <Waffle squares={box.squares} />
       )}
       <p className="mt-1 truncate text-xs leading-tight">{box.name}</p>
-      {box.caption ? <p className="truncate font-mono text-[10px] text-subtle">{box.caption}</p> : null}
+      <p className="truncate font-mono text-[10px] text-subtle">{sizeLine}</p>
     </article>
   );
 }
@@ -101,12 +109,16 @@ function Waffle({ squares }: { squares: MarketSquare[] }) {
     <div
       className="grid gap-[3px]"
       style={{
-        gridTemplateColumns: `repeat(${cols}, 0.85rem)`,
-        gridAutoRows: "0.85rem",
+        gridTemplateColumns: `repeat(${cols}, 0.9rem)`,
+        gridAutoRows: "0.9rem",
       }}
     >
       {squares.map((s) => (
-        <span key={s.id} className={cn("block rounded-[2px]", TONE[s.tone])} />
+        <span
+          key={s.id}
+          title={TONE_LABEL[s.tone]}
+          className={cn("block rounded-[2px]", TONE[s.tone])}
+        />
       ))}
     </div>
   );
