@@ -31,7 +31,7 @@ export function CountryPack() {
         <EmptyState copy={EMPTY} />
       ) : (
         <div>
-          <div className="bg-elev px-4 py-4" role="img" aria-label={line}>
+          <div className="border border-border bg-elev px-4 py-4" role="img" aria-label={line}>
             <div className="flex flex-wrap items-end gap-x-7 gap-y-5">
               {market.map((c, i) => (
                 <Cluster key={c.region} row={c} delay={i} />
