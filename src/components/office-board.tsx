@@ -6,7 +6,9 @@ import { LiveDot } from "@/components/live-dot";
 import { ownerId, Portrait } from "@/components/portrait";
 import { useStamp } from "@/components/plant-context";
 import {
+  bookPeriods,
   factorySquares,
+  inventWhatHappened,
   issueBoard,
   officeWorkers,
   pipeBoard,
@@ -15,7 +17,7 @@ import {
 } from "@/lib/lab/boards";
 import { EMPTY, recipePack } from "@/lib/lab/desk";
 import type { Recipe } from "@/lib/lab/stamp";
-import { cn } from "@/lib/utils";
+import { cn, fmtU } from "@/lib/utils";
 
 /** Next action first. */
 export function ThingsToFix() {
@@ -131,6 +133,32 @@ export function FactoryLine() {
   );
 }
 
+/** Invent queue and reject — Office, not Floor. */
+export function InventHappened() {
+  const stamp = useStamp();
+  const line = inventWhatHappened({
+    invent: stamp.office.invent,
+    inventWhy: stamp.office.inventWhy,
+    pitched: stamp.pipe.pitched,
+    hunters: stamp.hunters,
+    rejects: stamp.office.rejects,
+  });
+
+  return (
+    <section>
+      <header className="mb-2 flex items-baseline justify-between gap-3 border-b border-border pb-2">
+        <h2 className="text-sm font-medium">Invent</h2>
+        <p className="text-xs text-subtle">What happened</p>
+      </header>
+      {line === EMPTY ? (
+        <EmptyState copy={EMPTY} />
+      ) : (
+        <p className="text-sm text-muted">{line}</p>
+      )}
+    </section>
+  );
+}
+
 /** Parked vs still being tested, by country, then who’s working. */
 export function RecipesNotEarning() {
   const stamp = useStamp();
@@ -176,6 +204,17 @@ export function RecipesNotEarning() {
   );
 }
 
+function BookLine({ recipe }: { recipe: Recipe }) {
+  const book = bookPeriods(recipe);
+  const holdout = book.holdoutN == null ? EMPTY : `n=${book.holdoutN} ${EMPTY}`;
+  return (
+    <p className="mt-1 font-mono text-[10px] leading-snug text-subtle">
+      Paper n={book.paperN} {fmtU(book.paperU)} · Holdout {holdout}
+      <span className="mt-0.5 block font-sans text-xs">{book.line}</span>
+    </p>
+  );
+}
+
 function RecipeGroup({ title, hint, rows }: { title: string; hint: string; rows: Recipe[] }) {
   return (
     <section>
@@ -200,6 +239,7 @@ function RecipeGroup({ title, hint, rows }: { title: string; hint: string; rows:
                 <div className="min-w-0">
                   <p className="text-sm">{r.title}</p>
                   <p className="mt-0.5 text-xs text-subtle">{recipeStatus(r)}</p>
+                  <BookLine recipe={r} />
                 </div>
                 <p className="shrink-0 text-xs text-subtle">{r.region}</p>
               </Link>

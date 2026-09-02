@@ -1,14 +1,17 @@
 import { EmptyState } from "@/components/empty-state";
 import { useStamp } from "@/components/plant-context";
 import {
+  SQUARE_WINDOW_LABEL,
+  SQUARE_WINDOWS,
   capitalisingLine,
   countryMarket,
   inventHole,
   officeCountries,
-  plantCells,
+  plantMarkets,
+  racingSquare,
 } from "@/lib/lab/boards";
 import { EMPTY } from "@/lib/lab/desk";
-import type { CountryRow, MarketSquare } from "@/lib/lab/boards";
+import type { CountryRow, HoleCell, MarketSquare, SquareMarket } from "@/lib/lab/boards";
 import { cn } from "@/lib/utils";
 
 const TONE: Record<MarketSquare["tone"], string> = {
@@ -21,7 +24,7 @@ const TONE: Record<MarketSquare["tone"], string> = {
 };
 
 const TONE_LABEL: Record<MarketSquare["tone"], string> = {
-  empty: "unused",
+  empty: "Empty",
   hunt: "looking",
   idea: "still being tested",
   win: "solid",
@@ -29,24 +32,32 @@ const TONE_LABEL: Record<MarketSquare["tone"], string> = {
   parked: "parked",
 };
 
-/** One plant waffle of stamp cells, then eight countries as occupied vs Empty. */
+/** Whole racing square: country × window × WIN beside PLACE. Empty is area. */
 export function CountryPack() {
   const stamp = useStamp();
-  const squares = plantCells(stamp.counts);
+  const huntNotes = [stamp.office.inventWhy, ...stamp.hunters.map((h) => h.note)];
+  const holes = racingSquare({
+    recipes: stamp.recipes,
+    coverage: stamp.coverage,
+    moves: stamp.moves,
+    floorLog: stamp.floorLog,
+    huntNotes,
+    namedHoles: stamp.holes,
+  });
+  const markets = plantMarkets(holes.map((h) => h.market));
   const countries = countryMarket(officeCountries(stamp.coverage, stamp.recipes));
   const cap = capitalisingLine(stamp.counts);
   const hole =
-    [stamp.office.inventWhy, ...stamp.hunters.map((h) => h.note)]
-      .map(inventHole)
-      .find((n) => n !== EMPTY) ?? EMPTY;
-  const glance = `${cap}${hole !== EMPTY ? ` Looking at ${hole}.` : ""}`;
+    huntNotes.map(inventHole).find((n) => n !== EMPTY) ?? EMPTY;
+  const emptyN = holes.filter((h) => h.tone === "empty").length;
+  const glance = `${holes.length} holes. ${emptyN} Empty. WIN beside PLACE. ${cap}`;
 
   return (
     <section>
       <header className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-border pb-2">
-        <h2 className="text-sm font-medium text-muted">By country</h2>
+        <h2 className="text-sm font-medium text-muted">The square</h2>
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-subtle">
-          <LegendDot tone="empty" label="unused" />
+          <LegendDot tone="empty" label="Empty" />
           <LegendDot tone="hunt" label="looking" />
           <LegendDot tone="loss" label="killed" />
           <LegendDot tone="idea" label="still being tested" />
@@ -54,30 +65,86 @@ export function CountryPack() {
           <LegendDot tone="win" label="solid" />
         </p>
       </header>
-      {squares.length === 0 ? (
+      {holes.length === 0 ? (
         <EmptyState copy={EMPTY} />
       ) : (
         <div>
-          <div
-            className="grid gap-[3px] border border-border bg-bg p-3"
-            role="img"
-            aria-label={glance}
-            style={{ gridTemplateColumns: "repeat(auto-fill, minmax(0.7rem, 1fr))" }}
-          >
-            {squares.map((s) => (
-              <span
-                key={s.id}
-                title={TONE_LABEL[s.tone]}
-                className={cn("aspect-square rounded-[2px]", TONE[s.tone])}
-              />
-            ))}
+          <div className="overflow-x-auto">
+            <div className="min-w-[36rem]" role="img" aria-label={glance}>
+              <SquareGrid holes={holes} markets={markets} />
+            </div>
           </div>
-          <p className="mt-2 text-sm text-muted">{cap}</p>
+          <p className="mt-2 text-sm text-muted">
+            {emptyN} Empty of {holes.length} holes. WIN beside PLACE.
+          </p>
+          <p className="mt-0.5 text-xs text-subtle">Opened mill: {cap}</p>
           {hole !== EMPTY ? <p className="mt-0.5 text-xs text-subtle">Looking at {hole}.</p> : null}
           <CountryRowList rows={countries} />
         </div>
       )}
     </section>
+  );
+}
+
+function SquareGrid({ holes, markets }: { holes: readonly HoleCell[]; markets: readonly SquareMarket[] }) {
+  const byId = new Map(holes.map((h) => [h.id, h]));
+  const regions = [...new Set(holes.map((h) => h.region))];
+  return (
+    <div className="border border-border bg-bg">
+      <div
+        className="grid items-end gap-px px-2 pt-2"
+        style={{ gridTemplateColumns: `4.5rem repeat(${SQUARE_WINDOWS.length}, minmax(4.5rem, 1fr))` }}
+      >
+        <span />
+        {SQUARE_WINDOWS.map((w) => (
+          <p key={w} className="text-center font-mono text-[10px] text-subtle">
+            {SQUARE_WINDOW_LABEL[w]}
+          </p>
+        ))}
+      </div>
+      <div
+        className="grid gap-px px-2 pb-1"
+        style={{ gridTemplateColumns: `4.5rem repeat(${SQUARE_WINDOWS.length}, minmax(4.5rem, 1fr))` }}
+      >
+        <span />
+        {SQUARE_WINDOWS.map((w) => (
+          <div key={`${w}-mkt`} className="flex justify-center gap-1">
+            {markets.map((m) => (
+              <span key={m} className="w-4 text-center font-mono text-[9px] text-subtle">
+                {m === "PLACE" ? "P" : m === "LAY" ? "L" : "W"}
+              </span>
+            ))}
+          </div>
+        ))}
+      </div>
+      {regions.map((region) => {
+        const name = holes.find((h) => h.region === region)?.name ?? region;
+        return (
+          <div
+            key={region}
+            className="grid items-center gap-px border-t border-border px-2 py-1.5"
+            style={{ gridTemplateColumns: `4.5rem repeat(${SQUARE_WINDOWS.length}, minmax(4.5rem, 1fr))` }}
+          >
+            <p className="truncate text-xs">{name}</p>
+            {SQUARE_WINDOWS.map((window) => (
+              <div key={`${region}-${window}`} className="flex justify-center gap-1">
+                {markets.map((market) => {
+                  const cell = byId.get(`${region}|${window}|${market}`);
+                  const tone = cell?.tone ?? "empty";
+                  return (
+                    <span
+                      key={market}
+                      title={`${name} ${SQUARE_WINDOW_LABEL[window]} ${market} · ${TONE_LABEL[tone]}`}
+                      className={cn("size-4 rounded-[2px]", TONE[tone])}
+                    />
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

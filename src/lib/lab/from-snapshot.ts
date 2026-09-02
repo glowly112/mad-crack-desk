@@ -258,7 +258,38 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
     trends,
     trades: Array.isArray(snap.fills) ? parseFills(snap.fills) : base.trades,
     wait_open: Array.isArray(snap.wait_open) ? parseWaitOpen(snap.wait_open) : (base.wait_open ?? []),
+    holes: holesFromSnap(snap) ?? base.holes,
+    office: {
+      ...base.office,
+      rejects: rejectsFromSnap(snap) ?? base.office.rejects,
+    },
   };
+}
+
+function holesFromSnap(snap: Record<string, unknown>): LiveStamp["holes"] | null {
+  const raw = snap.holes ?? snap.matrix ?? snap.occupancy ?? snap.mercator_holes;
+  if (!Array.isArray(raw)) return null;
+  const out: LiveStamp["holes"] = [];
+  for (const row of raw) {
+    const r = rec(row);
+    if (!r) continue;
+    const region = String(r.region ?? r.country ?? "").toUpperCase();
+    const window = String(r.window ?? r.phase ?? "");
+    const market = String(r.market ?? r.side ?? "").toUpperCase();
+    if (!region || !window || !market) continue;
+    const tone = typeof r.tone === "string" ? r.tone : typeof r.status === "string" ? r.status : undefined;
+    out.push({ region, window, market, tone });
+  }
+  return out.length ? out : null;
+}
+
+function rejectsFromSnap(snap: Record<string, unknown>): string[] | null {
+  const invent = rec(snap.invent);
+  const raw = snap.rejects ?? snap.invent_rejects ?? invent?.rejects ?? invent?.gate_rejects;
+  if (typeof raw === "string" && raw.trim()) return [raw.trim()];
+  if (!Array.isArray(raw)) return null;
+  const out = raw.map((x) => String(x).trim()).filter(Boolean);
+  return out.length ? out : null;
 }
 
 function overlaySeats(base: LiveStamp["seats"], snap: Record<string, unknown>): LiveStamp["seats"] {

@@ -166,6 +166,244 @@ export function plantCells(counts: PlantCounts): MarketSquare[] {
   return out;
 }
 
+export const SQUARE_WINDOWS = ["morning", "late_pre", "near_off", "in_play"] as const;
+export type SquareWindow = (typeof SQUARE_WINDOWS)[number];
+export const SQUARE_WINDOW_LABEL: Record<SquareWindow, string> = {
+  morning: "morning",
+  late_pre: "late-pre",
+  near_off: "near-off",
+  in_play: "in-play",
+};
+
+export type SquareMarket = "WIN" | "PLACE" | "LAY";
+
+export type HoleCell = {
+  id: string;
+  region: string;
+  name: string;
+  window: SquareWindow;
+  market: SquareMarket;
+  tone: MarketTone;
+};
+
+const TONE_RANK: Record<MarketTone, number> = {
+  empty: 0,
+  hunt: 1,
+  idea: 2,
+  parked: 3,
+  loss: 4,
+  win: 5,
+};
+
+const WINDOW_PARSE: [RegExp, SquareWindow][] = [
+  [/near[\s_-]*off|nearoff/, "near_off"],
+  [/late[\s_-]*pre|latepre/, "late_pre"],
+  [/in[\s_-]*play|inplay/, "in_play"],
+  [/morning/, "morning"],
+];
+
+/** WIN beside PLACE. LAY only when the plant already names it. */
+export function plantMarkets(texts: readonly string[]): SquareMarket[] {
+  const blob = texts.join(" ");
+  if (/(?:^|[^A-Za-z])LAY(?:[^A-Za-z]|$)/.test(blob) && !/display/i.test(blob)) {
+    return ["WIN", "PLACE", "LAY"];
+  }
+  return ["WIN", "PLACE"];
+}
+
+export function parseWindow(text: string): SquareWindow | null {
+  const lower = text.toLowerCase();
+  for (const [re, key] of WINDOW_PARSE) {
+    if (re.test(lower)) return key;
+  }
+  return null;
+}
+
+export function parseMarket(text: string): SquareMarket | null {
+  const t = text.toUpperCase().replace(/_/g, " ");
+  if (/(?:^|[^A-Z])LAY(?:[^A-Z]|$)/.test(t)) return "LAY";
+  if (/\bPLACE\b/.test(t)) return "PLACE";
+  if (/\bWIN\b/.test(t)) return "WIN";
+  return null;
+}
+
+/** Country × window × market. All three or nothing — never invent a missing axis. */
+export function parseHole(text: string): { region: string; window: SquareWindow; market: SquareMarket } | null {
+  const region = regionFromText(text);
+  const window = parseWindow(text);
+  const market = parseMarket(text);
+  if (!region || !window || !market) return null;
+  return { region, window, market };
+}
+
+function asHoleTone(t?: string): MarketTone | null {
+  if (t === "empty" || t === "hunt" || t === "idea" || t === "win" || t === "loss" || t === "parked") return t;
+  return null;
+}
+
+function occupy(
+  map: Map<string, HoleCell>,
+  hole: { region: string; window: SquareWindow; market: SquareMarket },
+  tone: MarketTone,
+) {
+  const id = `${hole.region}|${hole.window}|${hole.market}`;
+  const cur = map.get(id);
+  if (!cur || TONE_RANK[tone] >= TONE_RANK[cur.tone]) {
+    map.set(id, { id, region: hole.region, name: countryName(hole.region), window: hole.window, market: hole.market, tone });
+  }
+}
+
+/**
+ * Whole racing square. Empty holes are real squares. Occupied only when the
+ * mill names that country × window × market. Never paints 126 kills across countries.
+ */
+export function racingSquare(input: {
+  recipes: readonly Recipe[];
+  coverage?: readonly { region: string; keep: number; measuring: number; note?: string }[];
+  moves?: readonly { recipe: string; to: string }[];
+  floorLog?: readonly { kind?: string; line: string }[];
+  huntNotes?: readonly string[];
+  namedHoles?: readonly { region: string; window: string; market: string; tone?: string }[];
+}): HoleCell[] {
+  const texts = [
+    ...input.recipes.map((r) => `${r.id} ${r.title} ${r.why}`),
+    ...(input.moves ?? []).map((m) => m.recipe),
+    ...(input.floorLog ?? []).map((r) => r.line),
+    ...(input.huntNotes ?? []),
+    ...(input.coverage ?? []).map((c) => c.note ?? ""),
+    ...(input.namedHoles ?? []).map((h) => h.market),
+  ];
+  const markets = plantMarkets(texts);
+  const occ = new Map<string, HoleCell>();
+  const grid: HoleCell[] = [];
+  for (const region of REGIONS) {
+    for (const window of SQUARE_WINDOWS) {
+      for (const market of markets) {
+        const id = `${region}|${window}|${market}`;
+        const cell: HoleCell = { id, region, name: countryName(region), window, market, tone: "empty" };
+        grid.push(cell);
+        occ.set(id, cell);
+      }
+    }
+  }
+
+  const named = input.namedHoles ?? [];
+  if (named.length) {
+    for (const h of named) {
+      const window = parseWindow(h.window) ?? (SQUARE_WINDOWS.includes(h.window as SquareWindow) ? (h.window as SquareWindow) : null);
+      const market = parseMarket(h.market);
+      const region = REGIONS.includes(h.region as (typeof REGIONS)[number]) ? h.region : regionFromText(h.region);
+      if (!region || !window || !market || !markets.includes(market)) continue;
+      occupy(occ, { region, window, market }, asHoleTone(h.tone) ?? "idea");
+    }
+  } else {
+    const regionsWithBook = new Set<string>();
+    for (const r of input.recipes) {
+      const hole = parseHole(`${r.region} ${r.title} ${r.id}`);
+      if (!hole) continue;
+      regionsWithBook.add(r.region);
+      occupy(occ, hole, recipeTone(r));
+    }
+    for (const m of input.moves ?? []) {
+      if (m.to !== "Dead") continue;
+      const hole = parseHole(m.recipe);
+      if (hole) occupy(occ, hole, "loss");
+    }
+    for (const row of input.floorLog ?? []) {
+      if (row.kind !== "kill" && !/→\s*Dead/i.test(row.line)) continue;
+      const hole = parseHole(row.line);
+      if (hole) occupy(occ, hole, "loss");
+    }
+    for (const note of input.huntNotes ?? []) {
+      const hole = parseHole(note);
+      if (hole) occupy(occ, hole, "hunt");
+    }
+    for (const c of input.coverage ?? []) {
+      if (regionsWithBook.has(c.region)) continue;
+      if (c.keep + c.measuring === 0) continue;
+      const hole = parseHole(`${c.region} ${c.note ?? ""}`);
+      if (!hole) continue;
+      occupy(occ, hole, c.keep > 0 ? "parked" : "idea");
+    }
+  }
+
+  return grid.map((cell) => occ.get(cell.id) ?? cell);
+}
+
+export type BookPeriods = {
+  paperN: number;
+  paperU: number | null;
+  holdoutN: number | null;
+  holdoutNeed: number | null;
+  sameBook: boolean;
+  line: string;
+};
+
+/** Paper and holdout as two periods of one book. Never recomputes P&L. */
+export function bookPeriods(recipe: Recipe): BookPeriods {
+  const paperN = Number.isFinite(recipe.n) ? recipe.n : 0;
+  const paperU = Number.isFinite(recipe.freezePnl) ? recipe.freezePnl : null;
+  const m = /holdout\s+(\d+)\s*\/\s*(\d+)/i.exec(recipe.why);
+  if (!m) {
+    return {
+      paperN,
+      paperU,
+      holdoutN: null,
+      holdoutNeed: null,
+      sameBook: false,
+      line: "Holdout Empty. The stamp does not prove paper and holdout are the same pick set.",
+    };
+  }
+  const holdoutN = Number.parseInt(m[1], 10);
+  const holdoutNeed = Number.parseInt(m[2], 10);
+  const short = holdoutN < holdoutNeed ? " Not enough holdout races yet." : "";
+  return {
+    paperN,
+    paperU,
+    holdoutN,
+    holdoutNeed,
+    sameBook: true,
+    line: `Same book. Holdout is later races.${short}`,
+  };
+}
+
+export function rejectEnglish(raw: string): string {
+  const t = raw.trim();
+  if (!t) return EMPTY;
+  if (/card_axes_on_geo_broad/i.test(t)) {
+    return "The gate sent Geo's card axes back on South Africa, New Zealand, and the United States. Those books are too broad.";
+  }
+  const snake = t.match(/\b([a-z]+_[a-z0-9_]+)\b/);
+  if (snake) {
+    return `The gate sent it back (${snake[1].replace(/_/g, " ")}).`;
+  }
+  return EMPTY;
+}
+
+/** Invent queue and reject in short English so Office does not look stalled. */
+export function inventWhatHappened(input: {
+  invent: boolean;
+  inventWhy: string;
+  pitched: number;
+  hunters: readonly { id: string; note: string }[];
+  rejects?: readonly string[];
+}): string {
+  const notes = [input.inventWhy, ...input.hunters.map((h) => h.note), ...(input.rejects ?? [])];
+  const bits: string[] = [];
+  if (input.invent) bits.push("Invent is on.");
+  if (input.pitched > 0) bits.push(`${input.pitched} new ideas in the queue.`);
+  const hole =
+    notes.map(inventHole).find((n) => n !== EMPTY) ?? EMPTY;
+  const hunter = input.hunters.find((h) => inventHole(h.note) !== EMPTY);
+  if (hole !== EMPTY) {
+    bits.push(`${hunter ? hunterName(hunter.id) : "Geo"} is looking at ${hole}.`);
+  }
+  const reject = notes.map(rejectEnglish).find((n) => n !== EMPTY);
+  if (reject) bits.push(reject);
+  else if (input.invent || input.pitched > 0) bits.push("The mill is not stalled.");
+  return bits.length ? bits.join(" ") : EMPTY;
+}
+
 export type MarketCountry = {
   region: string;
   name: string;

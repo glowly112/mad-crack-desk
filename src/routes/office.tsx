@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { FactoryLine, RecipesNotEarning, ThingsToFix } from "@/components/office-board";
+import { FactoryLine, InventHappened, RecipesNotEarning, ThingsToFix } from "@/components/office-board";
 
 export const Route = createFileRoute("/office")({ component: Office });
 
@@ -12,6 +12,7 @@ export function Office() {
       </header>
       <ThingsToFix />
       <FactoryLine />
+      <InventHappened />
       <RecipesNotEarning />
     </div>
   );

@@ -94,7 +94,9 @@ export const STAMP = {
     pareto: "geo",
     invent: true,
     inventWhy: "invent on · invent (densify) · next hole ZA|morning|WIN",
+    rejects: [] as string[],
   },
+  holes: [] as { region: string; window: string; market: string; tone?: string }[],
   hunters: [
     { id: "card", state: "FLOWING" as HunterState, note: "FLOWING · pitched=3 · proving=6 · conv 0.0%" },
     { id: "steam", state: "FLOWING" as HunterState, note: "FLOWING · no open deals" },

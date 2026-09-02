@@ -15,7 +15,11 @@ import {
   officeWorkers,
   factorySquares,
   inventHole,
+  inventWhatHappened,
+  bookPeriods,
   pipeBoard,
+  plantMarkets,
+  racingSquare,
   plantCellBuckets,
   plantCells,
   recipeStatus,
@@ -120,6 +124,64 @@ test("the plant waffle is stamp cells: unused leftover, hunting, kill, then the 
   assert.equal(leftover.empty, 180 - leftover.used);
   assert.equal(inventHole(STAMP.office.inventWhy), "South Africa morning WIN");
   assert.equal(inventHole("invent off"), EMPTY);
+});
+
+test("the racing square is the finite mill grid; Empty holes are real area", () => {
+  const holes = racingSquare({
+    recipes: STAMP.recipes,
+    coverage: STAMP.coverage,
+    moves: STAMP.moves,
+    floorLog: STAMP.floorLog,
+    huntNotes: [STAMP.office.inventWhy, ...STAMP.hunters.map((h) => h.note)],
+  });
+  assert.equal(plantMarkets(STAMP.recipes.map((r) => r.title)).join(), "WIN,PLACE");
+  assert.equal(holes.length, 8 * 4 * 2);
+  assert.equal(holes.filter((h) => h.tone === "empty").length > 40, true);
+  assert.equal(holes.find((h) => h.id === "GB|near_off|WIN")?.tone, "win");
+  assert.equal(holes.find((h) => h.id === "NZ|morning|WIN")?.tone, "parked");
+  assert.equal(holes.find((h) => h.id === "AU|late_pre|WIN")?.tone, "idea");
+  assert.equal(holes.find((h) => h.id === "AU|near_off|PLACE")?.tone, "loss");
+  assert.equal(holes.find((h) => h.id === "ZA|morning|WIN")?.tone, "hunt");
+  assert.equal(holes.find((h) => h.id === "IE|morning|PLACE")?.tone, "parked");
+  assert.equal(holes.find((h) => h.id === "HK|morning|WIN")?.tone, "empty");
+  assert.equal(holes.filter((h) => h.tone === "loss").length, 1);
+  const gbWin = holes.find((h) => h.id === "GB|near_off|WIN");
+  const gbPlace = holes.find((h) => h.id === "GB|near_off|PLACE");
+  assert.ok(gbWin && gbPlace);
+});
+
+test("paper and holdout are two periods of one book", () => {
+  const solid = STAMP.recipes.find((r) => r.badge === "Solid");
+  const proving = STAMP.recipes.find((r) => r.status === "MEASURING");
+  assert.ok(solid && proving);
+  const keep = bookPeriods(solid);
+  assert.equal(keep.sameBook, true);
+  assert.equal(keep.holdoutN, 23);
+  assert.match(keep.line, /Same book/);
+  const open = bookPeriods(proving);
+  assert.equal(open.holdoutN, null);
+  assert.match(open.line, /does not prove/);
+});
+
+test("invent what happened names the queue and a known reject", () => {
+  const line = inventWhatHappened({
+    invent: true,
+    inventWhy: STAMP.office.inventWhy,
+    pitched: 12,
+    hunters: STAMP.hunters,
+  });
+  assert.match(line, /12 new ideas/);
+  assert.match(line, /South Africa morning WIN/);
+  assert.match(line, /not stalled/);
+  const rejected = inventWhatHappened({
+    invent: true,
+    inventWhy: STAMP.office.inventWhy,
+    pitched: 18,
+    hunters: STAMP.hunters,
+    rejects: ["card_axes_on_geo_broad"],
+  });
+  assert.match(rejected, /card axes/);
+  assert.match(rejected, /too broad/i);
 });
 
 test("recipe status drops holdout_n_too_small", () => {
