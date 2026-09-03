@@ -3,6 +3,7 @@
 import {
   isPostEpochEholeMeasuring,
   isPostEpochEholeRecipe,
+  recipeIsPostEpoch,
 } from "./board-reset.ts";
 import {
   eholeChipRunOrder,
@@ -212,9 +213,9 @@ export function bookWord(book: FillBook): "paper" | "live" {
 
 export function fillResultWord(fill: Fill): string {
   if (fill.result === "waiting") return "Open";
-  if (fill.result === "won") return "Won";
-  if (fill.result === "lost") return "Lost";
-  if (fill.result === "void") return "Void";
+  if (fill.result === "void" || fill.pnl == null || fill.pnl === 0) return "Void";
+  if (fill.pnl > 0) return "Won";
+  if (fill.pnl < 0) return "Lost";
   return EMPTY;
 }
 
@@ -511,12 +512,60 @@ export function honestSettledFills(fills: readonly Fill[], _recipes: readonly Re
   return settledFills(fills).filter((f) => !junk.has(f.id));
 }
 
+/** Trades › Settled candidates — post-epoch first-book, Hyde/fast off. No junk peel. */
+export function tradesSettledCandidateFills(
+  fills: readonly Fill[],
+  _recipes: readonly Recipe[] = [],
+): Fill[] {
+  return settledFills(fills).filter(isFirstBookPaperFill);
+}
+
 /** Trades settled — Hyde / fast / legacy morning tape hidden. */
 export function honestFirstBookSettledFills(
   fills: readonly Fill[],
   recipes: readonly Recipe[] = [],
 ): Fill[] {
-  return honestSettledFills(fills, recipes).filter(isFirstBookTapeFill);
+  return tradesSettledCandidateFills(fills, recipes);
+}
+
+/** Signed P&L on Trades › Settled — Floor paper u, win·lose, Office roll-ups. */
+export function tradesSettledTapeFills(
+  fills: readonly Fill[],
+  recipes: readonly Recipe[] = [],
+): Fill[] {
+  return tradesSettledCandidateFills(fills, recipes).filter(isCountableSettledFill);
+}
+
+/** VOID / 0u on Trades — not wins, losses, or Floor paper. */
+export function tradesSettledVoidFills(
+  fills: readonly Fill[],
+  recipes: readonly Recipe[] = [],
+): Fill[] {
+  return tradesSettledCandidateFills(fills, recipes).filter((f) => !isCountableSettledFill(f));
+}
+
+/** @deprecated Use tradesSettledTapeFills — same tape as Trades › Settled. */
+export function countableFirstBookSettledFills(
+  fills: readonly Fill[],
+  recipes: readonly Recipe[] = [],
+): Fill[] {
+  return tradesSettledTapeFills(fills, recipes);
+}
+
+/** @deprecated Use tradesSettledVoidFills. */
+export function voidFirstBookSettledFills(
+  fills: readonly Fill[],
+  recipes: readonly Recipe[] = [],
+): Fill[] {
+  return tradesSettledVoidFills(fills, recipes);
+}
+
+/** Signed settled row on Trades › Settled — Floor and Office use the same gate. */
+export function isCountableSettledFill(fill: Fill): boolean {
+  if (fill.result === "void") return false;
+  const pnl = fill.pnl;
+  if (pnl == null || pnl === 0) return false;
+  return true;
 }
 
 /** Trades open — post-epoch ehole first-books only. */
@@ -532,10 +581,11 @@ export function paperSettledFills(fills: readonly Fill[], recipes: readonly Reci
   return honestSettledFills(fills, recipes).filter((f) => f.book === "paper" && f.result !== "void");
 }
 
-/** Hyde / fast / legacy tape — not today's post-epoch ehole first-book. */
+/** Hyde / fast / legacy tape — not today's post-epoch first-book. */
 export function isFirstBookPaperFill(fill: Fill): boolean {
   if (/^H-hyde-/i.test(fill.recipeId) || /^H-fast-/i.test(fill.recipeId)) return false;
-  return isPostEpochEholeRecipe({ id: fill.recipeId, title: fill.recipe });
+  if (isPostEpochEholeRecipe({ id: fill.recipeId, title: fill.recipe })) return true;
+  return recipeIsPostEpoch({ id: fill.recipeId, title: fill.recipe } as Recipe);
 }
 
 /** Open or settled on today's mill tape — post-epoch ehole first-book only. */
@@ -575,24 +625,24 @@ export function fmtWinLoseCounts(counts: SettledTradeCounts | null): string {
   return `${counts.wins} win · ${counts.losses} lose`;
 }
 
-/** Settled paper u for one day — Floor tile and Office row sum. First-book only. */
+/** Settled paper u for one day — Floor tile and Office row sum. Same tape as Trades settled. */
 export function settledPaperDayU(
   trades: readonly Fill[],
   day: string,
   recipes: readonly Recipe[] = [],
 ): number | null {
-  const paper = firstBookPaperSettledFills(fillsOnDay(trades, day), recipes);
+  const paper = tradesSettledTapeFills(fillsOnDay(trades, day), recipes);
   if (!paper.length) return null;
   return paper.reduce((acc, f) => acc + (f.pnl ?? 0), 0);
 }
 
-/** Win · lose counts for today's settled first-book paper — same tape as settledPaperDayU. */
+/** Win · lose counts for today's settled first-book — same tape as settledPaperDayU. */
 export function settledPaperDayCounts(
   trades: readonly Fill[],
   day: string,
   recipes: readonly Recipe[] = [],
 ): SettledTradeCounts | null {
-  return settledTradeCountsFromFills(firstBookPaperSettledFills(fillsOnDay(trades, day), recipes));
+  return settledTradeCountsFromFills(tradesSettledTapeFills(fillsOnDay(trades, day), recipes));
 }
 
 /** Settled first-book production fills — same tape rules as paper. */
@@ -600,7 +650,7 @@ export function firstBookProductionSettledFills(
   fills: readonly Fill[],
   recipes: readonly Recipe[] = [],
 ): Fill[] {
-  return honestFirstBookSettledFills(fills, recipes).filter((f) => f.book === "production");
+  return tradesSettledTapeFills(fills, recipes).filter((f) => f.book === "production");
 }
 
 /** Today's settled paper u for one strategy/book — null when no settles (Empty). */
@@ -611,8 +661,8 @@ export function settledPaperUForRecipeIds(
   recipes: readonly Recipe[] = [],
 ): number | null {
   if (!recipeIds.size) return null;
-  const paper = firstBookPaperSettledFills(fillsOnDay(trades, day), recipes).filter((f) =>
-    recipeIds.has(f.recipeId),
+  const paper = tradesSettledTapeFills(fillsOnDay(trades, day), recipes).filter(
+    (f) => f.book === "paper" && recipeIds.has(f.recipeId),
   );
   if (!paper.length) return null;
   return paper.reduce((acc, f) => acc + (f.pnl ?? 0), 0);
@@ -626,8 +676,8 @@ export function settledPaperCountsForRecipeIds(
   recipes: readonly Recipe[] = [],
 ): SettledTradeCounts | null {
   if (!recipeIds.size) return null;
-  const paper = firstBookPaperSettledFills(fillsOnDay(trades, day), recipes).filter((f) =>
-    recipeIds.has(f.recipeId),
+  const paper = tradesSettledTapeFills(fillsOnDay(trades, day), recipes).filter(
+    (f) => f.book === "paper" && recipeIds.has(f.recipeId),
   );
   return settledTradeCountsFromFills(paper);
 }
@@ -640,8 +690,8 @@ export function settledProductionCountsForRecipeIds(
   recipes: readonly Recipe[] = [],
 ): SettledTradeCounts | null {
   if (!recipeIds.size) return null;
-  const prod = firstBookProductionSettledFills(fillsOnDay(trades, day), recipes).filter((f) =>
-    recipeIds.has(f.recipeId),
+  const prod = tradesSettledTapeFills(fillsOnDay(trades, day), recipes).filter(
+    (f) => f.book === "production" && recipeIds.has(f.recipeId),
   );
   return settledTradeCountsFromFills(prod);
 }
@@ -665,7 +715,7 @@ export function millActivity(stamp: {
   const recipes = stamp.recipes ?? [];
   const open = honestOpenFills(dayFills, recipes);
   const settled = honestSettledFills(dayFills, recipes);
-  const paperSettled = firstBookPaperSettledFills(dayFills, recipes);
+  const paperSettled = tradesSettledTapeFills(dayFills, recipes).filter((f) => f.book === "paper");
   const paperDayU = paperSettled.length
     ? paperSettled.reduce((acc, f) => acc + (f.pnl ?? 0), 0)
     : null;

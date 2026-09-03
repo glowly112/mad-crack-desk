@@ -16,8 +16,7 @@ import {
 import type { Fill, SettledTradeCounts } from "./trades.ts";
 import {
   fmtWinLoseCounts,
-  firstBookPaperSettledFills,
-  firstBookProductionSettledFills,
+  tradesSettledTapeFills,
   fillsOnDay,
   settledTradeCountsFromFills,
 } from "./trades.ts";
@@ -170,25 +169,27 @@ function rollFillsToOfficeRows(
   return { totals, counts };
 }
 
+/** Every signed Trades › Settled row that rolls onto an Office book. */
+function officePaperRollupFills(input: OfficeBookInput): Fill[] {
+  return tradesSettledTapeFills(fillsOnDay(input.trades ?? [], input.day), input.recipes);
+}
+
 /** One fill → one Office row; twins roll to the displayed skin. */
 export function officePaperTotals(input: OfficeBookInput): Map<string, number> {
-  const trades = input.trades ?? [];
-  const fills = firstBookPaperSettledFills(fillsOnDay(trades, input.day), input.recipes);
   const rowByRecipe = officeRowByRecipeId(input.recipes);
-  return rollFillsToOfficeRows(fills, rowByRecipe).totals;
+  return rollFillsToOfficeRows(officePaperRollupFills(input), rowByRecipe).totals;
 }
 
 /** One fill → one Office row; twins roll to the displayed skin. */
 export function officePaperCounts(input: OfficeBookInput): Map<string, SettledTradeCounts | null> {
-  const trades = input.trades ?? [];
-  const fills = firstBookPaperSettledFills(fillsOnDay(trades, input.day), input.recipes);
   const rowByRecipe = officeRowByRecipeId(input.recipes);
-  return rollFillsToOfficeRows(fills, rowByRecipe).counts;
+  return rollFillsToOfficeRows(officePaperRollupFills(input), rowByRecipe).counts;
 }
 
 function officeProductionCounts(input: OfficeBookInput): Map<string, SettledTradeCounts | null> {
-  const trades = input.trades ?? [];
-  const fills = firstBookProductionSettledFills(fillsOnDay(trades, input.day), input.recipes);
+  const fills = tradesSettledTapeFills(fillsOnDay(input.trades ?? [], input.day), input.recipes).filter(
+    (f) => f.book === "production",
+  );
   return rollFillsToOfficeRows(fills, officeRowByRecipeId(input.recipes)).counts;
 }
 
@@ -281,15 +282,15 @@ export function officeBookRows(input: OfficeBookInput): OfficeBookRow[] {
   const recipes = input.recipes;
   const rowByRecipe = officeRowByRecipeId(recipes);
   const dayFills = fillsOnDay(input.trades ?? [], input.day);
-  const paperRollup = rollFillsToOfficeRows(
-    firstBookPaperSettledFills(dayFills, recipes),
-    rowByRecipe,
-  );
+  const paperRollup = rollFillsToOfficeRows(officePaperRollupFills(input), rowByRecipe);
   const paperTotals = input.paperTotals ?? paperRollup.totals;
   const paperCounts = input.paperCounts ?? paperRollup.counts;
   const productionCounts =
     input.productionCounts ??
-    rollFillsToOfficeRows(firstBookProductionSettledFills(dayFills, recipes), rowByRecipe).counts;
+    rollFillsToOfficeRows(
+      tradesSettledTapeFills(dayFills, recipes).filter((f) => f.book === "production"),
+      rowByRecipe,
+    ).counts;
   const withRollups: OfficeBookInput = {
     ...input,
     paperTotals,

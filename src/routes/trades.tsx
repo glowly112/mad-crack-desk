@@ -11,7 +11,8 @@ import {
   fillDeskRow,
   fillsOnDay,
   honestFirstBookOpenFills,
-  honestFirstBookSettledFills,
+  tradesSettledTapeFills,
+  tradesSettledVoidFills,
   waitDeskRow,
   tradesWaitChips,
 } from "@/lib/lab/trades";
@@ -25,7 +26,8 @@ export function Trades() {
   const scope = useDayScope();
   const dayFills = fillsOnDay(stamp.trades, scope.day);
   const open = honestFirstBookOpenFills(dayFills, stamp.recipes);
-  const settled = honestFirstBookSettledFills(dayFills, stamp.recipes);
+  const settled = tradesSettledTapeFills(dayFills, stamp.recipes);
+  const voided = tradesSettledVoidFills(dayFills, stamp.recipes);
   const chips = scope.lookingBack ? [] : tradesWaitChips(stamp.recipes, stamp.wait_open ?? [], open);
   const tape = dayTapePnl(settled, stamp.fuse_on);
   const live = plant.source === "oracle";
@@ -66,6 +68,20 @@ export function Trades() {
         onPick: pick(fill.id),
       })),
     },
+    ...(voided.length
+      ? [
+          {
+            id: "void",
+            label: "Void",
+            hint: "0u · not a win or lose",
+            rows: voided.map((fill) => ({
+              ...fillDeskRow(fill, stamp.fuse_on),
+              selected: selected === fill.id,
+              onPick: pick(fill.id),
+            })),
+          },
+        ]
+      : []),
   ];
 
   return (

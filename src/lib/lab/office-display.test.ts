@@ -181,6 +181,57 @@ test("office counts strategies, KEEP, production; live Empty when fuse off", () 
   assert.equal(counts.live, "Empty");
 });
 
+test("office paper totals sum to Floor settled tape u", () => {
+  const day = "2026-09-03";
+  const r1 = ehole("H-ehole-us-nearoff-win-73506Z", { region: "US" });
+  const r2 = ehole("H-ehole-us-latepre-win-73644Z", { region: "US" });
+  const trades = [
+    {
+      id: "us1",
+      ts: "2026-09-03T15:27:09Z",
+      t: "16:27:09",
+      day,
+      recipe: r1.title,
+      recipeId: r1.id,
+      market: "WIN",
+      book: "production" as const,
+      side: "BACK",
+      odds: 3,
+      stake: 1,
+      result: "won" as const,
+      flight: null,
+      liquidity: null,
+      pnl: 0.14,
+      horse: "Modern Miss",
+    },
+    {
+      id: "us2",
+      ts: "2026-09-03T15:27:13Z",
+      t: "16:27:13",
+      day,
+      recipe: r2.title,
+      recipeId: r2.id,
+      market: "WIN",
+      book: "production" as const,
+      side: "BACK",
+      odds: 4,
+      stake: 1,
+      result: "won" as const,
+      flight: null,
+      liquidity: null,
+      pnl: 3.33,
+      horse: "Despos Dream",
+    },
+  ];
+  const recipes = [r1, r2];
+  const floorU = settledPaperDayU(trades, day, recipes);
+  const totals = officePaperTotals({ recipes, day, trades });
+  let officeSum = 0;
+  for (const u of totals.values()) officeSum += u;
+  assert.equal(floorU, 3.47);
+  assert.equal(officeSum, floorU);
+});
+
 test("twins collapse to one measuring row per hole", () => {
   const recipes = [
     ehole("H-ehole-nz-latepre-place-35151Z", { region: "NZ" }),

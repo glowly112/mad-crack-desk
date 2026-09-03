@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { recipeDeskRow, EMPTY } from "./desk.ts";
+import { officePaperTotals } from "./office-display.ts";
 import {
   bookBadge,
   bookedClock,
@@ -15,6 +16,8 @@ import {
   honestSettledFills,
   honestOpenFills,
   honestFirstBookSettledFills,
+  tradesSettledTapeFills,
+  tradesSettledCandidateFills,
   paperSettledFills,
   fieldSprayFillIds,
   settledPaperDayU,
@@ -452,8 +455,9 @@ test("field spray packs do not count as paper or appear in settled", () => {
   assert.equal(ids.size, 7);
   assert.equal(honestSettledFills(fills).length, 1);
   assert.equal(honestSettledFills(fills)[0]?.id, honest.id);
-  assert.equal(settledPaperDayU(fills, "2026-09-03"), 1);
-  assert.equal(settledPaperDayU(spray, "2026-09-03"), null);
+  assert.equal(tradesSettledTapeFills(fills).length, 8);
+  assert.equal(settledPaperDayU(fills, "2026-09-03"), -6);
+  assert.equal(settledPaperDayU(spray, "2026-09-03"), -7);
 });
 
 test("two-odds same-tick pair is not field spray", () => {
@@ -639,6 +643,110 @@ test("win · lose counts use signed P&L, not exchange labels", () => {
   assert.equal(fmtWinLoseCounts(counts), "2 win · 10 lose");
   assert.equal(settledTradeCountsFromFills([]), null);
   assert.equal(fmtWinLoseCounts(null), EMPTY);
+});
+
+test("production-book settle counts on Floor and Office paper like Trades settled", () => {
+  const recipe = {
+    id: "H-ehole-us-nearoff-win-73506Z",
+    title: "ehole_us_nearoff_winner_73506Z",
+    region: "US",
+    status: "MEASURING",
+    badge: "Research",
+    chip: null,
+    n: 0,
+    roi: 0,
+    freezePnl: 0,
+    why: "Still proving.",
+    hunterName: "Residual",
+  } as const;
+  const day = "2026-09-03";
+  const fill = {
+    id: "us-modern-miss",
+    ts: "2026-09-03T15:27:09Z",
+    t: "16:27:09",
+    day,
+    recipe: recipe.title,
+    recipeId: recipe.id,
+    market: "WIN",
+    book: "production" as const,
+    side: "BACK",
+    odds: 3,
+    stake: 1,
+    result: "won" as const,
+    flight: null,
+    liquidity: null,
+    pnl: 0.14,
+    horse: "Modern Miss",
+  };
+  const trades = [fill];
+  const recipes = [recipe];
+  const tape = tradesSettledTapeFills(trades, recipes);
+  assert.equal(tape.length, 1);
+  assert.equal(settledPaperDayU(trades, day, recipes), 0.14);
+  const counts = settledPaperDayCounts(trades, day, recipes);
+  assert.deepEqual(counts, { wins: 1, losses: 0 });
+  const totals = officePaperTotals({ recipes, day, trades });
+  assert.equal(totals.get(recipe.id), 0.14);
+});
+
+test("Trades settled tape matches Floor — no junk peel beyond Trades UI", () => {
+  const day = "2026-09-03";
+  const base = {
+    date: day,
+    cell_id: "H-ehole-gb-nearoff-win-83959Z",
+    mode: "paper_live",
+    status: "SETTLED",
+    stake_gbp: 2,
+    placed_result: true,
+    side: "BACK",
+    ts: "2026-09-03T16:27:13Z",
+    t: "16:27:13",
+  };
+  const signed = fillFromRow({
+    ...base,
+    pick_id: "gb-signed",
+    paper_pnl_gbp: 3.33,
+  })!;
+  const void0 = fillFromRow({
+    ...base,
+    pick_id: "gb-void",
+    paper_pnl_gbp: 0,
+    status: "VOID",
+  })!;
+  const tape = tradesSettledTapeFills([signed, void0!]);
+  assert.equal(tape.length, 1);
+  assert.equal(tape[0]?.id, signed.id);
+  assert.equal(settledPaperDayU([signed, void0!], day), 1.665);
+  assert.equal(tradesSettledCandidateFills([signed, void0!]).length, 2);
+});
+
+test("fillResultWord follows signed P&L, not exchange label", () => {
+  const wonLoss = fillFromRow({
+    pick_id: "lay-lost-plus",
+    date: "2026-09-03",
+    cell_id: "H-ehole-gb-nearoff-place-01741Z",
+    mode: "auto_dry",
+    status: "SETTLED",
+    stake_gbp: 2,
+    paper_pnl_gbp: 0.98,
+    placed_result: false,
+    side: "LAY",
+    ts: "2026-09-03T12:00:00Z",
+  })!;
+  const lostWin = fillFromRow({
+    pick_id: "lay-won-minus",
+    date: "2026-09-03",
+    cell_id: "H-ehole-gb-nearoff-win-83959Z",
+    mode: "auto_dry",
+    status: "SETTLED",
+    stake_gbp: 2,
+    paper_pnl_gbp: -1,
+    placed_result: true,
+    side: "LAY",
+    ts: "2026-09-03T12:01:00Z",
+  })!;
+  assert.equal(fillResultWord(wonLoss), "Won");
+  assert.equal(fillResultWord(lostWin), "Lost");
 });
 
 test("wait chips dedupe by country window market", () => {
