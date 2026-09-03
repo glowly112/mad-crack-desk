@@ -45,16 +45,14 @@ function useOfficeDesk() {
 export function OfficeCounts() {
   const stamp = useStamp();
   const { counts } = useOfficeDesk();
-  const trend = stamp.trends.find((t) => t.day === stamp.day);
-  const keep = trend?.n_keep ?? counts.keep;
 
   const tiles = [
     { label: "Strategies", value: String(counts.strategies), hint: "First-book skins" },
     { label: "KEEP", value: String(counts.keep), hint: "Later-race same-bets" },
     {
       label: "Production",
-      value: officeProductionHeroValue(keep, counts.production),
-      hint: keep === 0 ? "Empty until KEEP proves" : "Solid recipes",
+      value: officeProductionHeroValue(counts.keep, counts.production),
+      hint: counts.keep === 0 ? "Empty until KEEP proves" : "Solid recipes",
     },
     { label: "Live", value: counts.live, hint: stamp.fuse_on ? "Real betting" : "fuse off" },
   ];
