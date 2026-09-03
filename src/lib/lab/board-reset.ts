@@ -20,11 +20,20 @@ function isPostEpochCompact(epoch: string): boolean {
   return epoch.toUpperCase() >= BOARD_RESET_EPOCH;
 }
 
+/** Scoreboard cell is a post-epoch empty-hole invent book — not Hyde / fast legacy. */
+export function cellIsPostEpochEhole(cell: { id?: unknown; title?: unknown }): boolean {
+  const id = String(cell.id ?? "");
+  const title = String(cell.title ?? "");
+  if (/^H-hyde-/i.test(id) || /^H-fast-/i.test(id)) return false;
+  return /^H-ehole-/i.test(id) || /^ehole_/i.test(title) || /^ehole_/i.test(id);
+}
+
 /** Recipe armed on the board after reset — run stamp in id, ehole invent, or live poll. */
 export function recipeIsPostEpoch(recipe: Recipe): boolean {
+  if (/^H-hyde-/i.test(recipe.id) || /^H-fast-/i.test(recipe.id)) return false;
+  if (/^H-ehole-/i.test(recipe.id) || /^ehole_/i.test(recipe.title)) return true;
   const fromId = compactEpoch(recipe.id);
   if (fromId) return isPostEpochCompact(fromId);
-  if (/^H-ehole-/i.test(recipe.id) || /^ehole_/i.test(recipe.title)) return true;
   if (/H-20260902T/i.test(recipe.id)) return true;
   return false;
 }
@@ -33,11 +42,6 @@ export function hasPostEpochEholeRecipes(recipes: readonly Recipe[]): boolean {
   return recipes.some(
     (r) => /^H-ehole-/i.test(r.id) || /^ehole_/i.test(r.title) || recipeIsPostEpoch(r),
   );
-}
-
-function stampGeneratedPostEpoch(stamp: LiveStamp): boolean {
-  const g = compactEpoch(stamp.generated);
-  return g ? isPostEpochCompact(g) : false;
 }
 
 export function fillIsPostEpoch(fill: Fill): boolean {
@@ -98,16 +102,13 @@ function filterWaitOpen(
   return wait_open.filter((w) => postCells.has(w.id) || !preCells.has(w.id));
 }
 
-/** Drop legacy tape, recipes, and fills — keep post-epoch plant facts. */
+/** Drop legacy tape, recipes, fills, and parked holes — keep post-epoch plant facts. */
 export function filterPreEpochLeftovers(stamp: LiveStamp): LiveStamp {
-  if (hasLivePlantArms(stamp)) return stamp;
-  if (stamp.source === "oracle" && stampGeneratedPostEpoch(stamp)) {
-    return stamp;
-  }
   const recipes = stamp.recipes.filter(recipeIsPostEpoch);
   const solids = recipes.filter((r) => r.badge === "Solid");
   const trades = stamp.trades.filter(fillIsPostEpoch);
   const wait_open = filterWaitOpen(stamp.wait_open ?? [], stamp.recipes, recipes);
+  const holes = stamp.holes.filter((h) => h.tone !== "parked");
 
   const trends = stamp.trends
     .filter((t) => t.day >= BOARD_RESET_DAY)
@@ -142,6 +143,7 @@ export function filterPreEpochLeftovers(stamp: LiveStamp): LiveStamp {
     solids,
     trades,
     wait_open,
+    holes,
     n_solid: solids.length > 0 ? solids.length : recipes.length ? stamp.n_solid : 0,
     trends: trends.length ? trends : [dayTrend],
     moves: stamp.moves.filter((m) => {
@@ -288,14 +290,14 @@ function boardResetSeatNow(seatId: string): string {
  * When n_armed is zero, paint the empty morning board.
  */
 export function applyBoardResetView(stamp: LiveStamp): LiveStamp {
-  if (hasLivePlantArms(stamp)) {
+  const filtered = filterPreEpochLeftovers(stamp);
+  if (hasLivePlantArms(filtered)) {
     return {
-      ...stamp,
+      ...filtered,
       fuse_on: false,
       fuse: "Real betting: OFF",
     };
   }
-  const filtered = filterPreEpochLeftovers(stamp);
   if (!isBoardResetView(filtered)) {
     return {
       ...filtered,

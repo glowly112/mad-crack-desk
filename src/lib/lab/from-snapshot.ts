@@ -3,11 +3,19 @@ import { cellName } from "./desk.ts";
 import type { Badge, Chip, Recipe } from "./stamp.ts";
 import { parseFills, parseWaitOpen } from "./trades.ts";
 import { parseHole } from "./boards.ts";
+import { cellIsPostEpochEhole } from "./board-reset.ts";
 
 const REGIONS = ["AU", "GB", "IE", "US", "NZ", "ZA", "HK", "FR"] as const;
 const BADGES: Badge[] = ["Solid", "Research", "Parked", "Dead"];
 const CHIPS: Chip[] = ["Waiting for races", "Booking", "On tape today"];
-const RECIPE_CAP = 16;
+const RECIPE_CAP = 64;
+
+const HOLE_TONE_RANK: Record<string, number> = {
+  hunt: 3,
+  idea: 2,
+  loss: 1,
+  parked: 0,
+};
 
 function rec(v: unknown): Record<string, unknown> | null {
   return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
@@ -102,11 +110,11 @@ function cellsOf(raw: Record<string, unknown>): Record<string, unknown>[] {
 }
 
 function recipesFromCells(cells: Record<string, unknown>[]): Recipe[] {
-  const keep: Recipe[] = [];
   const measuring: Recipe[] = [];
   for (const c of cells) {
+    if (!cellIsPostEpochEhole(c)) continue;
     const status = statusOf(c);
-    if (status !== "KEEP" && status !== "MEASURING" && status !== "HUNTING") continue;
+    if (status !== "MEASURING" && status !== "HUNTING") continue;
     const score = rec(c.score) ?? {};
     const stats = rec(c.stats) ?? {};
     const id = String(c.id || c.title || "").trim();
@@ -118,8 +126,8 @@ function recipesFromCells(cells: Record<string, unknown>[]): Recipe[] {
     const why =
       typeof c.why === "string" && c.why
         ? c.why
-        : status === "KEEP"
-          ? "Research keep. Not certified. Not the score."
+        : status === "HUNTING"
+          ? "Looking for the next book."
           : "Still proving. Not the score.";
     const recipe: Recipe = {
       id,
@@ -133,16 +141,15 @@ function recipesFromCells(cells: Record<string, unknown>[]): Recipe[] {
       freezePnl: pnl,
       why,
     };
-    if (status === "KEEP") keep.push(recipe);
-    else measuring.push(recipe);
+    measuring.push(recipe);
   }
-  keep.sort((a, b) => Number(b.badge === "Solid") - Number(a.badge === "Solid"));
-  return [...keep, ...measuring].slice(0, RECIPE_CAP);
+  return measuring.slice(0, RECIPE_CAP);
 }
 
 function holeFromCell(c: Record<string, unknown>): LiveStamp["holes"][number] | null {
+  if (!cellIsPostEpochEhole(c)) return null;
   const status = statusOf(c);
-  if (status !== "KEEP" && status !== "MEASURING" && status !== "HUNTING") return null;
+  if (status !== "MEASURING" && status !== "HUNTING" && status !== "KILL") return null;
   const id = String(c.id || "");
   const title = String(c.title || "");
   const blob = `${title} ${id}`
@@ -152,7 +159,7 @@ function holeFromCell(c: Record<string, unknown>): LiveStamp["holes"][number] | 
     .replace(/-/g, " ");
   const parsed = parseHole(blob);
   if (!parsed) return null;
-  const tone = status === "HUNTING" ? "hunt" : status === "KEEP" ? "parked" : "idea";
+  const tone = status === "HUNTING" ? "hunt" : status === "KILL" ? "loss" : "idea";
   return {
     region: parsed.region,
     window: parsed.window,
@@ -162,17 +169,30 @@ function holeFromCell(c: Record<string, unknown>): LiveStamp["holes"][number] | 
 }
 
 function holesFromCells(cells: Record<string, unknown>[]): LiveStamp["holes"] {
-  const out: LiveStamp["holes"] = [];
-  const seen = new Set<string>();
+  const map = new Map<string, LiveStamp["holes"][number]>();
   for (const c of cells) {
     const hole = holeFromCell(c);
     if (!hole) continue;
     const key = `${hole.region}|${hole.window}|${hole.market}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(hole);
+    const cur = map.get(key);
+    const rank = HOLE_TONE_RANK[hole.tone ?? "idea"] ?? 0;
+    const curRank = cur ? (HOLE_TONE_RANK[cur.tone ?? "idea"] ?? 0) : -1;
+    if (!cur || rank > curRank) map.set(key, hole);
   }
-  return out;
+  return [...map.values()];
+}
+
+function countEholeArms(cells: Record<string, unknown>[]): number {
+  const alive = new Set<string>();
+  for (const c of cells) {
+    if (!cellIsPostEpochEhole(c)) continue;
+    const status = statusOf(c);
+    if (status !== "MEASURING" && status !== "HUNTING") continue;
+    const hole = holeFromCell(c);
+    if (!hole) continue;
+    alive.add(`${hole.region}|${hole.window}|${hole.market}`);
+  }
+  return alive.size;
 }
 
 /**
@@ -237,6 +257,7 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
   const n_solid = nSolidExplicit ?? (recipes.length ? solids.length : base.n_solid);
   const cellList = cellsOf(snap);
   const namedHoles = holesFromCells(cellList);
+  const eholeArms = countEholeArms(cellList);
 
   const date =
     typeof snap.date === "string" && snap.date
@@ -270,8 +291,8 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
     day: date,
     generated,
     source: "oracle",
-    mill_n_armed: int(snap.mill_n_armed),
-    n_armed: int(snap.n_armed),
+    mill_n_armed: plantOracle && eholeArms > 0 ? eholeArms : int(snap.mill_n_armed),
+    n_armed: plantOracle && eholeArms > 0 ? eholeArms : int(snap.n_armed),
     n_solid,
     fuse_on,
     fuse: fuse_on ? "Real betting: ON" : "Real betting: OFF",
@@ -303,7 +324,9 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
     trades: Array.isArray(snap.fills) ? parseFills(snap.fills) : base.trades,
     wait_open: Array.isArray(snap.wait_open) ? parseWaitOpen(snap.wait_open) : (base.wait_open ?? []),
     holes: plantOracle
-      ? holesFromSnap(snap) ?? (namedHoles.length ? namedHoles : [])
+      ? namedHoles.length
+        ? namedHoles
+        : holesFromSnap(snap) ?? []
       : holesFromSnap(snap) ?? (namedHoles.length ? namedHoles : base.holes),
     office: {
       ...base.office,
