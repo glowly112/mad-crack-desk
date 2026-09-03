@@ -2,8 +2,8 @@ import type { LiveStamp } from "./from-digest.ts";
 import { cellName } from "./desk.ts";
 import type { Badge, Chip, Recipe } from "./stamp.ts";
 import { parseFills, parseWaitOpen } from "./trades.ts";
-import { parseHole } from "./boards.ts";
-import { cellIsPostEpochEhole } from "./board-reset.ts";
+import { parseHole, parseWindow, parseMarket, regionFromText, type SquareWindow } from "./boards.ts";
+import { cellIsPostEpochEhole, cellIsPostEpochParkedKeep } from "./board-reset.ts";
 
 const REGIONS = ["AU", "GB", "IE", "US", "NZ", "ZA", "HK", "FR"] as const;
 const BADGES: Badge[] = ["Solid", "Research", "Parked", "Dead"];
@@ -112,7 +112,7 @@ function cellsOf(raw: Record<string, unknown>): Record<string, unknown>[] {
 function recipesFromCells(cells: Record<string, unknown>[]): Recipe[] {
   const measuring: Recipe[] = [];
   for (const c of cells) {
-    if (!cellIsPostEpochEhole(c)) continue;
+    if (!cellPaintsSquare(c)) continue;
     const status = statusOf(c);
     if (status !== "MEASURING" && status !== "HUNTING") continue;
     const score = rec(c.score) ?? {};
@@ -132,7 +132,7 @@ function recipesFromCells(cells: Record<string, unknown>[]): Recipe[] {
     const recipe: Recipe = {
       id,
       title,
-      region: regionOf(title),
+      region: (plantRegion(c) ?? regionOf(title)) as Recipe["region"],
       status,
       badge: badgeOf(c, status),
       chip: chipOf(c),
@@ -146,38 +146,98 @@ function recipesFromCells(cells: Record<string, unknown>[]): Recipe[] {
   return measuring.slice(0, RECIPE_CAP);
 }
 
-function holeFromCell(c: Record<string, unknown>): LiveStamp["holes"][number] | null {
-  if (!cellIsPostEpochEhole(c)) return null;
-  const status = statusOf(c);
-  if (status !== "MEASURING" && status !== "HUNTING" && status !== "KILL") return null;
+function plantRegion(c: Record<string, unknown>): string | null {
+  const cs = c.country_scope;
+  if (Array.isArray(cs) && cs.length) {
+    const r = String(cs[0]).toUpperCase();
+    if ((REGIONS as readonly string[]).includes(r)) return r;
+  }
+  return null;
+}
+
+function plantMarket(c: Record<string, unknown>): ReturnType<typeof parseMarket> {
+  const mt = c.market_type;
+  if (typeof mt === "string") {
+    const m = parseMarket(mt);
+    if (m) return m;
+  }
+  const side = c.side;
+  if (typeof side === "string" && side.toUpperCase() === "LAY") return "LAY";
+  return null;
+}
+
+function plantWindow(c: Record<string, unknown>): SquareWindow | null {
+  const ws = c.window_scope;
+  if (Array.isArray(ws) && ws.length) return parseWindow(String(ws[0]));
+  return null;
+}
+
+function eholeBlob(c: Record<string, unknown>): string {
   const id = String(c.id || "");
   const title = String(c.title || "");
-  const blob = `${title} ${id}`
+  return `${title} ${id}`
     .replace(/^ehole_/i, "")
     .replace(/^H-ehole-/i, "")
     .replace(/_/g, " ")
     .replace(/-/g, " ");
+}
+
+function holeToneFromStatus(status: Recipe["status"]): string {
+  if (status === "HUNTING") return "hunt";
+  if (status === "KILL") return "loss";
+  if (status === "KEEP") return "parked";
+  return "idea";
+}
+
+function cellBlob(c: Record<string, unknown>): string {
+  const id = String(c.id || "");
+  const title = String(c.title || "");
+  if (cellIsPostEpochEhole(c)) return eholeBlob(c);
+  return `${title} ${id}`.replace(/_/g, " ").replace(/-/g, " ");
+}
+
+/** Plant window_scope first; also paint parsed title hole when scope disagrees. */
+function holePlacementsFromCell(c: Record<string, unknown>): LiveStamp["holes"] {
+  const status = statusOf(c);
+  if (status !== "MEASURING" && status !== "HUNTING" && status !== "KILL" && status !== "KEEP") return [];
+  const blob = cellBlob(c);
   const parsed = parseHole(blob);
-  if (!parsed) return null;
-  const tone = status === "HUNTING" ? "hunt" : status === "KILL" ? "loss" : "idea";
-  return {
-    region: parsed.region,
-    window: parsed.window,
-    market: parsed.market,
-    tone,
-  };
+  const region = plantRegion(c) ?? parsed?.region ?? regionFromText(blob);
+  const market = plantMarket(c) ?? parsed?.market;
+  if (!region || !market) return [];
+  const tone = holeToneFromStatus(status);
+  const plantW = plantWindow(c);
+  const parsedW = parsed?.window;
+  const windows: SquareWindow[] = [];
+  if (plantW) windows.push(plantW);
+  if (parsedW && !windows.includes(parsedW)) windows.push(parsedW);
+  if (!windows.length && parsedW) windows.push(parsedW);
+  if (!windows.length) return [];
+  return windows.map((window) => ({ region, window, market, tone }));
+}
+
+function holeFromCell(c: Record<string, unknown>): LiveStamp["holes"][number] | null {
+  if (!cellPaintsSquare(c)) return null;
+  const placements = holePlacementsFromCell(c);
+  return placements[0] ?? null;
+}
+
+function cellPaintsSquare(c: Record<string, unknown>): boolean {
+  return cellIsPostEpochEhole(c) || cellIsPostEpochParkedKeep(c);
 }
 
 function holesFromCells(cells: Record<string, unknown>[]): LiveStamp["holes"] {
   const map = new Map<string, LiveStamp["holes"][number]>();
   for (const c of cells) {
-    const hole = holeFromCell(c);
-    if (!hole) continue;
-    const key = `${hole.region}|${hole.window}|${hole.market}`;
-    const cur = map.get(key);
-    const rank = HOLE_TONE_RANK[hole.tone ?? "idea"] ?? 0;
-    const curRank = cur ? (HOLE_TONE_RANK[cur.tone ?? "idea"] ?? 0) : -1;
-    if (!cur || rank > curRank) map.set(key, hole);
+    if (!cellPaintsSquare(c)) continue;
+    const placements = holePlacementsFromCell(c);
+    for (const hole of placements) {
+      const key = `${hole.region}|${hole.window}|${hole.market}`;
+      const cur = map.get(key);
+      const rank = HOLE_TONE_RANK[hole.tone ?? "idea"] ?? 0;
+      const curRank = cur ? (HOLE_TONE_RANK[cur.tone ?? "idea"] ?? 0) : -1;
+      if (!cur || rank > curRank) map.set(key, hole);
+    }
   }
   return [...map.values()];
 }
@@ -185,7 +245,7 @@ function holesFromCells(cells: Record<string, unknown>[]): LiveStamp["holes"] {
 function countEholeArms(cells: Record<string, unknown>[]): number {
   const alive = new Set<string>();
   for (const c of cells) {
-    if (!cellIsPostEpochEhole(c)) continue;
+    if (!cellPaintsSquare(c)) continue;
     const status = statusOf(c);
     if (status !== "MEASURING" && status !== "HUNTING") continue;
     const hole = holeFromCell(c);

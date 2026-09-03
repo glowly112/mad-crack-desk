@@ -162,6 +162,49 @@ test("Hyde KEEP does not paint GB near-off WIN when oracle has ehole arms", () =
   assert.equal(holes.find((h) => h.id === "GB|late_pre|WIN")?.tone, "hunt");
 });
 
+test("window_scope mismatch paints plant window and parsed title hole", () => {
+  const cells = [
+    {
+      id: "H-ehole-za-morning-place-00731Z",
+      title: "ehole_za_morning_place_00731Z",
+      status: "MEASURING",
+      country_scope: ["ZA"],
+      market_type: "PLACE",
+      window_scope: ["near_off"],
+      n: 2,
+    },
+    {
+      id: "H-ehole-nz-late-pre-place-00206Z",
+      title: "ehole_nz_late_pre_place_00206Z",
+      status: "HUNTING",
+      country_scope: ["NZ"],
+      market_type: "PLACE",
+      window_scope: ["morning"],
+      n: 0,
+    },
+    {
+      id: "H-ehole-gb-late-pre-place-00206Z",
+      title: "ehole_gb_late_pre_place_00206Z",
+      status: "KILL",
+      country_scope: ["GB"],
+      market_type: "PLACE",
+      window_scope: ["near_off"],
+    },
+  ];
+  const base = STAMP as unknown as LiveStamp;
+  const snap = applySnapshot({ cells, truth: {}, summary: {} }, base);
+  const holes = floorRacingSquare({ namedHoles: snap.holes });
+  assert.equal(holes.find((h) => h.id === "ZA|near_off|PLACE")?.tone, "idea");
+  assert.equal(holes.find((h) => h.id === "ZA|morning|PLACE")?.tone, "idea");
+  assert.equal(holes.find((h) => h.id === "NZ|morning|PLACE")?.tone, "hunt");
+  assert.equal(holes.find((h) => h.id === "NZ|late_pre|PLACE")?.tone, "hunt");
+  assert.equal(holes.find((h) => h.id === "GB|near_off|PLACE")?.tone, "loss");
+  assert.equal(holes.find((h) => h.id === "GB|late_pre|PLACE")?.tone, "loss");
+  const empty = holes.filter((h) => h.tone === "empty").length;
+  assert.equal(holes.filter((h) => h.tone === "loss").length >= 1, true);
+  assert.ok(empty < 64);
+});
+
 test("scoreboard ehole cells paint holes including KILL and ignore Hyde", () => {
   const cells = [
     {

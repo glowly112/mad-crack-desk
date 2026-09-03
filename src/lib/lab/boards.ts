@@ -237,6 +237,7 @@ export function parseHole(text: string): { region: string; window: SquareWindow;
 }
 
 function asHoleTone(t?: string): MarketTone | null {
+  if (t === "killed" || t === "kill" || t === "dead") return "loss";
   if (t === "empty" || t === "hunt" || t === "idea" || t === "win" || t === "loss" || t === "parked") return t;
   return null;
 }

@@ -20,7 +20,15 @@ function isPostEpochCompact(epoch: string): boolean {
   return epoch.toUpperCase() >= BOARD_RESET_EPOCH;
 }
 
-/** Scoreboard cell is a post-epoch empty-hole invent book — not Hyde / fast legacy. */
+export function cellIsPostEpochParkedKeep(cell: { id?: unknown; title?: unknown; status?: unknown }): boolean {
+  const id = String(cell.id ?? "");
+  if (/^H-hyde-/i.test(id) || /^H-fast-/i.test(id)) return false;
+  const status = String(cell.status ?? "").toUpperCase();
+  if (status !== "KEEP" && status !== "KEPT") return false;
+  const fromId = compactEpoch(id);
+  return fromId ? isPostEpochCompact(fromId) : false;
+}
+
 export function cellIsPostEpochEhole(cell: { id?: unknown; title?: unknown }): boolean {
   const id = String(cell.id ?? "");
   const title = String(cell.title ?? "");
