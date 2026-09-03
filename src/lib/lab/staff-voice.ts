@@ -189,15 +189,12 @@ function tapeSeatLines(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchStamp): 
       const emptyHoleHunt = /empty-hole hunt|invent_empty/i.test(inventWhy);
       const look = f.inventCell !== EMPTY ? f.inventCell : "";
       if (emptyHoleHunt) {
-        const armed = (stamp as { mill_n_armed?: number }).mill_n_armed ?? 0;
-        const parked =
-          armed <= 0 &&
-          /mill parked/i.test(inventWhy) &&
-          !/fast-arm|fastarm/i.test(inventWhy);
+        const millMode = String((stamp as { mill_mode?: string }).mill_mode ?? "").toLowerCase();
+        const parked = millMode === "parked" || /mill parked/i.test(inventWhy);
         return [
           look ? `Next empty hole: ${look}.` : "Invent is on.",
           parked
-            ? "Mill parked — hunting empty cells on the square."
+            ? "Mill parked — empty-hole fast-arm hunt on the square."
             : "Empty-hole fast-arm hunt — not densifying the tape.",
         ].filter(Boolean);
       }

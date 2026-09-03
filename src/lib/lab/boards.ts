@@ -785,7 +785,7 @@ export function bookPeriods(recipe: Recipe): BookPeriods {
   };
 }
 
-/** Mill hunt caption — fast-arm when armed; never "mill parked" on an active hunt. */
+/** Mill hunt caption — fast-arm when armed; mill parked when mill_mode is parked. */
 export function millHuntCaption(
   why: string,
   opts?: { mill_mode?: string; mill_n_armed?: number; n_armed?: number },
@@ -797,20 +797,30 @@ export function millHuntCaption(
   const hunt = /empty-hole hunt|invent_empty/i.test(raw);
   if (!hunt) return raw;
 
+  const parkedMode =
+    mode === "parked" ||
+    mode === "mill-not-densify" ||
+    /mill-not-densify/.test(mode) ||
+    /\bmill parked\b/i.test(raw);
+
   let line = raw
-    .replace(/\s*·\s*mill parked/gi, "")
-    .replace(/mill parked\s*·\s*/gi, "")
-    .replace(/\bmill parked\b/gi, "")
+    .replace(/\s*·\s*invent\s*\(densify\)/gi, "")
+    .replace(/\binvent\s*\(densify\)\s*·\s*/gi, "")
+    .replace(/\bdensify\b/gi, "")
     .replace(/\s*·\s*·/g, " · ")
     .trim();
 
   const fastArm =
     /fast-arm|fastarm/i.test(line) ||
-    /fast-arm|fastarm/i.test(mode) ||
+    /fast-arm|fastarm|empty-hole-fast-arm/.test(mode) ||
     armed > 0;
 
   if (fastArm && !/fast-arm|fastarm/i.test(line)) {
     line = line.replace(/empty-hole hunt on/gi, "empty-hole fast-arm hunt on");
+  }
+
+  if (parkedMode && !/\bmill parked\b/i.test(line)) {
+    line = line ? `${line} · mill parked` : "mill parked";
   }
 
   return line.replace(/\s*·\s*·/g, " · ").trim();

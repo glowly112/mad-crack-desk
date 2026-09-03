@@ -749,12 +749,8 @@ function isMillParked(snap: Record<string, unknown>, inventCaption: string | nul
     rec(snap.invent_mill)?.mill_mode,
     rec(snap.empty_hole_hunt)?.mill_mode,
   ];
-  const parkedMode = modes.some((m) => String(m ?? "").toLowerCase() === "parked");
-  const armed =
-    int(snap.mill_n_armed) ?? int(snap.n_armed) ?? int(rec(snap.invent_mill)?.n_armed) ?? 0;
-  if (armed > 0 && /empty-hole hunt|invent_empty/i.test(inventCaption ?? "")) return false;
-  if (parkedMode && armed <= 0) return true;
-  return inventCaption != null && /mill parked/i.test(inventCaption) && armed <= 0;
+  if (modes.some((m) => String(m ?? "").toLowerCase() === "parked")) return true;
+  return inventCaption != null && /mill parked/i.test(inventCaption);
 }
 
 function plantLineFromInvent(caption: string): string {

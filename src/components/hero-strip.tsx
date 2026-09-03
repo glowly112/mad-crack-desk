@@ -56,6 +56,11 @@ export function PlantPane() {
         detail={plant.detail}
         tone={live ? "ok" : "warn"}
       />
+      {stamp.plantLine ? (
+        <p className="font-mono text-xs text-subtle" data-plant-line>
+          {stamp.plantLine}
+        </p>
+      ) : null}
 
       <div role="tablist" aria-label="Plant" className="flex flex-wrap border-b border-border">
         {facts.map((f) => (

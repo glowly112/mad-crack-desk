@@ -19,6 +19,7 @@ import {
   holeSideOccupied,
   inventHole,
   inventWhatHappened,
+  millHuntCaption,
   plantInventQueue,
   bookPeriods,
   bookStageLine,
@@ -370,6 +371,25 @@ test("paper and holdout are two periods of one book", () => {
   assert.match(open.line, /does not prove/);
 });
 
+test("mill hunt caption keeps mill parked when mill_mode is parked", () => {
+  const line = millHuntCaption("empty-hole hunt on · invent_empty_holes · mill parked", {
+    mill_mode: "parked",
+    n_armed: 40,
+  });
+  assert.match(line, /empty-hole fast-arm hunt/);
+  assert.match(line, /mill parked/);
+  assert.ok(!/densify/i.test(line));
+});
+
+test("mill hunt caption appends mill parked from parked mode even when armed", () => {
+  const line = millHuntCaption("empty-hole hunt on · invent_empty_holes", {
+    mill_mode: "parked",
+    mill_n_armed: 40,
+  });
+  assert.match(line, /empty-hole fast-arm hunt/);
+  assert.match(line, /mill parked/);
+});
+
 test("invent what happened names the queue and a known reject", () => {
   const line = inventWhatHappened({
     invent: true,
@@ -388,7 +408,7 @@ test("invent what happened names the queue and a known reject", () => {
     mill_n_armed: 52,
   });
   assert.match(hunt, /empty-hole fast-arm hunt/);
-  assert.ok(!hunt.includes("mill parked"));
+  assert.match(hunt, /mill parked/);
   assert.ok(!hunt.includes("12 new ideas"));
   const rejected = inventWhatHappened({
     invent: true,

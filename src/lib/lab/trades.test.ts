@@ -417,7 +417,7 @@ test("mill tape shows hunt arms when hops are empty and no tickets", () => {
   });
   assert.ok(rows.length >= 2);
   assert.match(rows[0].text, /empty-hole fast-arm hunt/);
-  assert.ok(!rows[0].text.includes("mill parked"));
+  assert.match(rows[0].text, /mill parked/);
   assert.match(rows.at(-1)?.text ?? "", /52 armed/);
   assert.ok(!rows.at(-1)?.text.includes("recipe, not a ticket"));
 });
