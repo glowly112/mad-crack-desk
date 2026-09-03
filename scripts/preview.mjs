@@ -301,6 +301,12 @@ async function restart() {
     cwd: ROOT,
     detached: true,
     stdio: ["ignore", log, log],
+    env: {
+      ...process.env,
+      VITE_DESK_BASEPATH: process.env.VITE_DESK_BASEPATH || "/desk",
+      DESK_BASEPATH: process.env.DESK_BASEPATH || "/desk",
+      NITRO_APP_BASE_URL: process.env.NITRO_APP_BASE_URL || "/desk/",
+    },
   });
   child.unref();
   writeFileSync(PID_FILE, `${child.pid}\n`);

@@ -41,6 +41,9 @@ DESK_COOKIE_SECURE=1
 DESK_COOKIE_PATH=/desk
 ORACLE_SCOREBOARD_PATH=$ROOT/data/firm/lab/latest/scoreboard.json
 VITE_AUTH_ENABLED=false
+NITRO_APP_BASE_URL=/desk/
+DESK_BASEPATH=/desk
+VITE_DESK_BASEPATH=/desk
 PATH=$HOME/opt/node/bin:/usr/bin:/bin
 EOF
 if [ -f "$APP/desk.pid" ]; then kill "$(cat "$APP/desk.pid")" 2>/dev/null || true; fi
