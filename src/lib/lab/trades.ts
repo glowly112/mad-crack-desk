@@ -10,7 +10,7 @@ import {
   millDisplayRecipes,
   recipeDisplayHoleKey,
 } from "./mill-display.ts";
-import { parseHole, parseWindow, millHuntCaption } from "./boards.ts";
+import { millHuntCaption } from "./boards.ts";
 import {
   bookDisplayName,
   deskMarketFromParts,
@@ -23,6 +23,7 @@ import {
   WAITING,
   type DeskRow,
 } from "./desk.ts";
+import { junkFillIds } from "./junk-fills.ts";
 import { hopVoice } from "./staff-voice.ts";
 import { ukClock, ukHopAt } from "./uk-time.ts";
 import type { Move, Recipe } from "./stamp.ts";
@@ -418,7 +419,7 @@ export function millTapeRows(stamp: {
   }
 
   const day = stamp.day ?? "";
-  const act = millActivity({ day, trades: stamp.trades ?? [] });
+  const act = millActivity({ day, trades: stamp.trades ?? [], recipes: stamp.recipes ?? [] });
   const recipes = stamp.recipes ?? [];
   const rows: MillTapeRow[] = [];
   const rawWhy = stamp.office?.inventWhy?.trim() ?? "";
@@ -492,116 +493,27 @@ export function settledFills(fills: readonly Fill[]): Fill[] {
   return fills.filter((f) => f.result !== "waiting");
 }
 
-/** Clock second for grouping fills booked in the same spray tick. */
-export function fillTickSecond(fill: Fill): string {
-  const t = fill.t?.trim() ?? "";
-  const hm = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(t);
-  if (hm) {
-    const hh = hm[1].padStart(2, "0");
-    const ss = hm[3] ?? "00";
-    return `${hh}:${hm[2]}:${ss}`;
-  }
-  const iso = /T(\d{2}):(\d{2}):(\d{2})/.exec(fill.ts);
-  return iso ? `${iso[1]}:${iso[2]}:${iso[3]}` : t;
+export {
+  fieldSprayFillIds,
+  fillHoleKey,
+  fillTickSecond,
+} from "./junk-fills.ts";
+
+/** Open tickets on today's tape — no junk packs or mill void leftovers. */
+export function honestOpenFills(fills: readonly Fill[], recipes: readonly Recipe[] = []): Fill[] {
+  const junk = junkFillIds(fills, recipes);
+  return openFills(fills).filter((f) => !junk.has(f.id));
 }
 
-/** Country × window × market — same hole, not horse or odds. */
-export function fillHoleKey(fill: Fill): string {
-  const hole = parseHole(fill.recipeId) ?? parseHole(fill.recipe);
-  if (hole) return `${hole.region}|${hole.window}|${hole.market}`;
-  const ehole = /^H-ehole-([a-z]{2})-([a-z]+)-(win|place|lay)/i.exec(fill.recipeId);
-  if (ehole) {
-    const region = ehole[1].toUpperCase();
-    const window = parseWindow(ehole[2]) ?? ehole[2];
-    const market = ehole[3].toUpperCase();
-    return `${region}|${window}|${market}`;
-  }
-  return fill.recipeId;
-}
-
-function fieldSprayGroupKey(fill: Fill): string {
-  const side = (fill.side ?? "").toUpperCase();
-  return `${fill.day}|${fillTickSecond(fill)}|${fillHoleKey(fill)}|${side}`;
-}
-
-/** Unbounded mill dumps — France 7-horse in-play packs, 5–8 runner sprays. */
-const FIELD_SPRAY_MIN_RUNNERS = 5;
-
-/** Recipe-declared pick count (two-pick, 3-pick, pack-4). One-pick is a strategy, not cap=1. */
-function recipePickCap(fill: Fill): number | null {
-  const blob = `${fill.recipeId} ${fill.recipe}`.toLowerCase().replace(/_/g, " ");
-  if (/two[\s-]?pick/.test(blob)) return 2;
-  if (/three[\s-]?pick/.test(blob)) return 3;
-  if (/four[\s-]?pick/.test(blob)) return 4;
-  const pack = /\bpack[\s-]?(\d+)\b/.exec(blob);
-  if (pack) {
-    const n = Number.parseInt(pack[1], 10);
-    if (Number.isFinite(n) && n > 0) return n;
-  }
-  const nPick = /\b(\d+)[\s-]?pick\b/.exec(blob);
-  if (nPick) {
-    const n = Number.parseInt(nPick[1], 10);
-    if (Number.isFinite(n) && n > 1) return n;
-  }
-  return null;
-}
-
-function groupPickCap(group: readonly Fill[]): number | null {
-  let cap: number | null = null;
-  for (const f of group) {
-    const c = recipePickCap(f);
-    if (c != null) cap = cap == null ? c : Math.max(cap, c);
-  }
-  return cap;
-}
-
-function isFieldSprayGroup(group: readonly Fill[]): boolean {
-  if (group.length < FIELD_SPRAY_MIN_RUNNERS) return false;
-  const odds = new Set(group.map((f) => f.odds).filter((o) => o != null));
-  if (odds.size < 2) return false;
-  const cap = groupPickCap(group);
-  if (cap != null && group.length <= cap && odds.size <= cap) return false;
-  return group.length >= FIELD_SPRAY_MIN_RUNNERS || odds.size >= FIELD_SPRAY_MIN_RUNNERS;
-}
-
-/**
- * Same-second same-hole unbounded BACK field spray — not honest recipe-scoped books.
- * Defined two-pick (etc.) at one tick stays visible; 5+ runner dumps without pick-cap hide.
- */
-export function fieldSprayFillIds(fills: readonly Fill[]): Set<string> {
-  const groups = new Map<string, Fill[]>();
-  for (const f of fills) {
-    if (f.result === "void") continue;
-    if (f.result !== "waiting" && f.result !== "won" && f.result !== "lost") continue;
-    if ((f.side ?? "").toUpperCase() !== "BACK") continue;
-    const key = fieldSprayGroupKey(f);
-    const list = groups.get(key) ?? [];
-    list.push(f);
-    groups.set(key, list);
-  }
-  const out = new Set<string>();
-  for (const group of groups.values()) {
-    if (!isFieldSprayGroup(group)) continue;
-    for (const f of group) out.add(f.id);
-  }
-  return out;
-}
-
-/** Open tickets on today's tape — no field sprays. */
-export function honestOpenFills(fills: readonly Fill[]): Fill[] {
-  const sprays = fieldSprayFillIds(fills);
-  return openFills(fills).filter((f) => !sprays.has(f.id));
-}
-
-/** Settled rows that count on today's tape — no field sprays. */
-export function honestSettledFills(fills: readonly Fill[]): Fill[] {
-  const sprays = fieldSprayFillIds(fills);
-  return settledFills(fills).filter((f) => !sprays.has(f.id));
+/** Settled rows that count on today's tape — no junk packs or mill void leftovers. */
+export function honestSettledFills(fills: readonly Fill[], recipes: readonly Recipe[] = []): Fill[] {
+  const junk = junkFillIds(fills, recipes);
+  return settledFills(fills).filter((f) => !junk.has(f.id));
 }
 
 /** Paper settles that contribute to the day u total. */
-export function paperSettledFills(fills: readonly Fill[]): Fill[] {
-  return honestSettledFills(fills).filter((f) => f.book === "paper" && f.result !== "void");
+export function paperSettledFills(fills: readonly Fill[], recipes: readonly Recipe[] = []): Fill[] {
+  return honestSettledFills(fills, recipes).filter((f) => f.book === "paper" && f.result !== "void");
 }
 
 export type MillActivity = {
@@ -614,11 +526,16 @@ export type MillActivity = {
 };
 
 /** Live mill tape from today's fills — same book as Trades. */
-export function millActivity(stamp: { day: string; trades?: readonly Fill[] }): MillActivity {
+export function millActivity(stamp: {
+  day: string;
+  trades?: readonly Fill[];
+  recipes?: readonly Recipe[];
+}): MillActivity {
   const dayFills = fillsOnDay(stamp.trades ?? [], stamp.day);
-  const open = honestOpenFills(dayFills);
-  const settled = honestSettledFills(dayFills);
-  const paperSettled = paperSettledFills(dayFills);
+  const recipes = stamp.recipes ?? [];
+  const open = honestOpenFills(dayFills, recipes);
+  const settled = honestSettledFills(dayFills, recipes);
+  const paperSettled = paperSettledFills(dayFills, recipes);
   const paperDayU = paperSettled.length
     ? paperSettled.reduce((acc, f) => acc + (f.pnl ?? 0), 0)
     : null;
@@ -633,8 +550,12 @@ export function millActivity(stamp: { day: string; trades?: readonly Fill[] }): 
 }
 
 /** Settled paper u for one day — Floor tile matches Trades headline. */
-export function settledPaperDayU(trades: readonly Fill[], day: string): number | null {
-  const paper = paperSettledFills(fillsOnDay(trades, day));
+export function settledPaperDayU(
+  trades: readonly Fill[],
+  day: string,
+  recipes: readonly Recipe[] = [],
+): number | null {
+  const paper = paperSettledFills(fillsOnDay(trades, day), recipes);
   if (!paper.length) return null;
   return paper.reduce((acc, f) => acc + (f.pnl ?? 0), 0);
 }

@@ -26,7 +26,7 @@ export function PlantPane() {
   const plant = usePlantSource();
   const scope = useDayScope();
   const [fact, setFact] = useState<FloorFactId>("paper");
-  const open = honestOpenFills(stamp.trades);
+  const open = honestOpenFills(stamp.trades, stamp.recipes);
   const holes = floorRacingSquare({
     namedHoles: stamp.holes,
     recipes: millDisplayRecipes(stamp.recipes),

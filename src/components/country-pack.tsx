@@ -41,7 +41,7 @@ const TONE_LABEL: Record<MarketSquare["tone"], string> = {
 /** Morning board square: empty holes visible. BACK/LAY split on each WIN/PLACE cell. */
 export function FloorSquare() {
   const stamp = useStamp();
-  const open = honestOpenFills(stamp.trades);
+  const open = honestOpenFills(stamp.trades, stamp.recipes);
   const holes = floorRacingSquare({
     namedHoles: stamp.holes,
     recipes: millDisplayRecipes(stamp.recipes),

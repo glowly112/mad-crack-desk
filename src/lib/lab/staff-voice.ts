@@ -113,7 +113,7 @@ function settleWord(result: string): string {
 function millSeatLines(seatId: string, stamp: StaffWatchStamp): string[] {
   const day = stamp.day ?? "";
   const recipes = stamp.recipes ?? [];
-  const act = millActivity({ day, trades: stamp.trades ?? [] });
+  const act = millActivity({ day, trades: stamp.trades ?? [], recipes });
   if (act.openCount === 0 && act.settledToday.length === 0) return [];
 
   const lastOpenName = act.lastOpen ? fillTradeName(act.lastOpen, recipes) : "";

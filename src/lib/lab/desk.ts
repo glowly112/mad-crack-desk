@@ -142,7 +142,7 @@ export function floorFacts(
   emptyHoles: number,
 ): FloorFact[] {
   const trend = stamp.trends.find((t) => t.day === scope.day);
-  const tapePaper = settledPaperDayU(stamp.trades ?? [], scope.day);
+  const tapePaper = settledPaperDayU(stamp.trades ?? [], scope.day, stamp.recipes);
   const paper = scope.lookingBack
     ? (trend?.paper_live_day_u ?? null)
     : (tapePaper ??
