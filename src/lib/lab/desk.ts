@@ -2,7 +2,7 @@
 
 import type { Move, Recipe, TrendPoint } from "./stamp.ts";
 import { BOARD_RESET_DAY } from "./board-reset.ts";
-import { settledPaperDayU } from "./trades.ts";
+import { fmtWinLoseCounts, settledPaperDayCounts, settledPaperDayU } from "./trades.ts";
 
 export const EMPTY = "Empty";
 /** Open or armed but not finished — not the same as unused. */
@@ -87,6 +87,8 @@ export type FloorFact = {
   hint: string;
   value: number | null;
   kind: "u" | "count";
+  /** Win · lose line from settled first-book tape (paper tile only). */
+  countsLine?: string | null;
 };
 
 export type FloorStamp = {
@@ -177,6 +179,9 @@ export function floorFacts(
 ): FloorFact[] {
   const trend = stamp.trends.find((t) => t.day === scope.day);
   const tapePaper = settledPaperDayU(stamp.trades ?? [], scope.day, stamp.recipes);
+  const tapePaperCounts = settledPaperDayCounts(stamp.trades ?? [], scope.day, stamp.recipes);
+  const paperCountsLine =
+    tapePaperCounts != null ? fmtWinLoseCounts(tapePaperCounts) : null;
   const dayHint = axisDay(scope.day);
   const nKeep = trend?.n_keep ?? 0;
 
@@ -205,7 +210,14 @@ export function floorFacts(
       value: emptyHoles,
       kind: "count",
     },
-    { id: "paper", label: "Paper", hint: paperHint, value: paper, kind: "u" },
+    {
+      id: "paper",
+      label: "Paper",
+      hint: paperHint,
+      value: paper,
+      kind: "u",
+      countsLine: paperCountsLine,
+    },
     { id: "production", label: "Production", hint: productionHint, value: production, kind: "u" },
     {
       id: "live",

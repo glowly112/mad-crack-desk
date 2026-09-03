@@ -34,6 +34,7 @@ test("office book rows include hole, strategy, side, market, state", () => {
   assert.match(rows[0]!.hole, /WIN/);
   assert.equal(rows[0]!.state, "measuring");
   assert.equal(rows[0]!.paperPnl, "Empty");
+  assert.equal(rows[0]!.paperCounts, "Empty");
 });
 
 test("measuring row shows today's paper settles — measuring is not KEEP", () => {
@@ -61,6 +62,7 @@ test("measuring row shows today's paper settles — measuring is not KEEP", () =
   const rows = officeBookRows({ recipes: [recipe], day, trades });
   assert.equal(rows[0]?.paperPnl, "−1.50u");
   assert.equal(rows[0]?.paperPnlTone, "down");
+  assert.equal(rows[0]?.paperCounts, "0 win · 1 lose");
   assert.equal(rows[0]?.productionPnl, "Empty");
   assert.equal(rows[0]?.laterRacePnl, "Empty");
 });

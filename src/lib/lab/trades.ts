@@ -552,6 +552,29 @@ export function firstBookPaperSettledFills(fills: readonly Fill[], recipes: read
   return paperSettledFills(fills, recipes).filter(isFirstBookPaperFill);
 }
 
+/** Win / lose tallies from settled tape — by signed P&L, not exchange labels. */
+export type SettledTradeCounts = { wins: number; losses: number };
+
+/** Count settled rows with P&L &gt; 0 as win, &lt; 0 as lose. Skips zero P&amp;L. */
+export function settledTradeCountsFromFills(fills: readonly Fill[]): SettledTradeCounts | null {
+  if (!fills.length) return null;
+  let wins = 0;
+  let losses = 0;
+  for (const f of fills) {
+    const pnl = f.pnl ?? 0;
+    if (pnl > 0) wins++;
+    else if (pnl < 0) losses++;
+  }
+  if (wins === 0 && losses === 0) return null;
+  return { wins, losses };
+}
+
+/** UK copy for win · lose counts — Empty when no settled trades. */
+export function fmtWinLoseCounts(counts: SettledTradeCounts | null): string {
+  if (!counts) return EMPTY;
+  return `${counts.wins} win · ${counts.losses} lose`;
+}
+
 /** Settled paper u for one day — Floor tile and Office row sum. First-book only. */
 export function settledPaperDayU(
   trades: readonly Fill[],
@@ -561,6 +584,23 @@ export function settledPaperDayU(
   const paper = firstBookPaperSettledFills(fillsOnDay(trades, day), recipes);
   if (!paper.length) return null;
   return paper.reduce((acc, f) => acc + (f.pnl ?? 0), 0);
+}
+
+/** Win · lose counts for today's settled first-book paper — same tape as settledPaperDayU. */
+export function settledPaperDayCounts(
+  trades: readonly Fill[],
+  day: string,
+  recipes: readonly Recipe[] = [],
+): SettledTradeCounts | null {
+  return settledTradeCountsFromFills(firstBookPaperSettledFills(fillsOnDay(trades, day), recipes));
+}
+
+/** Settled first-book production fills — same tape rules as paper. */
+export function firstBookProductionSettledFills(
+  fills: readonly Fill[],
+  recipes: readonly Recipe[] = [],
+): Fill[] {
+  return honestFirstBookSettledFills(fills, recipes).filter((f) => f.book === "production");
 }
 
 /** Today's settled paper u for one strategy/book — null when no settles (Empty). */
@@ -576,6 +616,34 @@ export function settledPaperUForRecipeIds(
   );
   if (!paper.length) return null;
   return paper.reduce((acc, f) => acc + (f.pnl ?? 0), 0);
+}
+
+/** Win · lose counts for one strategy's settled first-book paper fills. */
+export function settledPaperCountsForRecipeIds(
+  trades: readonly Fill[],
+  day: string,
+  recipeIds: ReadonlySet<string>,
+  recipes: readonly Recipe[] = [],
+): SettledTradeCounts | null {
+  if (!recipeIds.size) return null;
+  const paper = firstBookPaperSettledFills(fillsOnDay(trades, day), recipes).filter((f) =>
+    recipeIds.has(f.recipeId),
+  );
+  return settledTradeCountsFromFills(paper);
+}
+
+/** Win · lose counts for one strategy's settled first-book production fills. */
+export function settledProductionCountsForRecipeIds(
+  trades: readonly Fill[],
+  day: string,
+  recipeIds: ReadonlySet<string>,
+  recipes: readonly Recipe[] = [],
+): SettledTradeCounts | null {
+  if (!recipeIds.size) return null;
+  const prod = firstBookProductionSettledFills(fillsOnDay(trades, day), recipes).filter((f) =>
+    recipeIds.has(f.recipeId),
+  );
+  return settledTradeCountsFromFills(prod);
 }
 
 export type MillActivity = {

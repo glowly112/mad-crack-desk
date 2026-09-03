@@ -18,6 +18,9 @@ import {
   paperSettledFills,
   fieldSprayFillIds,
   settledPaperDayU,
+  settledPaperDayCounts,
+  settledTradeCountsFromFills,
+  fmtWinLoseCounts,
   tapePnl,
   tradeCounts,
   bookWord,
@@ -601,6 +604,41 @@ test("field spray open packs are hidden from Open tape", () => {
   assert.equal(honestOpenFills(fills).length, 1);
   assert.equal(honestOpenFills(fills)[0]?.id, honest.id);
   assert.equal(fieldSprayFillIds(fills).size, 8);
+});
+
+test("win · lose counts use signed P&L, not exchange labels", () => {
+  const wins = [
+    { pnl: 3.63, result: "won" as const },
+    { pnl: 0.73, result: "won" as const },
+    { pnl: -1, result: "won" as const },
+  ];
+  const losses = Array.from({ length: 9 }, (_, i) => ({
+    pnl: -0.5,
+    result: "lost" as const,
+    id: `l${i}`,
+  }));
+  const fills = [...wins, ...losses].map((row, i) => ({
+    id: `f${i}`,
+    ts: "2026-09-03T10:00:00Z",
+    t: "11:00",
+    day: "2026-09-03",
+    recipe: "ehole",
+    recipeId: "H-ehole-gb-nearoff-place-01741Z",
+    market: "PLACE",
+    book: "paper" as const,
+    side: "BACK",
+    odds: 2,
+    stake: 1,
+    flight: null,
+    liquidity: null,
+    horse: null,
+    ...row,
+  }));
+  const counts = settledTradeCountsFromFills(fills);
+  assert.deepEqual(counts, { wins: 2, losses: 10 });
+  assert.equal(fmtWinLoseCounts(counts), "2 win · 10 lose");
+  assert.equal(settledTradeCountsFromFills([]), null);
+  assert.equal(fmtWinLoseCounts(null), EMPTY);
 });
 
 test("wait chips dedupe by country window market", () => {

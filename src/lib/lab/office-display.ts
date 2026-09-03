@@ -13,8 +13,14 @@ import {
   millDisplayRecipes,
   millPaperRecipeIds,
 } from "./mill-display.ts";
-import { settledPaperUForRecipeIds, firstBookPaperSettledFills, fillsOnDay } from "./trades.ts";
-import type { Fill } from "./trades.ts";
+import type { Fill, SettledTradeCounts } from "./trades.ts";
+import {
+  fmtWinLoseCounts,
+  firstBookPaperSettledFills,
+  fillsOnDay,
+  settledProductionCountsForRecipeIds,
+  settledTradeCountsFromFills,
+} from "./trades.ts";
 import type { Recipe } from "./stamp.ts";
 
 export type OfficeBookState = "measuring" | "KEEP" | "production" | "killed";
@@ -30,8 +36,10 @@ export type OfficeBookRow = {
   state: OfficeBookState;
   paperPnl: string;
   paperPnlTone: OfficePnlTone;
+  paperCounts: string;
   productionPnl: string;
   productionPnlTone: OfficePnlTone;
+  productionCounts: string;
   laterRacePnl: string;
   laterRacePnlTone: OfficePnlTone;
   holdingId: string;
@@ -89,13 +97,22 @@ function fmtPnlU(v: number): string {
 
 function emptyPnl(): Pick<
   OfficeBookRow,
-  "paperPnl" | "paperPnlTone" | "productionPnl" | "productionPnlTone" | "laterRacePnl" | "laterRacePnlTone"
+  | "paperPnl"
+  | "paperPnlTone"
+  | "paperCounts"
+  | "productionPnl"
+  | "productionPnlTone"
+  | "productionCounts"
+  | "laterRacePnl"
+  | "laterRacePnlTone"
 > {
   return {
     paperPnl: EMPTY,
     paperPnlTone: "empty",
+    paperCounts: EMPTY,
     productionPnl: EMPTY,
     productionPnlTone: "empty",
+    productionCounts: EMPTY,
     laterRacePnl: EMPTY,
     laterRacePnlTone: "empty",
   };
@@ -108,10 +125,15 @@ function scoreTone(v: number): OfficePnlTone {
 function paperPnlCell(
   recipe: Recipe,
   totals: ReadonlyMap<string, number>,
-): Pick<OfficeBookRow, "paperPnl" | "paperPnlTone"> {
+  counts: ReadonlyMap<string, SettledTradeCounts | null>,
+): Pick<OfficeBookRow, "paperPnl" | "paperPnlTone" | "paperCounts"> {
   const u = totals.get(recipe.id);
-  if (u == null) return { paperPnl: EMPTY, paperPnlTone: "empty" };
-  return { paperPnl: fmtPnlU(u), paperPnlTone: scoreTone(u) };
+  if (u == null) return { paperPnl: EMPTY, paperPnlTone: "empty", paperCounts: EMPTY };
+  return {
+    paperPnl: fmtPnlU(u),
+    paperPnlTone: scoreTone(u),
+    paperCounts: fmtWinLoseCounts(counts.get(recipe.id) ?? null),
+  };
 }
 
 /** One fill → one Office row; twins roll to the displayed skin. */
@@ -131,16 +153,55 @@ export function officePaperTotals(input: OfficeBookInput): Map<string, number> {
   return totals;
 }
 
+/** One fill → one Office row; twins roll to the displayed skin. */
+export function officePaperCounts(input: OfficeBookInput): Map<string, SettledTradeCounts | null> {
+  const trades = input.trades ?? [];
+  const fills = firstBookPaperSettledFills(fillsOnDay(trades, input.day), input.recipes);
+  const rows = officeBookRecipes(input.recipes);
+  const counts = new Map<string, SettledTradeCounts | null>();
+  const buckets = new Map<string, Fill[]>();
+  const seen = new Set<string>();
+  for (const fill of fills) {
+    if (seen.has(fill.id)) continue;
+    const row = rows.find((r) => millPaperRecipeIds(r, input.recipes).has(fill.recipeId));
+    if (!row) continue;
+    seen.add(fill.id);
+    const list = buckets.get(row.id) ?? [];
+    list.push(fill);
+    buckets.set(row.id, list);
+  }
+  for (const [rowId, list] of buckets) {
+    counts.set(rowId, settledTradeCountsFromFills(list));
+  }
+  return counts;
+}
+
 function officePnlCells(
   recipe: Recipe,
   state: OfficeBookState,
   input: OfficeBookInput,
 ): Pick<
   OfficeBookRow,
-  "paperPnl" | "paperPnlTone" | "productionPnl" | "productionPnlTone" | "laterRacePnl" | "laterRacePnlTone"
+  | "paperPnl"
+  | "paperPnlTone"
+  | "paperCounts"
+  | "productionPnl"
+  | "productionPnlTone"
+  | "productionCounts"
+  | "laterRacePnl"
+  | "laterRacePnlTone"
 > {
   const paperTotals = input.paperTotals ?? officePaperTotals(input);
-  const paper = paperPnlCell(recipe, paperTotals);
+  const paperCountMap = officePaperCounts(input);
+  const paper = paperPnlCell(recipe, paperTotals, paperCountMap);
+  const recipeIds = millPaperRecipeIds(recipe, input.recipes);
+  const trades = input.trades ?? [];
+  const prodCountRaw = settledProductionCountsForRecipeIds(
+    trades,
+    input.day,
+    recipeIds,
+    input.recipes,
+  );
   const nKeep = input.n_keep ?? 0;
   const periods = bookPeriods(recipe);
   const freeze = Number.isFinite(recipe.freezePnl) ? recipe.freezePnl : null;
@@ -148,9 +209,13 @@ function officePnlCells(
 
   let productionPnl = EMPTY;
   let productionPnlTone: OfficePnlTone = "empty";
+  let productionCounts = EMPTY;
   if (state === "production" && nKeep > 0 && freeze != null) {
     productionPnl = fmtPnlU(freeze);
     productionPnlTone = scoreTone(freeze);
+  }
+  if (prodCountRaw != null) {
+    productionCounts = fmtWinLoseCounts(prodCountRaw);
   }
 
   let laterRacePnl = EMPTY;
@@ -164,6 +229,7 @@ function officePnlCells(
     ...paper,
     productionPnl,
     productionPnlTone,
+    productionCounts,
     laterRacePnl,
     laterRacePnlTone,
   };

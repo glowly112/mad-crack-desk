@@ -115,6 +115,9 @@ function FactCell({
       <p key={`${fact.id}-${fact.value}`} className={cn("log-in mt-1 font-mono text-2xl leading-none tracking-tight", tone)}>
         {display}
       </p>
+      {fact.countsLine && fact.countsLine !== EMPTY ? (
+        <p className="mt-1 font-mono text-[10px] text-subtle tabular-nums">{fact.countsLine}</p>
+      ) : null}
       <p className="mt-1.5 text-[10px] text-subtle">{fact.hint}</p>
     </button>
   );

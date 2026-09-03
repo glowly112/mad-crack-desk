@@ -67,6 +67,25 @@ function pnlClass(tone: OfficePnlTone): string {
   );
 }
 
+function PnlCell({
+  pnl,
+  tone,
+  counts,
+}: {
+  pnl: string;
+  tone: OfficePnlTone;
+  counts: string;
+}) {
+  return (
+    <td className={pnlClass(tone)}>
+      <div>{pnl}</div>
+      {counts !== EMPTY ? (
+        <div className="mt-0.5 text-[10px] text-subtle tabular-nums">{counts}</div>
+      ) : null}
+    </td>
+  );
+}
+
 /** One row per strategy/book — hole, name, side, market, state, paper / production / later-race P&L. */
 export function OfficeBooksTable() {
   const stamp = useStamp();
@@ -125,8 +144,12 @@ export function OfficeBooksTable() {
                   <td className="px-2 py-2.5 font-mono text-xs text-subtle">{row.side}</td>
                   <td className="px-2 py-2.5 font-mono text-xs text-subtle">{row.market}</td>
                   <td className="px-2 py-2.5 text-xs text-muted">{row.state}</td>
-                  <td className={pnlClass(row.paperPnlTone)}>{row.paperPnl}</td>
-                  <td className={pnlClass(row.productionPnlTone)}>{row.productionPnl}</td>
+                  <PnlCell pnl={row.paperPnl} tone={row.paperPnlTone} counts={row.paperCounts} />
+                  <PnlCell
+                    pnl={row.productionPnl}
+                    tone={row.productionPnlTone}
+                    counts={row.productionCounts}
+                  />
                   <td className={pnlClass(row.laterRacePnlTone)}>{row.laterRacePnl}</td>
                 </tr>
               ))}
