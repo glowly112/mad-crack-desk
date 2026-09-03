@@ -2,7 +2,7 @@
 
 import { EMPTY, hopMoves, recipeBookName, bookDisplayName } from "./desk.ts";
 import { isBoardResetView } from "./board-reset.ts";
-import { bookStages, bookLabel, holeName, staffBookFacts, type StaffWatchStamp } from "./boards.ts";
+import { bookStages, bookLabel, holeName, staffBookFacts, staffLine, type StaffWatchStamp } from "./boards.ts";
 import { millActivity, fillTradeName } from "./trades.ts";
 import type { Move, Recipe, Seat } from "./stamp.ts";
 import { fmtU } from "../utils.ts";
@@ -294,5 +294,30 @@ export function seatBubbles(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchSta
 
 export function seatPreview(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchStamp): string {
   const now = seatBubbles(seat, stamp).filter((b) => !b.older);
-  return now[0]?.text || EMPTY;
+  if (now[0]?.text) return now[0].text;
+  const watching = staffLine(seat.now ?? "", stamp.recipes ?? []);
+  if (watching !== EMPTY) return watching;
+  const older = seatBubbles(seat, stamp).filter((b) => b.older);
+  return older[older.length - 1]?.text ?? EMPTY;
+}
+
+/** Recent recipe hops for Staff — people lines, not Empty chrome. */
+export function staffPeopleHops(stamp: StaffWatchStamp): SeatBubble[] {
+  const hops = hopMoves(stamp.moves ?? []);
+  const out: SeatBubble[] = [];
+  for (const m of hops) {
+    const text = hopVoice(m);
+    if (!text) continue;
+    const dead = /dead/i.test(m.to);
+    const certified = /certified|solid/i.test(m.to);
+    const parked = /parked|research keep/i.test(m.to);
+    const who =
+      dead
+        ? "Virchow · Clerk"
+        : certified || parked
+          ? "Hyde · Foreman"
+          : "Staff";
+    out.push({ text: `${who}: ${text}`, at: m.at, older: true });
+  }
+  return out;
 }

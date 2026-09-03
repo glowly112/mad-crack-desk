@@ -6,7 +6,7 @@ import { parseFills, parseWaitOpen } from "./trades.ts";
 import { parseHole, parseWindow, parseMarket, regionFromText, millHuntCaption, squareHoleKeyAndSide, normalizeSquareHoleKey, type ParsedSquareMarket, type SquareWindow } from "./boards.ts";
 import { isSprayClassInPlayEholeFirstBook } from "./mill-display.ts";
 import { cellIsPostEpochEhole, cellIsPostEpochParkedKeep } from "./board-reset.ts";
-import { matrixKeyFromScoreboardCell } from "./hollow-occupancy.ts";
+import { matrixKeyFromScoreboardCell } from "./hollow-keys.ts";
 
 const REGIONS = ["AU", "GB", "IE", "US", "NZ", "ZA", "HK", "FR"] as const;
 const BADGES: Badge[] = ["Solid", "Research", "Parked", "Dead"];
