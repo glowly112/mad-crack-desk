@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Recipe } from "./stamp.ts";
-import { officeBookCounts, officeBookRows, officeBookRecipes, officePaperTotals } from "./office-display.ts";
+import { officeBookCounts, officeBookRows, officeBookRecipes, officePaperTotals, officeProductionHeroValue } from "./office-display.ts";
 import { settledPaperDayU } from "./trades.ts";
 import { STAMP } from "./stamp.ts";
 
@@ -179,6 +179,12 @@ test("office counts strategies, KEEP, production; live Empty when fuse off", () 
   assert.ok(counts.keep > 0);
   assert.equal(counts.production, rows.filter((r) => r.state === "production").length);
   assert.equal(counts.live, "Empty");
+});
+
+test("office production hero Empty while KEEP is 0", () => {
+  const rows = officeBookRows({ recipes: STAMP.recipes, day: STAMP.day, n_keep: 0 });
+  const counts = officeBookCounts(rows, false);
+  assert.equal(officeProductionHeroValue(0, counts.production), "Empty");
 });
 
 test("office paper totals sum to Floor settled tape u", () => {

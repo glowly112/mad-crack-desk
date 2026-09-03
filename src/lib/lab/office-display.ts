@@ -225,7 +225,7 @@ function officePnlCells(
     productionPnl = fmtPnlU(freeze);
     productionPnlTone = scoreTone(freeze);
   }
-  if (prodCountRaw != null) {
+  if (prodCountRaw != null && nKeep > 0) {
     productionCounts = fmtWinLoseCounts(prodCountRaw);
   }
 
@@ -311,6 +311,10 @@ export function officeBookRows(input: OfficeBookInput): OfficeBookRow[] {
       holdingId: recipe.id,
     };
   });
+}
+
+export function officeProductionHeroValue(keep: number, production: number): string {
+  return keep === 0 ? EMPTY : String(production);
 }
 
 export function officeBookCounts(

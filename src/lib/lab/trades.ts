@@ -540,21 +540,21 @@ export function isMillTapeFill(fill: Fill): boolean {
   return isMillDeskTradeFill(fill);
 }
 
-/** Trades › Settled / Void candidates — mill book mirror; SETTLED signed rows never peeled. */
+/** Trades › Settled / Void candidates — today's first-book tape only. */
 export function tradesSettledCandidateFills(
   fills: readonly Fill[],
   _recipes: readonly Recipe[] = [],
 ): Fill[] {
-  return settledFills(fills).filter(isMillDeskTradeFill);
+  return settledFills(fills).filter(isFirstBookTapeFill);
 }
 
-/** Trades › Open — mill OPEN rows on today's tape. */
+/** Trades › Open — first-book OPEN rows on today's tape. */
 export function tradesMillOpenFills(
   fills: readonly Fill[],
   day: string,
   recipes: readonly Recipe[] = [],
 ): Fill[] {
-  return honestOpenFills(fillsOnDay(fills, day), recipes).filter(isMillDeskTradeFill);
+  return honestOpenFills(fillsOnDay(fills, day), recipes).filter(isFirstBookTapeFill);
 }
 
 /** Trades settled — Hyde / fast / legacy morning tape hidden. */
@@ -609,12 +609,12 @@ export function isCountableSettledFill(fill: Fill): boolean {
   return true;
 }
 
-/** Trades open — today's mill tape, Hyde/fast off. */
+/** Trades open — today's first-book tape, Hyde/fast off. */
 export function honestFirstBookOpenFills(
   fills: readonly Fill[],
   recipes: readonly Recipe[] = [],
 ): Fill[] {
-  return honestOpenFills(fills, recipes).filter(isMillDeskTradeFill);
+  return honestOpenFills(fills, recipes).filter(isFirstBookTapeFill);
 }
 
 /** Paper settles that contribute to the day u total. */
@@ -664,6 +664,31 @@ export function settledTradeCountsFromFills(fills: readonly Fill[]): SettledTrad
 export function fmtWinLoseCounts(counts: SettledTradeCounts | null): string {
   if (!counts) return EMPTY;
   return `${counts.wins} win · ${counts.losses} lose`;
+}
+
+/**
+ * Archive mill history off the live board — focal day keeps first-book tape rows only.
+ * Hyde, occupancy leftovers, and full-day book.jsonl settles stay off Trades/Floor/Office.
+ */
+export function archiveTradesTape(
+  trades: readonly Fill[],
+  day: string,
+  _recipes: readonly Recipe[] = [],
+): Fill[] {
+  const spray = fieldSprayFillIds(trades);
+  const junk = junkFillIds(trades);
+  const out: Fill[] = [];
+  for (const f of trades) {
+    if (isHydeFastLegacyFill(f) || isPreResetDayFill(f)) continue;
+    if (f.day !== day) {
+      out.push(f);
+      continue;
+    }
+    if (!isFirstBookTapeFill(f)) continue;
+    if (spray.has(f.id) || junk.has(f.id)) continue;
+    out.push(f);
+  }
+  return out.sort((a, b) => b.ts.localeCompare(a.ts));
 }
 
 /** One roll-up for Trades › Settled, Floor paper tile, Trades header, and Office. */
@@ -753,7 +778,7 @@ export function refreshTapeFromBook(
   const byId = new Map<string, Fill>();
   for (const f of tapeTrades) byId.set(f.id, f);
   for (const f of bookFills) {
-    if (f.day !== day || !isMillDeskTradeFill(f)) continue;
+    if (f.day !== day || !isFirstBookTapeFill(f)) continue;
     if (byId.has(f.id)) byId.set(f.id, f);
   }
   return [...byId.values()].sort((a, b) => b.ts.localeCompare(a.ts));
@@ -804,15 +829,15 @@ export function mergeMillTradesTape(
       byId.set(f.id, f);
       continue;
     }
-    if (f.result === "waiting") {
+    if (f.result === "waiting" && isFirstBookTapeFill(f)) {
       byId.set(f.id, f);
       continue;
     }
-    if (!isCountableSettledFill(f)) {
+    if (!isCountableSettledFill(f) && isFirstBookTapeFill(f)) {
       byId.set(f.id, f);
       continue;
     }
-    // Do not grow today's settled tape from a bloated mill stamp poll.
+    // Do not grow today's settled tape from poll bloat or archived mill history.
   }
 
   for (const f of prevToday) {

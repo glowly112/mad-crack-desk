@@ -7,6 +7,7 @@ import { EMPTY } from "@/lib/lab/desk";
 import {
   officeBookCounts,
   officeBookRows,
+  officeProductionHeroValue,
   type OfficeBookRow,
   type OfficePnlTone,
 } from "@/lib/lab/office-display";
@@ -44,11 +45,17 @@ function useOfficeDesk() {
 export function OfficeCounts() {
   const stamp = useStamp();
   const { counts } = useOfficeDesk();
+  const trend = stamp.trends.find((t) => t.day === stamp.day);
+  const keep = trend?.n_keep ?? counts.keep;
 
   const tiles = [
     { label: "Strategies", value: String(counts.strategies), hint: "First-book skins" },
     { label: "KEEP", value: String(counts.keep), hint: "Later-race same-bets" },
-    { label: "Production", value: String(counts.production), hint: "On today's tape" },
+    {
+      label: "Production",
+      value: officeProductionHeroValue(keep, counts.production),
+      hint: keep === 0 ? "Empty until KEEP proves" : "Solid recipes",
+    },
     { label: "Live", value: counts.live, hint: stamp.fuse_on ? "Real betting" : "fuse off" },
   ];
 

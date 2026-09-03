@@ -4,7 +4,7 @@ import { parseMarket, parseWindow } from "./boards.ts";
 import { EMPTY, scrubPostResetTrendPaper } from "./desk.ts";
 import type { LiveStamp } from "./from-digest.ts";
 import type { Fill } from "./trades.ts";
-import { honestFirstBookOpenFills, settledPaperDayU, isFirstBookTapeFill, deskSettledTapeRollup, isMillDeskTradeFill } from "./trades.ts";
+import { honestFirstBookOpenFills, settledPaperDayU, isFirstBookTapeFill, deskSettledTapeRollup, archiveTradesTape } from "./trades.ts";
 import type { Recipe } from "./stamp.ts";
 
 export const BOARD_RESET_EPOCH = "20260902T101756Z";
@@ -128,8 +128,8 @@ function filterWaitOpen(
 export function filterPreEpochLeftovers(stamp: LiveStamp): LiveStamp {
   const recipes = stamp.recipes.filter(recipeIsPostEpoch);
   const solids = recipes.filter((r) => r.badge === "Solid");
-  /** Full mill tape for Trades/Floor — Hyde/fast and pre-reset days only. */
-  const trades = stamp.trades.filter(isMillDeskTradeFill);
+  /** First-book tape for Trades/Floor — mill history archived off the live board. */
+  const trades = archiveTradesTape(stamp.trades, stamp.day, recipes);
   const wait_open = filterWaitOpen(stamp.wait_open ?? [], stamp.recipes, recipes);
   const holes = stamp.holes.filter((h) => h.tone !== "parked");
   const firstBookPaper = deskSettledTapeRollup(trades, stamp.day, recipes).u;
@@ -199,7 +199,7 @@ export function isBoardResetView(stamp: {
   const recipes = (stamp.recipes ?? []) as Recipe[];
   const trades = (stamp.trades ?? []) as Fill[];
   const postRecipes = recipes.filter(recipeIsPostEpoch);
-  const postTrades = trades.filter((f) => isMillDeskTradeFill(f));
+  const postTrades = trades.filter(isFirstBookTapeFill);
   if (postTrades.length > 0 || honestFirstBookOpenFills(postTrades, postRecipes).length > 0) return false;
   const day = stamp.day ?? "";
   if (day && settledPaperDayU(postTrades, day) != null) return false;
