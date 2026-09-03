@@ -39,8 +39,15 @@ VITE_AUTH_ENABLED=false
 PATH=$HOME/opt/node/bin:/usr/bin:/bin
 EOF
 if [ -f "$APP/desk.pid" ]; then kill "$(cat "$APP/desk.pid")" 2>/dev/null || true; fi
+# Cmdline is "node .output/server/index.mjs" (cwd mcl-desk) — $APP/.output path rarely matches.
+pkill -f "node .output/server/index.mjs" 2>/dev/null || true
 pkill -f "$APP/.output/server/index.mjs" 2>/dev/null || true
 sleep 2
+# Ensure nothing still bound before we start.
+if curl -sS -m 2 -o /dev/null -w "%{http_code}" http://127.0.0.1:8791/desk/ 2>/dev/null | grep -q 200; then
+  pkill -9 -f "node .output/server/index.mjs" 2>/dev/null || true
+  sleep 1
+fi
 cd "$APP"
 rm -rf .output
 tar xzf mcl-desk-out.tar.gz
