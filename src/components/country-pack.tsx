@@ -44,7 +44,7 @@ export function FloorSquare() {
   const stamp = useStamp();
   const open = openFills(stamp.trades);
   const holes = floorRacingSquare({
-    namedHoles: [...stamp.holes, ...voidedJunkSquareHoles(stamp.trades, stamp.recipes)],
+    namedHoles: [...stamp.holes, ...voidedJunkSquareHoles(stamp.trades)],
     recipes: millDisplayRecipes(stamp.recipes),
     openFills: open.map((f) => ({
       id: f.id,

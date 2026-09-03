@@ -499,15 +499,15 @@ export {
   fillTickSecond,
 } from "./junk-fills.ts";
 
-/** Open tickets on today's tape — junk packs hidden; occupancy uses raw openFills. */
-export function honestOpenFills(fills: readonly Fill[], recipes: readonly Recipe[] = []): Fill[] {
-  const junk = junkFillIds(fills, recipes);
+/** Open tickets on today's tape — mill-void packs hidden; occupancy uses raw openFills. */
+export function honestOpenFills(fills: readonly Fill[], _recipes: readonly Recipe[] = []): Fill[] {
+  const junk = junkFillIds(fills);
   return openFills(fills).filter((f) => !junk.has(f.id));
 }
 
-/** Settled rows on today's tape — junk and mill-void leftovers excluded from paper u. */
-export function honestSettledFills(fills: readonly Fill[], recipes: readonly Recipe[] = []): Fill[] {
-  const junk = junkFillIds(fills, recipes);
+/** Settled rows on today's tape — mill-void packs excluded from paper u. */
+export function honestSettledFills(fills: readonly Fill[], _recipes: readonly Recipe[] = []): Fill[] {
+  const junk = junkFillIds(fills);
   return settledFills(fills).filter((f) => !junk.has(f.id));
 }
 
