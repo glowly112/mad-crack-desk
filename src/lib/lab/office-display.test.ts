@@ -1,9 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Recipe } from "./stamp.ts";
-import { officeBookCounts, officeBookRows, officeBookRecipes } from "./office-display.ts";
-import { settledPaperDayU, settledPaperUForRecipeIds } from "./trades.ts";
-import { millPaperRecipeIds } from "./mill-display.ts";
+import { officeBookCounts, officeBookRows, officeBookRecipes, officePaperTotals } from "./office-display.ts";
+import { settledPaperDayU } from "./trades.ts";
 import { STAMP } from "./stamp.ts";
 
 function ehole(id: string, overrides: Partial<Recipe> = {}): Recipe {
@@ -110,18 +109,9 @@ test("office paper u sums to Floor paper tile", () => {
   const recipes = [r1, r2];
   const rows = officeBookRows({ recipes, day, trades });
   const floorU = settledPaperDayU(trades, day, recipes);
+  const totals = officePaperTotals({ recipes, day, trades });
   let officeSum = 0;
-  for (const row of rows) {
-    const recipe = recipes.find((r) => r.id === row.id);
-    if (!recipe) continue;
-    const u = settledPaperUForRecipeIds(
-      trades,
-      day,
-      millPaperRecipeIds(recipe, recipes),
-      recipes,
-    );
-    if (u != null) officeSum += u;
-  }
+  for (const u of totals.values()) officeSum += u;
   assert.equal(floorU, -0.71);
   assert.equal(officeSum, floorU);
 });

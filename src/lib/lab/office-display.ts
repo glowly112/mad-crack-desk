@@ -13,7 +13,7 @@ import {
   millDisplayRecipes,
   millPaperRecipeIds,
 } from "./mill-display.ts";
-import { settledPaperUForRecipeIds } from "./trades.ts";
+import { settledPaperUForRecipeIds, firstBookPaperSettledFills, fillsOnDay } from "./trades.ts";
 import type { Fill } from "./trades.ts";
 import type { Recipe } from "./stamp.ts";
 
@@ -49,6 +49,7 @@ export type OfficeBookInput = {
   day: string;
   trades?: readonly Fill[];
   n_keep?: number;
+  paperTotals?: ReadonlyMap<string, number>;
 };
 
 function officeBookState(recipe: Recipe): OfficeBookState | null {
@@ -106,13 +107,28 @@ function scoreTone(v: number): OfficePnlTone {
 
 function paperPnlCell(
   recipe: Recipe,
-  input: OfficeBookInput,
+  totals: ReadonlyMap<string, number>,
 ): Pick<OfficeBookRow, "paperPnl" | "paperPnlTone"> {
-  const trades = input.trades ?? [];
-  const ids = millPaperRecipeIds(recipe, input.recipes);
-  const u = settledPaperUForRecipeIds(trades, input.day, ids, input.recipes);
+  const u = totals.get(recipe.id);
   if (u == null) return { paperPnl: EMPTY, paperPnlTone: "empty" };
   return { paperPnl: fmtPnlU(u), paperPnlTone: scoreTone(u) };
+}
+
+/** One fill → one Office row; twins roll to the displayed skin. */
+export function officePaperTotals(input: OfficeBookInput): Map<string, number> {
+  const trades = input.trades ?? [];
+  const fills = firstBookPaperSettledFills(fillsOnDay(trades, input.day), input.recipes);
+  const rows = officeBookRecipes(input.recipes);
+  const totals = new Map<string, number>();
+  const seen = new Set<string>();
+  for (const fill of fills) {
+    if (seen.has(fill.id)) continue;
+    const row = rows.find((r) => millPaperRecipeIds(r, input.recipes).has(fill.recipeId));
+    if (!row) continue;
+    seen.add(fill.id);
+    totals.set(row.id, (totals.get(row.id) ?? 0) + (fill.pnl ?? 0));
+  }
+  return totals;
 }
 
 function officePnlCells(
@@ -123,7 +139,8 @@ function officePnlCells(
   OfficeBookRow,
   "paperPnl" | "paperPnlTone" | "productionPnl" | "productionPnlTone" | "laterRacePnl" | "laterRacePnlTone"
 > {
-  const paper = paperPnlCell(recipe, input);
+  const paperTotals = input.paperTotals ?? officePaperTotals(input);
+  const paper = paperPnlCell(recipe, paperTotals);
   const nKeep = input.n_keep ?? 0;
   const periods = bookPeriods(recipe);
   const freeze = Number.isFinite(recipe.freezePnl) ? recipe.freezePnl : null;
@@ -186,9 +203,11 @@ export function officeBookRecipes(recipes: readonly Recipe[]): Recipe[] {
 
 export function officeBookRows(input: OfficeBookInput): OfficeBookRow[] {
   const recipes = input.recipes;
+  const paperTotals = officePaperTotals(input);
+  const withTotals: OfficeBookInput = { ...input, paperTotals };
   return officeBookRecipes(recipes).map((recipe) => {
     const state = officeBookState(recipe)!;
-    const pnl = officePnlCells(recipe, state, input);
+    const pnl = officePnlCells(recipe, state, withTotals);
     return {
       id: recipe.id,
       hole: officeHoleLabel(recipe),
