@@ -1,7 +1,6 @@
 /** Display grouping for the desk. Never sums cells or invents a score. */
 
 import type { Move, Recipe, TrendPoint } from "./stamp.ts";
-import { productionScore } from "./hero.ts";
 import { settledPaperDayU } from "./trades.ts";
 
 export const EMPTY = "Empty";
@@ -143,16 +142,26 @@ export function floorFacts(
 ): FloorFact[] {
   const trend = stamp.trends.find((t) => t.day === scope.day);
   const tapePaper = settledPaperDayU(stamp.trades ?? [], scope.day, stamp.recipes);
-  const paper = scope.lookingBack
-    ? (trend?.paper_live_day_u ?? null)
-    : (tapePaper ??
-        productionScore({
-          n_solid: stamp.n_solid,
-          day_u: stamp.hero.day_u,
-          researchKeepGbp: stamp.researchKeepGbp,
-        }));
-  const production = trend?.factory_day_pnl_u ?? null;
   const dayHint = axisDay(scope.day);
+  const nKeep = trend?.n_keep ?? 0;
+
+  let paper: number | null;
+  let paperHint: string;
+  if (scope.lookingBack) {
+    paper = trend?.paper_live_day_u ?? null;
+    paperHint = paper != null ? `${dayHint} · paper` : dayHint;
+  } else if (tapePaper != null) {
+    paper = tapePaper;
+    paperHint = `${dayHint} · paper settles · not KEEP`;
+  } else {
+    paper = null;
+    paperHint = `${dayHint} · paper`;
+  }
+
+  const production = trend?.factory_day_pnl_u ?? null;
+  const productionHint =
+    nKeep <= 0 ? "KEEP 0 · no later-race score" : `${dayHint} · later-race KEEP`;
+
   return [
     {
       id: "holes",
@@ -161,8 +170,8 @@ export function floorFacts(
       value: emptyHoles,
       kind: "count",
     },
-    { id: "paper", label: "Paper", hint: dayHint, value: paper, kind: "u" },
-    { id: "production", label: "Production", hint: dayHint, value: production, kind: "u" },
+    { id: "paper", label: "Paper", hint: paperHint, value: paper, kind: "u" },
+    { id: "production", label: "Production", hint: productionHint, value: production, kind: "u" },
     {
       id: "live",
       label: "Live",

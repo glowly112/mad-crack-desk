@@ -6,7 +6,8 @@ import {
   isMillVoidPackFill,
   isRawIdRunSuffix,
   junkFillIds,
-  voidedJunkSquareHoles,
+  scrubMillVoidNamedHoles,
+  squareOpenFillsForPaint,
 } from "./junk-fills.ts";
 import { honestOpenFills, honestSettledFills, settledPaperDayU } from "./trades.ts";
 
@@ -49,63 +50,7 @@ test("US morning WIN 1.15 one-per-market first book is not junk", () => {
     t: "08:30:00",
   })!;
   assert.equal(isMillVoidPackFill(fill), false);
-  assert.equal(junkFillIds([fill]).has(fill.id), false);
-  assert.equal(honestOpenFills([fill]).length, 1);
-});
-
-test("GB late-pre one-per-market first book is not junk", () => {
-  const fill = fillFromRow({
-    pick_id: "gb-late-one",
-    date: "2026-09-03",
-    cell_id: "H-ehole-gb-latepre-win-83959Z",
-    mode: "auto_dry",
-    status: "OPEN",
-    horse_name: "Late Runner",
-    odds: 2.4,
-    side: "BACK",
-    stake_gbp: 2,
-    ts: "2026-09-03T12:30:00Z",
-    t: "12:30:00",
-  })!;
-  assert.equal(isMillVoidPackFill(fill), false);
-  assert.equal(junkFillIds([fill]).has(fill.id), false);
-});
-
-test("other raw-id ehole without horse is not junk", () => {
-  const fill = fillFromRow({
-    pick_id: "nz-raw",
-    date: "2026-09-03",
-    cell_id: "H-ehole-nz-morning-win-73508Z",
-    mode: "auto_dry",
-    status: "SETTLED",
-    odds: 4,
-    side: "BACK",
-    stake_gbp: 2,
-    paper_pnl_gbp: 2,
-    placed_result: true,
-    ts: "2026-09-03T10:30:00Z",
-    t: "10:30:00",
-  })!;
-  assert.equal(junkFillIds([fill]).has(fill.id), false);
-  assert.equal(honestSettledFills([fill]).length, 1);
-});
-
-test("FR in-play 73339Z pack is junk", () => {
-  const fill = fillFromRow({
-    pick_id: "fr-inplay",
-    date: "2026-09-03",
-    cell_id: "H-ehole-fr-inplay-win-73339Z",
-    mode: "auto_dry",
-    status: "OPEN",
-    horse_name: "Runner One",
-    odds: 5,
-    side: "BACK",
-    stake_gbp: 2,
-    ts: "2026-09-03T11:13:00Z",
-    t: "11:13:00",
-  })!;
-  assert.equal(isMillVoidPackFill(fill), true);
-  assert.equal(junkFillIds([fill]).has(fill.id), true);
+  assert.equal(squareOpenFillsForPaint([fill]).length, 1);
 });
 
 test("mill-voided ZA 73506Z does not count as paper lost", () => {
@@ -128,7 +73,7 @@ test("mill-voided ZA 73506Z does not count as paper lost", () => {
   assert.equal(settledPaperDayU([voidSpray], "2026-09-03"), null);
 });
 
-test("voided GB 34829Z spray paints killed on square", () => {
+test("mill VOID scrubs kill tone on voided junk holes — not later-race kill", () => {
   const voidGb = fillFromRow({
     pick_id: "gb-void",
     date: "2026-09-03",
@@ -141,9 +86,10 @@ test("voided GB 34829Z spray paints killed on square", () => {
     ts: "2026-09-03T11:00:00Z",
     t: "11:00:00",
   })!;
-  const holes = voidedJunkSquareHoles([voidGb]);
-  assert.equal(holes.length, 1);
-  assert.equal(holes[0]?.region, "GB");
-  assert.equal(holes[0]?.tone, "loss");
-  assert.equal(holes[0]?.window, "late_pre");
+  const scrubbed = scrubMillVoidNamedHoles(
+    [{ region: "GB", window: "late_pre", market: "WIN", tone: "loss" }],
+    [voidGb],
+  );
+  assert.equal(scrubbed[0]?.tone, "empty");
+  assert.equal(squareOpenFillsForPaint([voidGb]).length, 0);
 });

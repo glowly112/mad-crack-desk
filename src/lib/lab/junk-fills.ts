@@ -1,6 +1,12 @@
 /** Mill-voided packs only — not one-per-market first books on Lab Mill. */
 
-import { parseHole, parseWindow, squareHoleKeyAndSide } from "./boards.ts";
+import {
+  normalizeSquareHoleKey,
+  parseHole,
+  parseWindow,
+  squareHoleKeyAndSide,
+  type SquareWindow,
+} from "./boards.ts";
 import { eholeRunSuffix } from "./desk.ts";
 import type { Fill } from "./trades.ts";
 
@@ -124,40 +130,63 @@ export function isMillVoidPackFill(fill: Fill): boolean {
   return false;
 }
 
-/** Voided row from a mill-void pack — square paints killed, paper u ignores. */
+/** Voided row from a mill-void pack — tape only; square stays Empty (not killed). */
 export function isMillVoidLeftover(fill: Fill): boolean {
   return fill.result === "void" && isMillVoidPackFill(fill);
 }
 
-export type VoidGoneHole = {
+export type NamedSquareHole = {
   region: string;
   window: string;
   market: string;
-  tone: string;
+  tone?: string;
   side?: string;
 };
 
-/** Voided mill-void packs paint killed on the square — not a fake empty hole. */
-export function voidedJunkSquareHoles(fills: readonly Fill[]): VoidGoneHole[] {
-  const out: VoidGoneHole[] = [];
-  const seen = new Set<string>();
+/** Hole keys for the three mill-void packs — never paint as later-race kill. */
+export function millVoidPackHoleKeys(fills: readonly Fill[]): Set<string> {
+  const keys = new Set<string>();
   for (const f of fills) {
-    if (!isMillVoidLeftover(f)) continue;
+    if (!isMillVoidPackFill(f)) continue;
     const parsed = squareHoleKeyAndSide(f.recipeId, f.recipe);
-    if (!parsed) continue;
-    if (seen.has(parsed.id)) continue;
-    seen.add(parsed.id);
-    const parts = parsed.id.split("|");
-    const window = parseWindow(parts[1]) ?? parts[1];
-    out.push({
-      region: parts[0],
-      window,
-      market: parsed.market,
-      tone: "loss",
-      side: parsed.side,
-    });
+    if (parsed) keys.add(parsed.id);
   }
-  return out;
+  return keys;
+}
+
+function namedHoleSquareKey(hole: NamedSquareHole): string | null {
+  const region = hole.region?.toUpperCase();
+  const window =
+    parseWindow(hole.window) ??
+    (["morning", "late_pre", "near_off", "in_play"].includes(hole.window)
+      ? (hole.window as SquareWindow)
+      : parseWindow(hole.window.replace(/-/g, "_")));
+  if (!region || !window) return null;
+  const norm = normalizeSquareHoleKey(region, window, hole.market);
+  return norm?.id ?? null;
+}
+
+/** Mill VOID ≠ kill — scrub oracle kill marks on voided junk holes to Empty. */
+export function scrubMillVoidNamedHoles<T extends NamedSquareHole>(
+  holes: readonly T[],
+  fills: readonly Fill[],
+): T[] {
+  const millVoidKeys = millVoidPackHoleKeys(fills);
+  if (!millVoidKeys.size) return [...holes];
+  return holes.map((h) => {
+    const key = namedHoleSquareKey(h);
+    if (!key || !millVoidKeys.has(key)) return h;
+    const tone = (h.tone ?? "").toLowerCase();
+    if (tone === "loss" || tone === "kill" || tone === "killed" || tone === "dead") {
+      return { ...h, tone: "empty" };
+    }
+    return h;
+  });
+}
+
+/** Open tickets that paint the square — not mill-void junk packs. */
+export function squareOpenFillsForPaint(fills: readonly Fill[]): Fill[] {
+  return fills.filter((f) => f.result === "waiting" && !isMillVoidPackFill(f));
 }
 
 /** Trades tape + paper u — only the three mill-voided packs, not first-book waits. */

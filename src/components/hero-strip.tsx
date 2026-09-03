@@ -17,8 +17,10 @@ import {
   type FloorFactId,
 } from "@/lib/lab/desk";
 import { floorRacingSquare, holeSideOccupied } from "@/lib/lab/boards";
-import { openFills } from "@/lib/lab/trades";
-import { voidedJunkSquareHoles } from "@/lib/lab/junk-fills.ts";
+import {
+  scrubMillVoidNamedHoles,
+  squareOpenFillsForPaint,
+} from "@/lib/lab/junk-fills.ts";
 import { millDisplayRecipes } from "@/lib/lab/mill-display.ts";
 import { cn, fmtScore } from "@/lib/utils";
 
@@ -27,9 +29,9 @@ export function PlantPane() {
   const plant = usePlantSource();
   const scope = useDayScope();
   const [fact, setFact] = useState<FloorFactId>("paper");
-  const open = openFills(stamp.trades);
+  const open = squareOpenFillsForPaint(stamp.trades);
   const holes = floorRacingSquare({
-    namedHoles: [...stamp.holes, ...voidedJunkSquareHoles(stamp.trades)],
+    namedHoles: scrubMillVoidNamedHoles(stamp.holes, stamp.trades),
     recipes: millDisplayRecipes(stamp.recipes),
     openFills: open.map((f) => ({
       id: f.id,
