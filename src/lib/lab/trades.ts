@@ -522,12 +522,13 @@ function fieldSprayGroupKey(fill: Fill): string {
 
 /**
  * Same-second same-hole multi-runner BACK packs — mill field spray, not honest one-pick paper.
- * Plant VOID rows are left out (honoured separately).
+ * Scans open and settled rows. Plant VOID rows are left out (honoured separately).
  */
 export function fieldSprayFillIds(fills: readonly Fill[]): Set<string> {
   const groups = new Map<string, Fill[]>();
-  for (const f of settledFills(fills)) {
+  for (const f of fills) {
     if (f.result === "void") continue;
+    if (f.result !== "waiting" && f.result !== "won" && f.result !== "lost") continue;
     if ((f.side ?? "").toUpperCase() !== "BACK") continue;
     const key = fieldSprayGroupKey(f);
     const list = groups.get(key) ?? [];
@@ -544,7 +545,13 @@ export function fieldSprayFillIds(fills: readonly Fill[]): Set<string> {
   return out;
 }
 
-/** Settled rows that count on today's tape — no field sprays, open tickets unchanged. */
+/** Open tickets on today's tape — no field sprays. */
+export function honestOpenFills(fills: readonly Fill[]): Fill[] {
+  const sprays = fieldSprayFillIds(fills);
+  return openFills(fills).filter((f) => !sprays.has(f.id));
+}
+
+/** Settled rows that count on today's tape — no field sprays. */
 export function honestSettledFills(fills: readonly Fill[]): Fill[] {
   const sprays = fieldSprayFillIds(fills);
   return settledFills(fills).filter((f) => !sprays.has(f.id));
@@ -567,7 +574,7 @@ export type MillActivity = {
 /** Live mill tape from today's fills — same book as Trades. */
 export function millActivity(stamp: { day: string; trades?: readonly Fill[] }): MillActivity {
   const dayFills = fillsOnDay(stamp.trades ?? [], stamp.day);
-  const open = openFills(dayFills);
+  const open = honestOpenFills(dayFills);
   const settled = honestSettledFills(dayFills);
   const paperSettled = paperSettledFills(dayFills);
   const paperDayU = paperSettled.length

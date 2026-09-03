@@ -4,7 +4,7 @@ import { parseMarket, parseWindow } from "./boards.ts";
 import { EMPTY } from "./desk.ts";
 import type { LiveStamp } from "./from-digest.ts";
 import type { Fill } from "./trades.ts";
-import { openFills, settledPaperDayU } from "./trades.ts";
+import { honestOpenFills, settledPaperDayU } from "./trades.ts";
 import type { Recipe } from "./stamp.ts";
 
 export const BOARD_RESET_EPOCH = "20260902T101756Z";
@@ -196,7 +196,7 @@ export function isBoardResetView(stamp: {
   const trades = (stamp.trades ?? []) as Fill[];
   const postRecipes = recipes.filter(recipeIsPostEpoch);
   const postTrades = trades.filter(fillIsPostEpoch);
-  if (postTrades.length > 0 || openFills(postTrades).length > 0) return false;
+  if (postTrades.length > 0 || honestOpenFills(postTrades).length > 0) return false;
   const day = stamp.day ?? "";
   if (day && settledPaperDayU(postTrades, day) != null) return false;
   return (

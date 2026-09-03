@@ -10,6 +10,7 @@ import {
   dayTapePnl,
   fillDeskRow,
   fillsOnDay,
+  honestOpenFills,
   honestSettledFills,
   openFills,
   waitDeskRow,
@@ -24,7 +25,7 @@ export function Trades() {
   const plant = usePlantSource();
   const scope = useDayScope();
   const dayFills = fillsOnDay(stamp.trades, scope.day);
-  const open = openFills(dayFills);
+  const open = honestOpenFills(dayFills);
   const settled = honestSettledFills(dayFills);
   const chips = scope.lookingBack ? [] : tradesWaitChips(stamp.recipes, stamp.wait_open ?? [], open);
   const tape = dayTapePnl(settled, stamp.fuse_on);

@@ -13,6 +13,7 @@ import {
   parseWaitOpen,
   settledFills,
   honestSettledFills,
+  honestOpenFills,
   paperSettledFills,
   fieldSprayFillIds,
   settledPaperDayU,
@@ -442,6 +443,45 @@ test("field spray packs do not count as paper or appear in settled", () => {
   assert.equal(honestSettledFills(fills)[0]?.id, honest.id);
   assert.equal(settledPaperDayU(fills, "2026-09-03"), 1);
   assert.equal(settledPaperDayU(spray, "2026-09-03"), null);
+});
+
+test("field spray open packs are hidden from Open tape", () => {
+  const base = {
+    date: "2026-09-03",
+    cell_id: "H-ehole-fr-inplay-win-73339Z",
+    mode: "auto_dry",
+    status: "OPEN",
+    stake_gbp: 2,
+    placed_result: null,
+    side: "BACK",
+    ts: "2026-09-03T11:13:38Z",
+    t: "11:13:38",
+  };
+  const spray = [11.5, 6.2, 5.2, 19, 50, 26, 220, 32]
+    .map((odds, i) =>
+      fillFromRow({
+        ...base,
+        pick_id: `fr-open-spray-${i}`,
+        odds,
+      }),
+    )
+    .filter((f): f is NonNullable<typeof f> => Boolean(f));
+  const honest = fillFromRow({
+    pick_id: "gb-one-pick-open",
+    date: "2026-09-03",
+    cell_id: "H-20260903T120000Z-gb-nearoff-win-one-pick",
+    mode: "auto_dry",
+    status: "OPEN",
+    odds: 3.2,
+    stake_gbp: 2,
+    side: "BACK",
+    ts: "2026-09-03T11:20:00Z",
+    t: "11:20:00",
+  })!;
+  const fills = [...spray, honest];
+  assert.equal(honestOpenFills(fills).length, 1);
+  assert.equal(honestOpenFills(fills)[0]?.id, honest.id);
+  assert.equal(fieldSprayFillIds(fills).size, 8);
 });
 
 test("wait chips dedupe by country window market", () => {
