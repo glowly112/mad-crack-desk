@@ -23,6 +23,7 @@ import {
   tradesSettledCandidateFills,
   deskSettledTapeRollup,
   mergeMillTradesTape,
+  patchTapeWithBookSettledSigned,
   reconcileTodayTradesWithBook,
   assertMillSettledSignedPresent,
   paperSettledFills,
@@ -847,7 +848,7 @@ test("poll merge keeps SETTLED signed rows when stamp tick drops them", () => {
   assertMillSettledSignedPresent(merged, day, [{ horse: "Harb" }]);
 });
 
-test("book reconcile restores today SETTLED rows missing from stamp", () => {
+test("book patch restores SETTLED signed on tape cell scope", () => {
   const day = "2026-09-03";
   const harb = fillFromRow({
     pick_id: "harb-34829",
@@ -862,10 +863,89 @@ test("book reconcile restores today SETTLED rows missing from stamp", () => {
     side: "BACK",
     ts: "2026-09-03T14:00:00Z",
   })!;
-  const stampTrades: Fill[] = [];
-  const bookFills = [harb!];
-  const merged = reconcileTodayTradesWithBook(stampTrades, bookFills, day);
+  const openOnCell = fillFromRow({
+    pick_id: "open-34829",
+    date: day,
+    cell_id: "H-ehole-gb-latepre-win-34829Z",
+    mode: "auto_dry",
+    status: "OPEN",
+    stake_gbp: 2,
+    placed_result: null,
+    side: "BACK",
+    ts: "2026-09-03T13:00:00Z",
+  })!;
+  const merged = patchTapeWithBookSettledSigned([openOnCell!], [harb!], day);
   assertMillSettledSignedPresent(merged, day, [{ horse: "Harb" }]);
+});
+
+test("book patch does not dump full-day book.jsonl into trades tape", () => {
+  const day = "2026-09-03";
+  const tapeRow = fillFromRow({
+    pick_id: "tape-1",
+    date: day,
+    cell_id: "H-ehole-gb-nearoff-win-83959Z",
+    mode: "auto_dry",
+    status: "SETTLED",
+    paper_pnl_gbp: 2,
+    stake_gbp: 2,
+    placed_result: true,
+    side: "BACK",
+    ts: "2026-09-03T11:00:00Z",
+  })!;
+  const history = Array.from({ length: 60 }, (_, i) =>
+    fillFromRow({
+      pick_id: `hist-${i}`,
+      date: day,
+      cell_id: `H-ehole-fr-inplay-win-${String(70000 + i)}Z`,
+      mode: "auto_dry",
+      status: "SETTLED",
+      paper_pnl_gbp: -2,
+      stake_gbp: 2,
+      placed_result: false,
+      side: "BACK",
+      ts: `2026-09-03T10:${String(i).padStart(2, "0")}:00Z`,
+    })!,
+  ).filter((f): f is NonNullable<typeof f> => Boolean(f));
+  const merged = patchTapeWithBookSettledSigned([tapeRow!], history, day);
+  const rollup = deskSettledTapeRollup(merged, day);
+  assert.equal(rollup.counts?.wins, 1);
+  assert.equal(rollup.counts?.losses, 0);
+});
+
+test("poll merge rejects bloated mill stamp settled rows not on prev tape", () => {
+  const day = "2026-09-03";
+  const tapeRow = fillFromRow({
+    pick_id: "tape-1",
+    date: day,
+    cell_id: "H-ehole-gb-nearoff-win-83959Z",
+    mode: "auto_dry",
+    status: "SETTLED",
+    paper_pnl_gbp: 2,
+    stake_gbp: 2,
+    placed_result: true,
+    side: "BACK",
+    ts: "2026-09-03T11:00:00Z",
+  })!;
+  const history = Array.from({ length: 60 }, (_, i) =>
+    fillFromRow({
+      pick_id: `hist-${i}`,
+      date: day,
+      cell_id: `H-ehole-fr-inplay-win-${String(70000 + i)}Z`,
+      mode: "auto_dry",
+      status: "SETTLED",
+      paper_pnl_gbp: -2,
+      stake_gbp: 2,
+      placed_result: false,
+      side: "BACK",
+      ts: `2026-09-03T10:${String(i).padStart(2, "0")}:00Z`,
+    })!,
+  ).filter((f): f is NonNullable<typeof f> => Boolean(f));
+  const prev = [tapeRow!];
+  const next = [...history, tapeRow!];
+  const merged = mergeMillTradesTape(prev, next, day);
+  const rollup = deskSettledTapeRollup(merged, day);
+  assert.equal(rollup.counts?.wins, 1);
+  assert.equal(rollup.counts?.losses, 0);
 });
 
 test("board reset view keeps Harb and Splendid on settled tape", () => {

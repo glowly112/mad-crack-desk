@@ -710,41 +710,119 @@ export function assertDeskTapeFloorAligns(
   }
 }
 
-/** Today’s mill book wins on stamp/digest — never drop SETTLED signed rows on poll. */
+function fillTapeCell(fill: Fill): string {
+  return fill.recipeId.split("|")[0] ?? fill.recipeId;
+}
+
+/** Pick ids and hole cells already on today's desk tape — not full book.jsonl occupancy. */
+export function tapeScopeForDay(trades: readonly Fill[], day: string): {
+  pickIds: Set<string>;
+  cells: Set<string>;
+} {
+  const pickIds = new Set<string>();
+  const cells = new Set<string>();
+  for (const f of trades) {
+    if (f.day !== day) continue;
+    pickIds.add(f.id);
+    const cell = fillTapeCell(f);
+    if (cell) cells.add(cell);
+  }
+  return { pickIds, cells };
+}
+
+function tapeScopeHit(
+  fill: Fill,
+  scope: { pickIds: Set<string>; cells: Set<string> },
+): boolean {
+  return scope.pickIds.has(fill.id) || scope.cells.has(fillTapeCell(fill));
+}
+
+/**
+ * Patch today's tape from book — refresh rows already on tape; add missing mill SETTLED
+ * signed for tape pick/cell scope only. Never dump full-day book.jsonl into trades.
+ */
+export function patchTapeWithBookSettledSigned(
+  tapeTrades: readonly Fill[],
+  bookFills: readonly Fill[],
+  day: string,
+): Fill[] {
+  const byId = new Map<string, Fill>();
+  for (const f of tapeTrades) byId.set(f.id, f);
+  const scope = tapeScopeForDay(tapeTrades, day);
+
+  for (const f of bookFills) {
+    if (f.day !== day || !isMillDeskTradeFill(f)) continue;
+    const onTape = byId.has(f.id) || tapeScopeHit(f, scope);
+    if (!onTape) continue;
+    if (byId.has(f.id)) {
+      byId.set(f.id, f);
+      continue;
+    }
+    if (f.result === "waiting" || f.result === "void" || !isCountableSettledFill(f)) {
+      byId.set(f.id, f);
+      continue;
+    }
+    byId.set(f.id, f);
+    scope.pickIds.add(f.id);
+    scope.cells.add(fillTapeCell(f));
+  }
+
+  return [...byId.values()].sort((a, b) => b.ts.localeCompare(a.ts));
+}
+
+/** @deprecated use patchTapeWithBookSettledSigned */
 export function reconcileTodayTradesWithBook(
   stampTrades: readonly Fill[],
   bookFills: readonly Fill[],
   day: string,
 ): Fill[] {
-  const otherDays = stampTrades.filter((f) => f.day !== day);
-  const byId = new Map<string, Fill>();
-  for (const f of stampTrades) {
-    if (f.day === day) byId.set(f.id, f);
-  }
-  for (const f of bookFills) {
-    if (f.day !== day || !isMillDeskTradeFill(f)) continue;
-    byId.set(f.id, f);
-  }
-  return [...otherDays, ...byId.values()];
+  return patchTapeWithBookSettledSigned(stampTrades, bookFills, day);
 }
 
-/** Client poll merge — keep SETTLED signed rows if a stamp tick drops them. */
+/**
+ * Client poll merge — today's tape is canonical. Refresh opens/voids from stamp; keep
+ * SETTLED signed rows if a tick drops them; reject bloated mill history not on prev tape.
+ */
 export function mergeMillTradesTape(
   prev: readonly Fill[],
   next: readonly Fill[],
   day: string,
 ): Fill[] {
+  const prevToday = prev.filter((f) => f.day === day);
+  const prevIds = new Set(prevToday.map((f) => f.id));
   const byId = new Map<string, Fill>();
-  for (const f of next) byId.set(f.id, f);
+
   for (const f of prev) {
-    if (f.day !== day || !isCountableSettledFill(f)) continue;
-    const n = byId.get(f.id);
-    if (!n) {
+    if (f.day !== day) byId.set(f.id, f);
+  }
+  for (const f of prevToday) byId.set(f.id, f);
+
+  for (const f of next) {
+    if (f.day !== day) {
       byId.set(f.id, f);
       continue;
     }
-    if (!isCountableSettledFill(n)) byId.set(f.id, f);
+    if (prevIds.has(f.id)) {
+      byId.set(f.id, f);
+      continue;
+    }
+    if (f.result === "waiting") {
+      byId.set(f.id, f);
+      continue;
+    }
+    if (!isCountableSettledFill(f)) {
+      byId.set(f.id, f);
+      continue;
+    }
+    // Do not grow today's settled tape from a bloated mill stamp poll.
   }
+
+  for (const f of prevToday) {
+    if (!isCountableSettledFill(f)) continue;
+    const n = next.find((x) => x.day === day && x.id === f.id);
+    if (!n || !isCountableSettledFill(n)) byId.set(f.id, f);
+  }
+
   return [...byId.values()].sort((a, b) => b.ts.localeCompare(a.ts));
 }
 

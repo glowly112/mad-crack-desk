@@ -106,7 +106,27 @@ function recentFillDays(endDay: string, window = 14): Set<string> {
   return out;
 }
 
-async function readRecentFills(focalDay: string): Promise<Record<string, unknown>[]> {
+function digestTapeFills(
+  digest: Record<string, unknown>,
+  snapInner: Record<string, unknown>,
+): Record<string, unknown>[] | null {
+  if (Array.isArray(snapInner.fills) && snapInner.fills.length) {
+    return snapInner.fills as Record<string, unknown>[];
+  }
+  const snap = rec(digest.snapshot);
+  if (snap && Array.isArray(snap.fills) && snap.fills.length) {
+    return snap.fills as Record<string, unknown>[];
+  }
+  if (Array.isArray(digest.fills) && digest.fills.length) {
+    return digest.fills as Record<string, unknown>[];
+  }
+  return null;
+}
+
+async function readBookDayRows(
+  focalDay: string,
+  tailOtherDays = 120,
+): Promise<Record<string, unknown>[]> {
   const want = recentFillDays(focalDay);
   if (!want.size) return [];
   try {
@@ -132,12 +152,30 @@ async function readRecentFills(focalDay: string): Promise<Record<string, unknown
     for (const dte of [...byDay.keys()].sort()) {
       const bucket = byDay.get(dte) ?? [];
       if (dte === focalDay) fills.push(...bucket);
-      else fills.push(...bucket.slice(-120));
+      else fills.push(...bucket.slice(-tailOtherDays));
     }
     return fills;
   } catch {
     return [];
   }
+}
+
+/** Full book.jsonl for one day — patch scan only; never the Trades tape source. */
+export async function readFullBookDayFills(focalDay: string): Promise<Record<string, unknown>[]> {
+  const rows = await readBookDayRows(focalDay, 0);
+  return rows.filter((r) => r.date === focalDay);
+}
+
+async function readRecentFills(
+  focalDay: string,
+  digest: Record<string, unknown>,
+  snapInner: Record<string, unknown>,
+): Promise<Record<string, unknown>[]> {
+  const tape = digestTapeFills(digest, snapInner);
+  if (tape) return tape;
+  const book = await readBookDayRows(focalDay);
+  const focal = book.filter((r) => r.date === focalDay);
+  return focal.length ? focal.slice(-120) : book;
 }
 
 async function readWaitOpen(): Promise<Record<string, unknown>[]> {
@@ -224,7 +262,7 @@ export async function readLocalOraclePlant(): Promise<Record<string, unknown> | 
     const millTs = typeof inventMill?.ts === "string" ? inventMill.ts : "";
     const freshest = [generated, huntTs, millTs].filter(Boolean).sort().at(-1) ?? generated;
 
-    const fills = day ? await readRecentFills(day) : [];
+    const fills = day ? await readRecentFills(day, digest, snapInner) : [];
     const wait_open = await readWaitOpen();
 
     const bbbRoot = process.env.BBB_ROOT?.trim() || join(homedir(), "bbb");

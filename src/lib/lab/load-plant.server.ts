@@ -6,8 +6,8 @@ import { promisify } from "node:util";
 import liveSnap from "./live-snapshot.json" with { type: "json" };
 import { applyBoardResetView, isBoardResetView, hasLivePlantArms } from "./board-reset.ts";
 import { applySnapshot } from "./from-snapshot.ts";
-import { readLocalOraclePlant, oracleScoreboardExists } from "./oracle-local-plant.ts";
-import { parseFills, reconcileTodayTradesWithBook } from "./trades.ts";
+import { readLocalOraclePlant, oracleScoreboardExists, readFullBookDayFills } from "./oracle-local-plant.ts";
+import { parseFills, patchTapeWithBookSettledSigned } from "./trades.ts";
 import { bootStamp, digestStamp, plantFromTape, type PlantPayload } from "./plant-boot.ts";
 import type { LiveStamp } from "./from-digest.ts";
 
@@ -31,32 +31,39 @@ if day:
     d["day"] = day
 book = pathlib.Path.home() / "bbb/data/firm/live_ledger/book.jsonl"
 keys = ("pick_id","ts","settled_ts","cell_id","mode","status","odds","stake_gbp","paper_stake_gbp","paper_pnl_gbp","placed_result","certified_keep","gate_verdict","side","lab_status","date","unmatched","unmatched_size","atb_size_gbp","phase","in_play","off_ts","off_time","horse","runner","horse_name","runner_name","selection_name","sel_name")
-want = set()
-try:
-    end = date.fromisoformat(str(day))
-    want = {(end - timedelta(days=i)).isoformat() for i in range(14)}
-except Exception:
+tape = d.get("fills")
+if not isinstance(tape, list):
+    snap = d.get("snapshot") if isinstance(d.get("snapshot"), dict) else {}
+    tape = snap.get("fills") if isinstance(snap.get("fills"), list) else []
+if tape:
+    d["fills"] = tape
+else:
     want = set()
-by = defaultdict(list)
-if book.exists() and want:
-    for line in book.read_text().splitlines():
-        if not line.strip():
-            continue
-        try:
-            row = json.loads(line)
-        except Exception:
-            continue
-        dte = row.get("date")
-        if dte in want:
-            by[dte].append({k: row.get(k) for k in keys})
-fills = []
-for dte in sorted(by):
-    bucket = by[dte]
-    if dte == day:
-        fills.extend(bucket)
-    else:
-        fills.extend(bucket[-120:])
-d["fills"] = fills
+    try:
+        end = date.fromisoformat(str(day))
+        want = {(end - timedelta(days=i)).isoformat() for i in range(14)}
+    except Exception:
+        want = set()
+    by = defaultdict(list)
+    if book.exists() and want:
+        for line in book.read_text().splitlines():
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except Exception:
+                continue
+            dte = row.get("date")
+            if dte in want:
+                by[dte].append({k: row.get(k) for k in keys})
+    fills = []
+    for dte in sorted(by):
+        bucket = by[dte]
+        if dte == day:
+            fills.extend(bucket[-120:])
+        else:
+            fills.extend(bucket[-120:])
+    d["fills"] = fills
 wait_open = []
 lf = pathlib.Path.home() / "bbb/data/firm/lab/latest/live_fast_auto.json"
 if lf.exists():
@@ -239,13 +246,13 @@ function fromLiveFile(base: LiveStamp): PlantPayload {
 
 async function finishOraclePayload(hit: PlantPayload): Promise<PlantPayload> {
   let stamp = applyBoardResetView(hit.stamp);
-  if (stamp.source === "oracle" && (await oracleScoreboardExists())) {
-    const local = await readLocalOraclePlant();
-    if (local && Array.isArray(local.fills) && local.fills.length) {
-      const bookFills = parseFills(local.fills);
+  if (stamp.source === "oracle" && stamp.day && (await oracleScoreboardExists())) {
+    const bookRows = await readFullBookDayFills(stamp.day);
+    if (bookRows.length) {
+      const bookFills = parseFills(bookRows);
       stamp = applyBoardResetView({
         ...stamp,
-        trades: reconcileTodayTradesWithBook(stamp.trades, bookFills, stamp.day),
+        trades: patchTapeWithBookSettledSigned(stamp.trades, bookFills, stamp.day),
       });
     }
   }
