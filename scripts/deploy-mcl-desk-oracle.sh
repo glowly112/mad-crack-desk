@@ -17,6 +17,11 @@ export DESK_BASEPATH=/desk
 export NITRO_PRESET=node-server
 npm run build
 
+if [ ! -f .output/server/index.mjs ]; then
+  echo "missing .output/server/index.mjs — ensure NITRO_PRESET=node-server" >&2
+  exit 1
+fi
+
 tar czf /tmp/mcl-desk-out.tar.gz .output
 scp "${SSH_OPTS[@]}" /tmp/mcl-desk-out.tar.gz "$HOST:~/mcl-desk/mcl-desk-out.tar.gz"
 
