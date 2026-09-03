@@ -8,10 +8,10 @@ import { usePlantSource, useStamp } from "@/components/plant-context";
 import { axisDay, EMPTY, type DeskGroup } from "@/lib/lab/desk";
 import {
   dayTapePnl,
+  deskSettledTapeRollup,
   fillDeskRow,
   fillsOnDay,
-  honestFirstBookOpenFills,
-  tradesSettledTapeFills,
+  tradesMillOpenFills,
   tradesSettledVoidFills,
   waitDeskRow,
   tradesWaitChips,
@@ -25,8 +25,9 @@ export function Trades() {
   const plant = usePlantSource();
   const scope = useDayScope();
   const dayFills = fillsOnDay(stamp.trades, scope.day);
-  const open = honestFirstBookOpenFills(dayFills, stamp.recipes);
-  const settled = tradesSettledTapeFills(dayFills, stamp.recipes);
+  const rollup = deskSettledTapeRollup(stamp.trades, scope.day, stamp.recipes);
+  const open = tradesMillOpenFills(stamp.trades, scope.day, stamp.recipes);
+  const settled = rollup.fills;
   const voided = tradesSettledVoidFills(dayFills, stamp.recipes);
   const chips = scope.lookingBack ? [] : tradesWaitChips(stamp.recipes, stamp.wait_open ?? [], open);
   const tape = dayTapePnl(settled, stamp.fuse_on);

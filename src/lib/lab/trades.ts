@@ -4,6 +4,7 @@ import {
   isPostEpochEholeMeasuring,
   isPostEpochEholeRecipe,
   recipeIsPostEpoch,
+  fillIsPostEpoch,
 } from "./board-reset.ts";
 import {
   eholeChipRunOrder,
@@ -102,9 +103,15 @@ function bookOf(row: Record<string, unknown>): FillBook {
 
 function resultOf(row: Record<string, unknown>): FillResult {
   const status = String(row.status || "").toUpperCase();
-  if (status === "VOID") return "void";
   if (status === "OPEN" || status === "PENDING" || status === "WAITING" || status === "UNMATCHED") {
     return "waiting";
+  }
+  if (status === "VOID") return "void";
+  const signedPnl = pnlInU(row);
+  if (signedPnl != null && signedPnl !== 0) {
+    if (row.placed_result === true) return "won";
+    if (row.placed_result === false) return "lost";
+    return signedPnl > 0 ? "won" : "lost";
   }
   if (row.placed_result === true) return "won";
   if (row.placed_result === false) return "lost";
@@ -213,9 +220,9 @@ export function bookWord(book: FillBook): "paper" | "live" {
 
 export function fillResultWord(fill: Fill): string {
   if (fill.result === "waiting") return "Open";
-  if (fill.result === "void" || fill.pnl == null || fill.pnl === 0) return "Void";
-  if (fill.pnl > 0) return "Won";
-  if (fill.pnl < 0) return "Lost";
+  const pnl = fill.pnl;
+  if (pnl != null && pnl !== 0) return pnl > 0 ? "Won" : "Lost";
+  if (fill.result === "void" || pnl == null || pnl === 0) return "Void";
   return EMPTY;
 }
 
@@ -512,12 +519,27 @@ export function honestSettledFills(fills: readonly Fill[], _recipes: readonly Re
   return settledFills(fills).filter((f) => !junk.has(f.id));
 }
 
-/** Trades › Settled candidates — post-epoch first-book, Hyde/fast off. No junk peel. */
+/** Today's mill tape row — post-reset, Hyde/fast legacy off; no first-book archaeology. */
+export function isMillTapeFill(fill: Fill): boolean {
+  if (/^H-hyde-/i.test(fill.recipeId) || /^H-fast-/i.test(fill.recipeId)) return false;
+  return fillIsPostEpoch(fill);
+}
+
+/** Trades › Settled / Void candidates — mirror mill status for today, not stamp archaeology. */
 export function tradesSettledCandidateFills(
   fills: readonly Fill[],
   _recipes: readonly Recipe[] = [],
 ): Fill[] {
-  return settledFills(fills).filter(isFirstBookPaperFill);
+  return settledFills(fills).filter(isMillTapeFill);
+}
+
+/** Trades › Open — mill OPEN rows on today's tape. */
+export function tradesMillOpenFills(
+  fills: readonly Fill[],
+  day: string,
+  recipes: readonly Recipe[] = [],
+): Fill[] {
+  return honestOpenFills(fillsOnDay(fills, day), recipes).filter(isMillTapeFill);
 }
 
 /** Trades settled — Hyde / fast / legacy morning tape hidden. */
@@ -568,12 +590,12 @@ export function isCountableSettledFill(fill: Fill): boolean {
   return true;
 }
 
-/** Trades open — post-epoch ehole first-books only. */
+/** Trades open — today's mill tape, Hyde/fast off. */
 export function honestFirstBookOpenFills(
   fills: readonly Fill[],
   recipes: readonly Recipe[] = [],
 ): Fill[] {
-  return honestOpenFills(fills, recipes).filter(isFirstBookTapeFill);
+  return honestOpenFills(fills, recipes).filter(isMillTapeFill);
 }
 
 /** Paper settles that contribute to the day u total. */
@@ -625,15 +647,61 @@ export function fmtWinLoseCounts(counts: SettledTradeCounts | null): string {
   return `${counts.wins} win · ${counts.losses} lose`;
 }
 
+/** One roll-up for Trades › Settled, Floor paper tile, Trades header, and Office. */
+export type DeskSettledTapeRollup = {
+  fills: Fill[];
+  u: number | null;
+  counts: SettledTradeCounts | null;
+  countsLine: string;
+};
+
+/** Signed settles on the desk tape — never stamp trends or mill occupancy. */
+export function deskSettledTapeRollup(
+  trades: readonly Fill[],
+  day: string,
+  recipes: readonly Recipe[] = [],
+): DeskSettledTapeRollup {
+  const fills = tradesSettledTapeFills(fillsOnDay(trades, day), recipes);
+  const counts = settledTradeCountsFromFills(fills);
+  const u = fills.length ? fills.reduce((acc, f) => acc + (f.pnl ?? 0), 0) : null;
+  return {
+    fills,
+    u,
+    counts,
+    countsLine: fmtWinLoseCounts(counts),
+  };
+}
+
+/** Floor tile win·lose/u must match Trades › Settled — throws when they diverge. */
+export function assertDeskTapeFloorAligns(
+  trades: readonly Fill[],
+  day: string,
+  recipes: readonly Recipe[],
+  floorU: number | null,
+  floorCounts: SettledTradeCounts | null,
+): void {
+  const rollup = deskSettledTapeRollup(trades, day, recipes);
+  const wonOnTape = rollup.fills.filter((f) => (f.pnl ?? 0) > 0).length;
+  if (floorU !== rollup.u) {
+    throw new Error(`Floor u ${floorU} !== tape ${rollup.u}`);
+  }
+  if (
+    floorCounts?.wins !== rollup.counts?.wins ||
+    floorCounts?.losses !== rollup.counts?.losses
+  ) {
+    throw new Error(
+      `Floor ${floorCounts?.wins} win · ${floorCounts?.losses} lose !== tape ${rollup.counts?.wins} win · ${rollup.counts?.losses} lose (${wonOnTape} Won rows)`,
+    );
+  }
+}
+
 /** Settled paper u for one day — Floor tile and Office row sum. Same tape as Trades settled. */
 export function settledPaperDayU(
   trades: readonly Fill[],
   day: string,
   recipes: readonly Recipe[] = [],
 ): number | null {
-  const paper = tradesSettledTapeFills(fillsOnDay(trades, day), recipes);
-  if (!paper.length) return null;
-  return paper.reduce((acc, f) => acc + (f.pnl ?? 0), 0);
+  return deskSettledTapeRollup(trades, day, recipes).u;
 }
 
 /** Win · lose counts for today's settled first-book — same tape as settledPaperDayU. */
@@ -642,7 +710,7 @@ export function settledPaperDayCounts(
   day: string,
   recipes: readonly Recipe[] = [],
 ): SettledTradeCounts | null {
-  return settledTradeCountsFromFills(tradesSettledTapeFills(fillsOnDay(trades, day), recipes));
+  return deskSettledTapeRollup(trades, day, recipes).counts;
 }
 
 /** Settled first-book production fills — same tape rules as paper. */
@@ -737,15 +805,14 @@ export function fillTradeName(fill: Fill, recipes: readonly Recipe[] = []): stri
   return tradeName(fill, recipeForFill(recipes, fill));
 }
 
-/** Day's tape totals. Paper/production Empty when that book has no fills. Live is 0 while fuse off. */
+/** Day's tape totals from signed settles — paper line is full tape u (all books). */
 export function dayTapePnl(fills: readonly Fill[], fuseOn: boolean) {
-  const paper = fills.filter((f) => f.book === "paper");
+  const sum = (rows: readonly Fill[]) =>
+    rows.length ? rows.reduce((acc, f) => acc + (f.pnl ?? 0), 0) : null;
   const production = fills.filter((f) => f.book === "production");
   const live = fills.filter((f) => f.book === "live");
-  const sum = (rows: Fill[]) =>
-    rows.length ? rows.reduce((acc, f) => acc + (f.pnl ?? 0), 0) : null;
   return {
-    paper: sum(paper),
+    paper: sum(fills),
     production: sum(production),
     live: fuseOn ? sum(live) : 0,
   };

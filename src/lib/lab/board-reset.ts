@@ -4,7 +4,7 @@ import { parseMarket, parseWindow } from "./boards.ts";
 import { EMPTY, scrubPostResetTrendPaper } from "./desk.ts";
 import type { LiveStamp } from "./from-digest.ts";
 import type { Fill } from "./trades.ts";
-import { honestFirstBookOpenFills, settledPaperDayU, isFirstBookTapeFill } from "./trades.ts";
+import { honestFirstBookOpenFills, settledPaperDayU, isFirstBookTapeFill, deskSettledTapeRollup } from "./trades.ts";
 import type { Recipe } from "./stamp.ts";
 
 export const BOARD_RESET_EPOCH = "20260902T101756Z";
@@ -128,10 +128,11 @@ function filterWaitOpen(
 export function filterPreEpochLeftovers(stamp: LiveStamp): LiveStamp {
   const recipes = stamp.recipes.filter(recipeIsPostEpoch);
   const solids = recipes.filter((r) => r.badge === "Solid");
-  const trades = stamp.trades.filter((f) => fillIsPostEpoch(f) && isFirstBookTapeFill(f));
+  /** Full post-epoch tape — Trades/Floor count here; do not peel isFirstBookTapeFill. */
+  const trades = stamp.trades.filter((f) => fillIsPostEpoch(f));
   const wait_open = filterWaitOpen(stamp.wait_open ?? [], stamp.recipes, recipes);
   const holes = stamp.holes.filter((h) => h.tone !== "parked");
-  const firstBookPaper = settledPaperDayU(trades, stamp.day, recipes);
+  const firstBookPaper = deskSettledTapeRollup(trades, stamp.day, recipes).u;
 
   const trends = scrubPostResetTrendPaper(
     stamp.trends.filter((t) => t.day >= BOARD_RESET_DAY).map((t) =>
@@ -318,7 +319,8 @@ function boardResetSeatNow(seatId: string): string {
  * When n_armed is zero, paint the empty morning board.
  */
 function overlayPaperTape(stamp: LiveStamp): LiveStamp {
-  const paperU = settledPaperDayU(stamp.trades, stamp.day, stamp.recipes);
+  const rollup = deskSettledTapeRollup(stamp.trades, stamp.day, stamp.recipes);
+  const paperU = rollup.u;
   if (paperU == null) {
     return {
       ...stamp,

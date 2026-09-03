@@ -38,7 +38,9 @@ except Exception:
     want = set()
 by = defaultdict(list)
 if book.exists() and want:
-    for line in book.read_text().splitlines()[-4000:]:
+    lines = book.read_text().splitlines()
+    tail = lines[-20000:] if len(lines) > 20000 else lines
+    for line in tail:
         if not line.strip():
             continue
         try:
@@ -50,7 +52,11 @@ if book.exists() and want:
             by[dte].append({k: row.get(k) for k in keys})
 fills = []
 for dte in sorted(by):
-    fills.extend(by[dte][-80:])
+    bucket = by[dte]
+    if dte == day:
+        fills.extend(bucket)
+    else:
+        fills.extend(bucket[-120:])
 d["fills"] = fills
 wait_open = []
 lf = pathlib.Path.home() / "bbb/data/firm/lab/latest/live_fast_auto.json"

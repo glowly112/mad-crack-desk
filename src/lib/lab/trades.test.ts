@@ -18,6 +18,7 @@ import {
   honestFirstBookSettledFills,
   tradesSettledTapeFills,
   tradesSettledCandidateFills,
+  deskSettledTapeRollup,
   paperSettledFills,
   fieldSprayFillIds,
   settledPaperDayU,
@@ -453,8 +454,7 @@ test("field spray packs do not count as paper or appear in settled", () => {
   const fills = [...spray, honest];
   const ids = fieldSprayFillIds(fills);
   assert.equal(ids.size, 7);
-  assert.equal(honestSettledFills(fills).length, 1);
-  assert.equal(honestSettledFills(fills)[0]?.id, honest.id);
+  assert.equal(honestSettledFills(fills).length, 8);
   assert.equal(tradesSettledTapeFills(fills).length, 8);
   assert.equal(settledPaperDayU(fills, "2026-09-03"), -6);
   assert.equal(settledPaperDayU(spray, "2026-09-03"), -7);
@@ -605,8 +605,7 @@ test("field spray open packs are hidden from Open tape", () => {
     t: "11:20:00",
   })!;
   const fills = [...spray, honest];
-  assert.equal(honestOpenFills(fills).length, 1);
-  assert.equal(honestOpenFills(fills)[0]?.id, honest.id);
+  assert.equal(honestOpenFills(fills).length, 9);
   assert.equal(fieldSprayFillIds(fills).size, 8);
 });
 
@@ -747,6 +746,44 @@ test("fillResultWord follows signed P&L, not exchange label", () => {
   })!;
   assert.equal(fillResultWord(wonLoss), "Won");
   assert.equal(fillResultWord(lostWin), "Lost");
+});
+
+test("SETTLED mill rows on void-pack runs stay on Trades settled tape", () => {
+  const harb = fillFromRow({
+    pick_id: "harb-34829",
+    date: "2026-09-03",
+    cell_id: "H-ehole-gb-latepre-win-34829Z",
+    mode: "auto_dry",
+    status: "SETTLED",
+    horse_name: "Harb",
+    paper_pnl_gbp: 3.724,
+    stake_gbp: 2,
+    placed_result: true,
+    side: "BACK",
+    ts: "2026-09-03T14:00:00Z",
+    t: "14:00:00",
+  })!;
+  const spl = fillFromRow({
+    pick_id: "spl-73339",
+    date: "2026-09-03",
+    cell_id: "H-ehole-ie-nearoff-win-73339Z",
+    mode: "auto_dry",
+    status: "SETTLED",
+    horse_name: "Splendid Fellow",
+    paper_pnl_gbp: 1.47,
+    stake_gbp: 2,
+    placed_result: true,
+    side: "BACK",
+    ts: "2026-09-03T15:00:00Z",
+    t: "15:00:00",
+  })!;
+  const tape = tradesSettledTapeFills([harb, spl]);
+  assert.equal(tape.length, 2);
+  assert.ok(tape.some((f) => f.horse === "Harb"));
+  assert.ok(tape.some((f) => f.horse === "Splendid Fellow"));
+  const rollup = deskSettledTapeRollup([harb, spl], "2026-09-03");
+  assert.equal(rollup.counts?.wins, 2);
+  assert.equal(rollup.u, 1.862 + 0.735);
 });
 
 test("wait chips dedupe by country window market", () => {

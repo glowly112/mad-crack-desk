@@ -189,11 +189,11 @@ export function squareOpenFillsForPaint(fills: readonly Fill[]): Fill[] {
   return fills.filter((f) => f.result === "waiting" && !isMillVoidPackFill(f));
 }
 
-/** Trades tape + paper u — only the three mill-voided packs, not first-book waits. */
+/** Trades tape + paper u — only VOID mill-void packs; SETTLED signed rows stay on tape. */
 export function junkFillIds(fills: readonly Fill[]): Set<string> {
   const out = new Set<string>();
   for (const f of fills) {
-    if (isMillVoidPackFill(f)) out.add(f.id);
+    if (f.result === "void" && isMillVoidPackFill(f)) out.add(f.id);
   }
   return out;
 }

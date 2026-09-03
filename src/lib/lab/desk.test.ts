@@ -30,6 +30,7 @@ import {
   solidRows,
 } from "./desk.ts";
 import { STAMP } from "./stamp.ts";
+import { assertDeskTapeFloorAligns, deskSettledTapeRollup, fillFromRow } from "./trades.ts";
 
 test("empty copy is Empty, not a skeleton", () => {
   assert.equal(EMPTY, "Empty");
@@ -247,4 +248,45 @@ test("Floor paper chart uses first-book tape on post-reset days", () => {
   assert.equal(floorFactDayValue(stamp, "paper", "2026-09-03"), null);
   const scrubbed = scrubPostResetTrendPaper(stamp.trends, [], stamp.recipes);
   assert.equal(scrubbed.find((t) => t.day === "2026-09-03")?.paper_live_day_u, null);
+});
+
+test("Floor paper tile matches Trades settled tape roll-up", () => {
+  const harb = fillFromRow({
+    pick_id: "harb-34829",
+    date: "2026-09-03",
+    cell_id: "H-ehole-gb-latepre-win-34829Z",
+    mode: "auto_dry",
+    status: "SETTLED",
+    horse_name: "Harb",
+    paper_pnl_gbp: 3.724,
+    stake_gbp: 2,
+    placed_result: true,
+    side: "BACK",
+    ts: "2026-09-03T14:00:00Z",
+  })!;
+  const spl = fillFromRow({
+    pick_id: "spl-73339",
+    date: "2026-09-03",
+    cell_id: "H-ehole-ie-nearoff-win-73339Z",
+    mode: "auto_dry",
+    status: "SETTLED",
+    horse_name: "Splendid Fellow",
+    paper_pnl_gbp: 1.47,
+    stake_gbp: 2,
+    placed_result: true,
+    side: "BACK",
+    ts: "2026-09-03T15:00:00Z",
+  })!;
+  const trades = [harb!, spl!];
+  const day = "2026-09-03";
+  const rollup = deskSettledTapeRollup(trades, day, []);
+  const facts = floorFacts(
+    { ...STAMP, day, trades, trends: STAMP.trends },
+    { day, lookingBack: false },
+    0,
+  );
+  const paper = facts.find((f) => f.id === "paper");
+  assert.equal(paper?.value, rollup.u);
+  assert.equal(paper?.countsLine, rollup.countsLine);
+  assertDeskTapeFloorAligns(trades, day, [], paper?.value ?? null, rollup.counts);
 });

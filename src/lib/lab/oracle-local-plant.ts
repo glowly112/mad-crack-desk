@@ -106,13 +106,15 @@ function recentFillDays(endDay: string, window = 14): Set<string> {
   return out;
 }
 
-async function readRecentFills(day: string): Promise<Record<string, unknown>[]> {
-  const want = recentFillDays(day);
+async function readRecentFills(focalDay: string): Promise<Record<string, unknown>[]> {
+  const want = recentFillDays(focalDay);
   if (!want.size) return [];
   try {
     const text = await readFile(bookPath(), "utf8");
+    const lines = text.split("\n");
     const byDay = new Map<string, Record<string, unknown>[]>();
-    for (const line of text.split("\n").slice(-4000)) {
+    const tail = lines.length > 20000 ? lines.slice(-20000) : lines;
+    for (const line of tail) {
       if (!line.trim()) continue;
       try {
         const row = JSON.parse(line) as Record<string, unknown>;
@@ -129,7 +131,9 @@ async function readRecentFills(day: string): Promise<Record<string, unknown>[]> 
     }
     const fills: Record<string, unknown>[] = [];
     for (const dte of [...byDay.keys()].sort()) {
-      fills.push(...(byDay.get(dte) ?? []).slice(-80));
+      const bucket = byDay.get(dte) ?? [];
+      if (dte === focalDay) fills.push(...bucket);
+      else fills.push(...bucket.slice(-120));
     }
     return fills;
   } catch {

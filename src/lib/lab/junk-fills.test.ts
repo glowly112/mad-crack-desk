@@ -73,6 +73,25 @@ test("mill-voided ZA 73506Z does not count as paper lost", () => {
   assert.equal(settledPaperDayU([voidSpray], "2026-09-03"), null);
 });
 
+test("mill VOID pack run does not peel SETTLED signed rows from junk", () => {
+  const settledGb = fillFromRow({
+    pick_id: "gb-harb",
+    date: "2026-09-03",
+    cell_id: "H-ehole-gb-latepre-win-34829Z",
+    mode: "auto_dry",
+    status: "SETTLED",
+    horse_name: "Harb",
+    paper_pnl_gbp: 3.724,
+    stake_gbp: 2,
+    placed_result: true,
+    side: "BACK",
+    ts: "2026-09-03T14:00:00Z",
+  })!;
+  assert.equal(isMillVoidPackFill(settledGb), true);
+  assert.equal(junkFillIds([settledGb]).has(settledGb.id), false);
+  assert.equal(honestSettledFills([settledGb]).length, 1);
+});
+
 test("mill VOID scrubs kill tone on voided junk holes — not later-race kill", () => {
   const voidGb = fillFromRow({
     pick_id: "gb-void",

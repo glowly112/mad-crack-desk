@@ -2,7 +2,7 @@
 
 import type { Move, Recipe, TrendPoint } from "./stamp.ts";
 import { BOARD_RESET_DAY } from "./board-reset.ts";
-import { fmtWinLoseCounts, settledPaperDayCounts, settledPaperDayU } from "./trades.ts";
+import { deskSettledTapeRollup } from "./trades.ts";
 
 export const EMPTY = "Empty";
 /** Open or armed but not finished — not the same as unused. */
@@ -137,13 +137,13 @@ export function floorDayValue(id: FloorFactId, point: TrendPoint | undefined): n
   return null;
 }
 
-/** Paper u for one day — post-reset from first-book tape only, never hero leftovers. */
+/** Paper u for one day — post-reset from tape roll-up only, never hero or mill stamp. */
 export function floorPaperForDay(
   stamp: Pick<FloorStamp, "trades" | "recipes" | "trends">,
   day: string,
 ): number | null {
   if (day >= BOARD_RESET_DAY) {
-    return settledPaperDayU(stamp.trades ?? [], day, stamp.recipes);
+    return deskSettledTapeRollup(stamp.trades ?? [], day, stamp.recipes).u;
   }
   const trend = stamp.trends.find((t) => t.day === day);
   return trend?.paper_live_day_u ?? null;
@@ -159,7 +159,7 @@ export function floorFactDayValue(
   return floorDayValue(fact, point);
 }
 
-/** Post-reset trend rows — paper_live_day_u from first-book tape, not hero day_u. */
+/** Post-reset trend rows — paper_live_day_u from tape roll-up, not mill stamp. */
 export function scrubPostResetTrendPaper(
   trends: readonly TrendPoint[],
   trades: readonly import("./trades.ts").Fill[],
@@ -167,7 +167,7 @@ export function scrubPostResetTrendPaper(
 ): TrendPoint[] {
   return trends.map((t) => {
     if (t.day < BOARD_RESET_DAY) return t;
-    return { ...t, paper_live_day_u: settledPaperDayU(trades, t.day, recipes) };
+    return { ...t, paper_live_day_u: deskSettledTapeRollup(trades, t.day, recipes).u };
   });
 }
 
@@ -178,10 +178,13 @@ export function floorFacts(
   emptyHoles: number,
 ): FloorFact[] {
   const trend = stamp.trends.find((t) => t.day === scope.day);
-  const tapePaper = settledPaperDayU(stamp.trades ?? [], scope.day, stamp.recipes);
-  const tapePaperCounts = settledPaperDayCounts(stamp.trades ?? [], scope.day, stamp.recipes);
+  const rollup =
+    scope.day >= BOARD_RESET_DAY
+      ? deskSettledTapeRollup(stamp.trades ?? [], scope.day, stamp.recipes)
+      : null;
+  const tapePaper = rollup?.u ?? null;
   const paperCountsLine =
-    tapePaperCounts != null ? fmtWinLoseCounts(tapePaperCounts) : null;
+    rollup?.counts != null ? rollup.countsLine : null;
   const dayHint = axisDay(scope.day);
   const nKeep = trend?.n_keep ?? 0;
 
