@@ -255,6 +255,81 @@ function countEholeArms(cells: Record<string, unknown>[]): number {
   return alive.size;
 }
 
+/** Post-epoch occupancy from factory empty-hole hunt — not every MEASURING cell on the board. */
+function holesFromOccupancyPostEpoch(
+  snap: Record<string, unknown>,
+  cells: Record<string, unknown>[],
+): LiveStamp["holes"] | null {
+  const occRec =
+    rec(snap.occupancy_post_epoch) ??
+    rec(rec(snap.empty_hole_hunt)?.occupancy_post_epoch) ??
+    rec(rec(snap.factory_empty_hole_hunt)?.occupancy_post_epoch);
+  const list = occRec?.occupied_cells;
+  if (!Array.isArray(list) || !list.length) return null;
+
+  const map = new Map<string, LiveStamp["holes"][number]>();
+  const cellByHole = new Map<string, Record<string, unknown>>();
+  for (const c of cells) {
+    if (!cellPaintsSquare(c)) continue;
+    for (const h of holePlacementsFromCell(c)) {
+      cellByHole.set(`${h.region}|${h.window}|${h.market}`, c);
+    }
+  }
+
+  for (const key of list) {
+    const parts = String(key).split("|");
+    if (parts.length !== 3) continue;
+    const region = parts[0].toUpperCase();
+    if (!(REGIONS as readonly string[]).includes(region)) continue;
+    const window = parseWindow(parts[1]) ?? parseWindow(parts[1].replace(/_/g, " "));
+    const market = parseMarket(parts[2]);
+    if (!window || !market) continue;
+    const holeKey = `${region}|${window}|${market}`;
+    const cell = cellByHole.get(String(key)) ?? cellByHole.get(holeKey);
+    const status = cell ? statusOf(cell) : "MEASURING";
+    map.set(holeKey, {
+      region,
+      window,
+      market,
+      tone: holeToneFromStatus(status),
+    });
+  }
+
+  for (const c of cells) {
+    if (!cellIsPostEpochEhole(c)) continue;
+    if (statusOf(c) !== "KILL") continue;
+    for (const h of holePlacementsFromCell(c)) {
+      const key = `${h.region}|${h.window}|${h.market}`;
+      map.set(key, h);
+    }
+  }
+
+  return map.size ? [...map.values()] : null;
+}
+
+function armedFromSnap(
+  snap: Record<string, unknown>,
+  plantOracle: boolean,
+  millParked: boolean,
+  eholeArms: number,
+): { mill_n_armed?: number; n_armed?: number } {
+  const snapArmed = int(snap.n_armed) ?? int(snap.mill_n_armed);
+  if (millParked && snapArmed != null && snapArmed > 0) {
+    const mill = int(snap.mill_n_armed);
+    return {
+      mill_n_armed: mill != null && mill > 0 ? mill : snapArmed,
+      n_armed: snapArmed,
+    };
+  }
+  if (plantOracle && eholeArms > 0) {
+    return { mill_n_armed: eholeArms, n_armed: eholeArms };
+  }
+  return {
+    mill_n_armed: int(snap.mill_n_armed) ?? undefined,
+    n_armed: int(snap.n_armed) ?? undefined,
+  };
+}
+
 /**
  * Overlay a live oracle snapshot (Linear / local_api / firm scoreboard) onto a
  * digest-applied stamp. Never treats KEEP paper (pnlTotal) as the production score.
@@ -316,7 +391,8 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
   const solids = recipes.filter((r) => r.badge === "Solid");
   const n_solid = nSolidExplicit ?? (recipes.length ? solids.length : base.n_solid);
   const cellList = cellsOf(snap);
-  const namedHoles = holesFromCells(cellList);
+  const occupancyHoles = isPlantSnap(opened) ? holesFromOccupancyPostEpoch(snap, cellList) : null;
+  const namedHolesFromCells = holesFromCells(cellList);
   const eholeArms = countEholeArms(cellList);
 
   const date =
@@ -336,6 +412,8 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
   const inventCaption = plantOracle ? inventCaptionFromSnap(snap) : null;
   const inventWhy = inventCaption ?? base.office.inventWhy;
   const inventOn = inventCaption ? inventIsOn(inventCaption) : base.office.invent;
+  const millParked = plantOracle && isMillParked(snap, inventCaption);
+  const armed = armedFromSnap(snap, plantOracle, millParked, eholeArms);
 
   const trends = base.trends.map((t) => {
     if (t.day !== date) return t;
@@ -354,8 +432,8 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
     day: date,
     generated,
     source: "oracle",
-    mill_n_armed: plantOracle && eholeArms > 0 ? eholeArms : int(snap.mill_n_armed),
-    n_armed: plantOracle && eholeArms > 0 ? eholeArms : int(snap.n_armed),
+    mill_n_armed: armed.mill_n_armed,
+    n_armed: armed.n_armed,
     n_solid,
     fuse_on,
     fuse: fuse_on ? "Real betting: ON" : "Real betting: OFF",
@@ -389,10 +467,10 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
     trades: Array.isArray(snap.fills) ? parseFills(snap.fills) : base.trades,
     wait_open: Array.isArray(snap.wait_open) ? parseWaitOpen(snap.wait_open) : (base.wait_open ?? []),
     holes: plantOracle
-      ? namedHoles.length
-        ? namedHoles
+      ? (occupancyHoles ?? namedHolesFromCells).length
+        ? occupancyHoles ?? namedHolesFromCells
         : holesFromSnap(snap) ?? []
-      : holesFromSnap(snap) ?? (namedHoles.length ? namedHoles : base.holes),
+      : holesFromSnap(snap) ?? (namedHolesFromCells.length ? namedHolesFromCells : base.holes),
     office: {
       ...base.office,
       invent: inventOn,
@@ -487,6 +565,16 @@ function inventCaptionFromSnap(snap: Record<string, unknown>): string | null {
 
 function inventIsOn(caption: string): boolean {
   return /invent on|empty-hole hunt on|invent_empty/i.test(caption);
+}
+
+function isMillParked(snap: Record<string, unknown>, inventCaption: string | null): boolean {
+  if (inventCaption && /mill parked/i.test(inventCaption)) return true;
+  const modes = [
+    snap.mill_mode,
+    rec(snap.invent_mill)?.mill_mode,
+    rec(snap.empty_hole_hunt)?.mill_mode,
+  ];
+  return modes.some((m) => String(m ?? "").toLowerCase() === "parked");
 }
 
 function plantLineFromInvent(caption: string): string {

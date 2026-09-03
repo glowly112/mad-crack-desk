@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { applyDigest, type Digest } from "./from-digest.ts";
+import { applyDigest, type Digest, type LiveStamp } from "./from-digest.ts";
 import { applySnapshot } from "./from-snapshot.ts";
 import { productionScore } from "./hero.ts";
 import { STAMP } from "./stamp.ts";
@@ -273,6 +273,8 @@ test("oracle snapshot invent replaces bundled digest densify plantLine", () => {
       summary: { by_status: { KEEP: 1, MEASURING: 54, HUNTING: 6, KILL: 4 } },
       invent: "empty-hole hunt on · invent_empty_holes · mill parked",
       invent_mode: "invent_empty_holes",
+      mill_mode: "parked",
+      n_armed: 23,
       ts: "20260903T013706Z",
       cells: [],
     },
@@ -283,4 +285,51 @@ test("oracle snapshot invent replaces bundled digest densify plantLine", () => {
   assert.ok(!/densify/i.test(live.plantLine));
   assert.match(live.office.inventWhy, /invent_empty_holes/);
   assert.equal(live.office.invent, true);
+  assert.equal((live as LiveStamp & { n_armed?: number }).n_armed, 23);
+  assert.equal((live as LiveStamp & { mill_n_armed?: number }).mill_n_armed, 23);
+});
+
+test("mill parked uses occupancy_post_epoch holes and invent n_armed not all measuring cells", () => {
+  const live = applySnapshot(
+    {
+      truth: { keep: 1, measuring: 54, gathering: 6, dropped: 4 },
+      mill_mode: "parked",
+      n_armed: 23,
+      invent: "empty-hole hunt on · invent_empty_holes · mill parked",
+      occupancy_post_epoch: {
+        n_occupied_cells: 26,
+        occupied_cells: ["GB|morning|WIN", "GB|near_off|WIN", "AU|morning|WIN"],
+      },
+      cells: [
+        {
+          id: "H-ehole-gb-morning-win-02634Z",
+          title: "GB morning WIN",
+          status: "MEASURING",
+          country_scope: ["GB"],
+          window_scope: ["morning"],
+          market_type: "WIN",
+        },
+        {
+          id: "H-ehole-gb-latepre-win-34829Z",
+          title: "GB late-pre WIN",
+          status: "MEASURING",
+          country_scope: ["GB"],
+          window_scope: ["late_pre"],
+          market_type: "WIN",
+        },
+        {
+          id: "H-ehole-au-morning-win-02927Z",
+          title: "AU morning WIN",
+          status: "MEASURING",
+          country_scope: ["AU"],
+          window_scope: ["morning"],
+          market_type: "WIN",
+        },
+      ],
+    },
+    base(),
+  );
+  assert.equal((live as LiveStamp & { n_armed?: number }).n_armed, 23);
+  assert.equal(live.holes?.length, 3);
+  assert.ok(live.holes?.every((h) => ["GB", "AU"].includes(h.region)));
 });

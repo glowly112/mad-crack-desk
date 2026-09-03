@@ -67,6 +67,26 @@ d["n_armed"] = d.get("n_armed")
 if d.get("ts"):
     d["generated_at_utc"] = d.get("ts")
     d["generatedAt"] = d.get("ts")
+hunt_p = pathlib.Path.home() / "bbb/data/firm/lab/latest/factory_empty_hole_hunt_stamp.json"
+if hunt_p.exists():
+    hs = json.loads(hunt_p.read_text())
+    d["occupancy_post_epoch"] = hs.get("occupancy_post_epoch")
+    d["mill_mode"] = hs.get("mill_mode")
+    d["invent_mode"] = hs.get("invent_mode")
+    d["empty_hole_hunt"] = hs
+    if hs.get("ts"):
+        d["generated_at_utc"] = hs["ts"]
+        d["generatedAt"] = hs["ts"]
+im_p = pathlib.Path.home() / "bbb/data/firm/lab/latest/invent_mill.json"
+if im_p.exists():
+    im = json.loads(im_p.read_text())
+    d["invent_mill"] = im
+    if im.get("mill_mode"):
+        d["mill_mode"] = im["mill_mode"]
+    if im.get("n_armed"):
+        d["n_armed"] = im["n_armed"]
+        if not d.get("mill_n_armed"):
+            d["mill_n_armed"] = im["n_armed"]
 snap_inner = d.get("snapshot") if isinstance(d.get("snapshot"), dict) else {}
 if snap_inner.get("mill_n_armed") and not d.get("mill_n_armed"):
     d["mill_n_armed"] = snap_inner.get("mill_n_armed")

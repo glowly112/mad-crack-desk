@@ -51,6 +51,14 @@ function liveFastPath(): string {
   return join(labLatestDir(), "live_fast_auto.json");
 }
 
+async function readJsonOptional(path: string): Promise<Record<string, unknown> | null> {
+  try {
+    return JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
 const FILL_KEYS = [
   "pick_id",
   "ts",
@@ -182,10 +190,34 @@ export async function readLocalOraclePlant(): Promise<Record<string, unknown> | 
     const byStatus = rec(summary.by_status) ?? {};
     const measuring = int(summary.n_measuring ?? byStatus.MEASURING);
     const hunting = int(summary.n_hunting ?? byStatus.HUNTING);
-    const mill_n_armed = int(
+
+    const huntStamp = await readJsonOptional(join(labLatestDir(), "factory_empty_hole_hunt_stamp.json"));
+    const inventMill = await readJsonOptional(join(labLatestDir(), "invent_mill.json"));
+    const millMode = String(huntStamp?.mill_mode ?? inventMill?.mill_mode ?? "").toLowerCase();
+    const inventArmed = int(inventMill?.n_armed);
+    const publishArmed = int(
       digest.mill_n_armed ?? snapInner.mill_n_armed ?? digest.n_armed ?? snapInner.n_armed,
     );
-    const n_armed = mill_n_armed > 0 ? mill_n_armed : int(digest.n_armed ?? sb.n_armed ?? measuring + hunting);
+
+    let mill_n_armed: number;
+    let n_armed: number;
+    if (millMode === "parked" && inventArmed > 0) {
+      n_armed = inventArmed;
+      mill_n_armed = int(inventMill?.mill_n_armed) > 0 ? int(inventMill?.mill_n_armed) : inventArmed;
+    } else if (publishArmed > 0) {
+      mill_n_armed = publishArmed;
+      n_armed = publishArmed;
+    } else if (inventArmed > 0) {
+      mill_n_armed = inventArmed;
+      n_armed = inventArmed;
+    } else {
+      mill_n_armed = measuring + hunting;
+      n_armed = measuring + hunting;
+    }
+
+    const huntTs = typeof huntStamp?.ts === "string" ? huntStamp.ts : "";
+    const millTs = typeof inventMill?.ts === "string" ? inventMill.ts : "";
+    const freshest = [generated, huntTs, millTs].filter(Boolean).sort().at(-1) ?? generated;
 
     const fills = day ? await readRecentFills(day) : [];
     const wait_open = await readWaitOpen();
@@ -199,8 +231,13 @@ export async function readLocalOraclePlant(): Promise<Record<string, unknown> | 
       truth: sb.truth ?? digest.truth ?? snapInner.truth,
       date: day,
       day,
-      generated_at_utc: generated,
-      generatedAt: generated,
+      generated_at_utc: freshest,
+      generatedAt: freshest,
+      occupancy_post_epoch: huntStamp?.occupancy_post_epoch ?? snapInner.occupancy_post_epoch,
+      mill_mode: huntStamp?.mill_mode ?? inventMill?.mill_mode,
+      invent_mode: huntStamp?.invent_mode ?? inventMill?.hunt_mode,
+      invent_mill: inventMill,
+      empty_hole_hunt: huntStamp,
       mill_n_armed,
       n_armed,
       fills,
