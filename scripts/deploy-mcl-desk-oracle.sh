@@ -52,16 +52,19 @@ DESK_BASEPATH=/desk
 VITE_DESK_BASEPATH=/desk
 PATH=$HOME/opt/node/bin:/usr/bin:/bin
 EOF
-if [ -f "$APP/desk.pid" ]; then kill "$(cat "$APP/desk.pid")" 2>/dev/null || true; fi
-# Cmdline is "node .output/server/index.mjs" (cwd mcl-desk) — $APP/.output path rarely matches.
-pkill -f "node .output/server/index.mjs" 2>/dev/null || true
-pkill -f "$APP/.output/server/index.mjs" 2>/dev/null || true
-sleep 2
-# Ensure nothing still bound before we start.
-if curl -sS -m 2 -o /dev/null -w "%{http_code}" http://127.0.0.1:8791/desk/ 2>/dev/null | grep -q 200; then
-  pkill -9 -f "node .output/server/index.mjs" 2>/dev/null || true
-  sleep 1
-fi
+kill_stale_desk() {
+  if [ -f "$APP/desk.pid" ]; then kill "$(cat "$APP/desk.pid")" 2>/dev/null || true; fi
+  pkill -f "node .output/server/index.mjs" 2>/dev/null || true
+  pkill -f "$APP/.output/server/index.mjs" 2>/dev/null || true
+  if command -v fuser >/dev/null 2>&1; then fuser -k 8791/tcp 2>/dev/null || true; fi
+  sleep 2
+  if curl -sS -m 2 -o /dev/null -w "%{http_code}" http://127.0.0.1:8791/desk/ 2>/dev/null | grep -q 200; then
+    pkill -9 -f "node .output/server/index.mjs" 2>/dev/null || true
+    if command -v fuser >/dev/null 2>&1; then fuser -k 8791/tcp 2>/dev/null || true; fi
+    sleep 1
+  fi
+}
+kill_stale_desk
 cd "$APP"
 rm -rf .output
 tar xzf mcl-desk-out.tar.gz
@@ -85,7 +88,7 @@ words=\" \".join(t2.split())
 m=re.search(r\"(\d+) empty of (\d+)\", words)
 print(\"empty\", m.groups() if m else None)
 print(\"square\", \"The square\" in words)
-stamps=sorted(set(re.findall(r\"20260903T\d{6}Z\", t)))
+stamps=sorted(set(re.findall(r\"20\d{6}T\d{6}Z\", t)))
 print(\"stamp\", stamps[-1] if stamps else \"none\")
 print(\"live\", words.count(\"live oracle\"))
 "'
