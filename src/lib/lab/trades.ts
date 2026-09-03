@@ -488,6 +488,73 @@ export function settledFills(fills: readonly Fill[]): Fill[] {
   return fills.filter((f) => f.result !== "waiting");
 }
 
+/** Clock second for grouping fills booked in the same spray tick. */
+export function fillTickSecond(fill: Fill): string {
+  const t = fill.t?.trim() ?? "";
+  const hm = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(t);
+  if (hm) {
+    const hh = hm[1].padStart(2, "0");
+    const ss = hm[3] ?? "00";
+    return `${hh}:${hm[2]}:${ss}`;
+  }
+  const iso = /T(\d{2}):(\d{2}):(\d{2})/.exec(fill.ts);
+  return iso ? `${iso[1]}:${iso[2]}:${iso[3]}` : t;
+}
+
+/** Country × window × market — same hole, not horse or odds. */
+export function fillHoleKey(fill: Fill): string {
+  const hole = parseHole(fill.recipeId) ?? parseHole(fill.recipe);
+  if (hole) return `${hole.region}|${hole.window}|${hole.market}`;
+  const ehole = /^H-ehole-([a-z]{2})-([a-z]+)-(win|place|lay)/i.exec(fill.recipeId);
+  if (ehole) {
+    const region = ehole[1].toUpperCase();
+    const window = parseWindow(ehole[2]) ?? ehole[2];
+    const market = ehole[3].toUpperCase();
+    return `${region}|${window}|${market}`;
+  }
+  return fill.recipeId;
+}
+
+function fieldSprayGroupKey(fill: Fill): string {
+  const side = (fill.side ?? "").toUpperCase();
+  return `${fill.day}|${fillTickSecond(fill)}|${fillHoleKey(fill)}|${side}`;
+}
+
+/**
+ * Same-second same-hole multi-runner BACK packs — mill field spray, not honest one-pick paper.
+ * Plant VOID rows are left out (honoured separately).
+ */
+export function fieldSprayFillIds(fills: readonly Fill[]): Set<string> {
+  const groups = new Map<string, Fill[]>();
+  for (const f of settledFills(fills)) {
+    if (f.result === "void") continue;
+    if ((f.side ?? "").toUpperCase() !== "BACK") continue;
+    const key = fieldSprayGroupKey(f);
+    const list = groups.get(key) ?? [];
+    list.push(f);
+    groups.set(key, list);
+  }
+  const out = new Set<string>();
+  for (const group of groups.values()) {
+    if (group.length < 2) continue;
+    const odds = new Set(group.map((f) => f.odds).filter((o) => o != null));
+    if (odds.size < 2) continue;
+    for (const f of group) out.add(f.id);
+  }
+  return out;
+}
+
+/** Settled rows that count on today's tape — no field sprays, open tickets unchanged. */
+export function honestSettledFills(fills: readonly Fill[]): Fill[] {
+  const sprays = fieldSprayFillIds(fills);
+  return settledFills(fills).filter((f) => !sprays.has(f.id));
+}
+
+/** Paper settles that contribute to the day u total. */
+export function paperSettledFills(fills: readonly Fill[]): Fill[] {
+  return honestSettledFills(fills).filter((f) => f.book === "paper" && f.result !== "void");
+}
+
 export type MillActivity = {
   open: Fill[];
   settledToday: Fill[];
@@ -501,8 +568,8 @@ export type MillActivity = {
 export function millActivity(stamp: { day: string; trades?: readonly Fill[] }): MillActivity {
   const dayFills = fillsOnDay(stamp.trades ?? [], stamp.day);
   const open = openFills(dayFills);
-  const settled = settledFills(dayFills);
-  const paperSettled = settled.filter((f) => f.book === "paper");
+  const settled = honestSettledFills(dayFills);
+  const paperSettled = paperSettledFills(dayFills);
   const paperDayU = paperSettled.length
     ? paperSettled.reduce((acc, f) => acc + (f.pnl ?? 0), 0)
     : null;
@@ -518,7 +585,7 @@ export function millActivity(stamp: { day: string; trades?: readonly Fill[] }): 
 
 /** Settled paper u for one day — Floor tile matches Trades headline. */
 export function settledPaperDayU(trades: readonly Fill[], day: string): number | null {
-  const paper = settledFills(fillsOnDay(trades, day)).filter((f) => f.book === "paper");
+  const paper = paperSettledFills(fillsOnDay(trades, day));
   if (!paper.length) return null;
   return paper.reduce((acc, f) => acc + (f.pnl ?? 0), 0);
 }

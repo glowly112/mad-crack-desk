@@ -12,6 +12,10 @@ import {
   parseFills,
   parseWaitOpen,
   settledFills,
+  honestSettledFills,
+  paperSettledFills,
+  fieldSprayFillIds,
+  settledPaperDayU,
   tapePnl,
   tradeCounts,
   bookWord,
@@ -392,6 +396,52 @@ test("mill tape shows hunt arms when hops are empty and no tickets", () => {
   assert.match(rows[0].text, /empty-hole hunt/);
   assert.match(rows.at(-1)?.text ?? "", /52 armed/);
   assert.ok(!rows.at(-1)?.text.includes("recipe, not a ticket"));
+});
+
+test("field spray packs do not count as paper or appear in settled", () => {
+  const base = {
+    date: "2026-09-03",
+    cell_id: "H-ehole-fr-inplay-win-73339Z",
+    mode: "auto_dry",
+    status: "SETTLED",
+    stake_gbp: 2,
+    placed_result: false,
+    side: "BACK",
+    ts: "2026-09-03T10:55:08Z",
+    t: "10:55:08",
+  };
+  const oddsList = [9.4, 15, 6, 16, 17, 22, 11];
+  const spray = oddsList
+    .map((odds, i) =>
+      fillFromRow({
+        ...base,
+        pick_id: `fr-spray-${i}`,
+        odds,
+        paper_pnl_gbp: -2,
+      }),
+    )
+    .filter((f): f is NonNullable<typeof f> => Boolean(f));
+  const honest = fillFromRow({
+    pick_id: "gb-one-pick",
+    date: "2026-09-03",
+    cell_id: "H-20260903T120000Z-gb-nearoff-win-one-pick",
+    mode: "auto_dry",
+    status: "SETTLED",
+    odds: 3.2,
+    stake_gbp: 2,
+    paper_pnl_gbp: 2,
+    placed_result: true,
+    side: "BACK",
+    ts: "2026-09-03T11:00:00Z",
+    t: "11:00:00",
+  })!;
+  const fills = [...spray, honest];
+  const ids = fieldSprayFillIds(fills);
+  assert.equal(ids.size, 7);
+  assert.equal(honestSettledFills(fills).length, 1);
+  assert.equal(honestSettledFills(fills)[0]?.id, honest.id);
+  assert.equal(settledPaperDayU(fills, "2026-09-03"), 1);
+  assert.equal(settledPaperDayU(spray, "2026-09-03"), null);
 });
 
 test("wait chips dedupe by country window market", () => {
