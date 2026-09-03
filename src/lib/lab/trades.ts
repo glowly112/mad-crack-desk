@@ -166,10 +166,18 @@ export function fillFromRow(raw: unknown): Fill | null {
   };
 }
 
-/** Name on the board: strategy mark, plus horse if the stamp names one. Odds stay in Odds. */
+/** Name on the board. Open tickets: horse, else hole + odds + side. Settled: horse else mark. */
 export function tradeName(fill: Fill): string {
   const mark = strategyMark(fill.recipe, fill.recipeId);
   if (fill.horse && fill.horse !== EMPTY) return `${mark} · ${fill.horse}`;
+  if (fill.result === "waiting") {
+    const tail: string[] = [];
+    if (fill.odds != null && Number.isFinite(fill.odds)) {
+      tail.push(Number.isInteger(fill.odds) ? String(fill.odds) : String(fill.odds));
+    }
+    if (fill.side && fill.side !== EMPTY) tail.push(fill.side);
+    if (tail.length) return `${mark} · ${tail.join(" ")}`;
+  }
   return mark;
 }
 

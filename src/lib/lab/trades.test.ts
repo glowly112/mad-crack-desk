@@ -192,8 +192,17 @@ test("trade name is the mark plus horse; odds live in Odds", () => {
     assert.ok(f);
     return fillDeskRow(f, false);
   });
-  assert.ok(rows.every((r) => r.name === "Britain · near-off · winner"));
   assert.deepEqual(rows.map((r) => r.odds), ["3.2", "25", "10", "9.4"]);
+  assert.deepEqual(
+    rows.map((r) => r.name),
+    [
+      "Britain · near-off · winner · 3.2 BACK",
+      "Britain · near-off · winner · 25 BACK",
+      "Britain · near-off · winner · 10 BACK",
+      "Britain · near-off · winner · 9.4 BACK",
+    ],
+  );
+  assert.equal(new Set(rows.map((r) => r.name)).size, 4);
   assert.ok(rows.every((r) => r.book === "paper"));
   assert.ok(rows.every((r) => r.side === "BACK"));
   assert.ok(rows.every((r) => r.stake === "1u"));
@@ -207,7 +216,7 @@ test("trade name is the mark plus horse; odds live in Odds", () => {
   assert.equal(fillDeskRow(named, false).odds, "3.2");
   const blank = fillFromRow({ ...gbOpen, horse: "H-fast-gb-nearoff-win-83959Z", runner: "67117187" });
   assert.equal(blank?.horse, null);
-  assert.equal(tradeName(blank!), "Britain · near-off · winner");
+  assert.equal(tradeName(blank!), "Britain · near-off · winner · 3.2 BACK");
   assert.equal(bookWord("production"), "paper");
   assert.equal(bookWord("live"), "live");
   assert.equal(fillResultWord(fillFromRow(auWon)!), "Won");
@@ -304,6 +313,8 @@ test("open ticket shows real side/odds/stake; unsettled P&L stays Empty", () => 
   assert.equal(row.stake, "1u");
   assert.equal(row.time, "08:14:03");
   assert.equal(row.result, "Open");
+  assert.match(row.name, /New Zealand · morning · winner/);
+  assert.match(row.name, /3\.55 BACK/);
   assert.equal(row.pnl, null);
 });
 
