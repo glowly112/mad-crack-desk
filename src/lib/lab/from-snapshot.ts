@@ -265,7 +265,13 @@ function holesFromOccupancyPostEpoch(
     rec(rec(snap.empty_hole_hunt)?.occupancy_post_epoch) ??
     rec(rec(snap.factory_empty_hole_hunt)?.occupancy_post_epoch);
   const list = occRec?.occupied_cells;
+  const nOccupied = int(occRec?.n_occupied_cells);
   if (!Array.isArray(list) || !list.length) return null;
+  // bbb hunt stamp truncates occupied_cells[:24]; full list is rebuilt on oracle poll.
+  const keysToPaint =
+    nOccupied != null && nOccupied > 0 && list.length >= nOccupied
+      ? list.slice(0, nOccupied)
+      : list;
 
   const map = new Map<string, LiveStamp["holes"][number]>();
   const cellByHole = new Map<string, Record<string, unknown>>();
@@ -276,7 +282,7 @@ function holesFromOccupancyPostEpoch(
     }
   }
 
-  for (const key of list) {
+  for (const key of keysToPaint) {
     const parts = String(key).split("|");
     if (parts.length !== 3) continue;
     const region = parts[0].toUpperCase();

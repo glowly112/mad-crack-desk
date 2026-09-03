@@ -3,6 +3,7 @@
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { computeHollowOccupiedKeys } from "./hollow-occupancy.ts";
 
 function rec(v: unknown): Record<string, unknown> | null {
   return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
@@ -222,6 +223,15 @@ export async function readLocalOraclePlant(): Promise<Record<string, unknown> | 
     const fills = day ? await readRecentFills(day) : [];
     const wait_open = await readWaitOpen();
 
+    const bbbRoot = process.env.BBB_ROOT?.trim() || join(homedir(), "bbb");
+    const cells = Array.isArray(sb.cells) ? sb.cells : [];
+    const hollowKeys = await computeHollowOccupiedKeys(bbbRoot, cells);
+    const stampOcc = rec(huntStamp?.occupancy_post_epoch);
+    const occupancy_post_epoch =
+      hollowKeys.length > 0
+        ? { n_occupied_cells: hollowKeys.length, occupied_cells: hollowKeys }
+        : stampOcc ?? snapInner.occupancy_post_epoch;
+
     return {
       ...snapInner,
       ...digest,
@@ -233,7 +243,7 @@ export async function readLocalOraclePlant(): Promise<Record<string, unknown> | 
       day,
       generated_at_utc: freshest,
       generatedAt: freshest,
-      occupancy_post_epoch: huntStamp?.occupancy_post_epoch ?? snapInner.occupancy_post_epoch,
+      occupancy_post_epoch,
       mill_mode: huntStamp?.mill_mode ?? inventMill?.mill_mode,
       invent_mode: huntStamp?.invent_mode ?? inventMill?.hunt_mode,
       invent_mill: inventMill,
