@@ -8,10 +8,12 @@ import { ownerId, Portrait } from "@/components/portrait";
 import { useStamp } from "@/components/plant-context";
 import {
   factorySquares,
+  floorRacingSquare,
   inventWhatHappened,
   officeIssuesForBoard,
   officeWorkers,
   pipeBoard,
+  SQUARE_HOLE_COUNT,
   dedupeRecipesByHole,
   waffleCols,
 } from "@/lib/lab/boards";
@@ -66,12 +68,26 @@ const STAGE_SQ: Record<string, string> = {
   closed: "bg-subtle",
   certified: "bg-fg",
   live: "bg-up",
+  empty: "bg-elev ring-1 ring-inset ring-border-strong",
+  armed: "bg-warn",
 };
 
 /** Factory line: stuck sentence + a pile of unit squares. Numbers stay quiet. */
 export function FactoryLine() {
   const stamp = useStamp();
-  const board = pipeBoard(stamp.pipe, stamp.fuse_on);
+  const holes = floorRacingSquare({ namedHoles: stamp.holes });
+  const holeTotal = holes.length > 0 ? holes.length : SQUARE_HOLE_COUNT;
+  const authOccupied = (stamp as { square_occupied_n?: number }).square_occupied_n;
+  const paintedOccupied = holes.filter((h) => h.tone !== "empty").length;
+  const occupiedN =
+    authOccupied != null && authOccupied > paintedOccupied ? authOccupied : paintedOccupied;
+  const emptyN = holeTotal - occupiedN;
+  const armed = (stamp as { mill_n_armed?: number; n_armed?: number }).mill_n_armed ??
+    (stamp as { n_armed?: number }).n_armed ?? 0;
+  const board = pipeBoard(stamp.pipe, stamp.fuse_on, {
+    inventWhy: stamp.office.inventWhy,
+    square: { armed, empty: emptyN, solid: stamp.n_solid },
+  });
   const squares = factorySquares(board.stages);
   const glance = board.stages
     .map((s) => `${s.label} ${s.count === 0 ? EMPTY : s.count}`)

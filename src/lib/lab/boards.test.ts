@@ -288,6 +288,23 @@ test("Pipe stages are the factory line; Live is 0 while fuse is off", () => {
   assert.equal(squares.length, 12 + 21 + 1 + 1);
 });
 
+test("empty-hole hunt factory line uses square occupancy, not invent queue", () => {
+  const board = pipeBoard(STAMP.pipe, false, {
+    inventWhy: "empty-hole hunt on · invent_empty_holes · mill parked",
+    square: { armed: 52, empty: 9, solid: 0 },
+  });
+  assert.deepEqual(
+    board.stages.map((s) => s.label),
+    ["Empty holes", "Armed on mill", "Solid", "Live"],
+  );
+  assert.equal(board.stages.find((s) => s.key === "empty")?.count, 9);
+  assert.equal(board.stages.find((s) => s.key === "armed")?.count, 52);
+  assert.ok(!board.stuck.includes("new ideas"));
+  assert.ok(!board.stuck.includes("still being tested"));
+  assert.match(board.stuck, /52 armed on the mill/);
+  assert.match(board.stuck, /9 empty on the square/);
+});
+
 test("Health rows are sentences, not RED/AMBER/GREEN", () => {
   const board = healthBoard(STAMP.kpis);
   assert.equal(board.broken.length, 0);

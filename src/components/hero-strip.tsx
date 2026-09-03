@@ -13,6 +13,7 @@ import {
   floorDayValue,
   floorFacts,
   seriesWindow,
+  ensureWindowEndsOn,
   type FloorFact,
   type FloorFactId,
 } from "@/lib/lab/desk";
@@ -108,11 +109,15 @@ function DailyBars({ fact }: { fact: FloorFactId }) {
   const stamp = useStamp();
   const scope = useDayScope();
   const days = stamp.trends.map((t) => t.day);
-  const points = seriesWindow(days, scope.day, (d) =>
-    floorDayValue(
-      fact,
-      stamp.trends.find((t) => t.day === d),
+  const points = ensureWindowEndsOn(
+    scope.today,
+    seriesWindow(days, scope.today, (d) =>
+      floorDayValue(
+        fact,
+        stamp.trends.find((t) => t.day === d),
+      ),
     ),
+    8,
   );
   const series = points.map((d) => {
     const hit = stamp.trends.find((t) => t.day === d);
@@ -190,6 +195,7 @@ function DailyBars({ fact }: { fact: FloorFactId }) {
         ))}
         {series.map((p, i) => {
           const selected = p.day === scope.day;
+          const oracleEnd = p.day === scope.today;
           const v = floorDayValue(fact, p);
           const cx = xAt(i);
           const barW = Math.max(6, slot * 0.55);
@@ -224,7 +230,7 @@ function DailyBars({ fact }: { fact: FloorFactId }) {
                 className={selected ? "fill-fg font-mono" : "fill-subtle font-mono"}
                 fontSize="8"
               >
-                {i === 0 || i === series.length - 1 || selected ? axisDay(p.day) : String(Number(p.day.slice(8)))}
+                {i === 0 || oracleEnd || selected ? axisDay(p.day) : String(Number(p.day.slice(8)))}
               </text>
             </g>
           );

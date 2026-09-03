@@ -13,6 +13,7 @@ import {
   dailyDomain,
   dailyTicks,
   dayWindow,
+  ensureWindowEndsOn,
   floorFacts,
   hopTally,
   floorSeats,
@@ -125,10 +126,12 @@ test("daily window and domain keep Empty days off the scale", () => {
   const ahead = dayWindow(days, "2026-09-03", 8);
   assert.equal(ahead.at(-1), "2026-09-03");
   assert.ok(ahead.includes("2026-09-02"));
+  const anchored = ensureWindowEndsOn("2026-09-03", ["2026-08-27", "2026-09-02"], 8);
+  assert.equal(anchored.at(-1), "2026-09-03");
   const win = chartWindow(STAMP.trends, "2026-09-02", 8);
   assert.equal(win.at(-1), "2026-09-02");
-  assert.ok(win.includes("2026-08-25"));
-  assert.ok(STAMP.trends.find((t) => t.day === "2026-08-25")?.paper_live_day_u != null);
+  assert.ok(win.includes("2026-08-26"));
+  assert.equal(win.length, 8);
   const nums = win.map((d) => STAMP.trends.find((t) => t.day === d)?.paper_live_day_u);
   const [lo, hi] = dailyDomain(nums);
   assert.ok(lo <= -60);

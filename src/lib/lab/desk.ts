@@ -399,9 +399,11 @@ export function seriesWindow(
   max = 15,
 ): string[] {
   const trailing = dayWindow(days, selected, size);
-  if (trailing.some((d) => valueOf(d) != null)) return trailing;
+  if (trailing.some((d) => valueOf(d) != null)) {
+    return ensureWindowEndsOn(selected, trailing, size);
+  }
   const lastDay = days[days.length - 1];
-  if (lastDay && selected > lastDay) return trailing;
+  if (lastDay && selected > lastDay) return ensureWindowEndsOn(selected, trailing, size);
   let lastProd = -1;
   const end = days.indexOf(selected);
   const endI = end < 0 ? days.length - 1 : end;
@@ -411,9 +413,18 @@ export function seriesWindow(
       break;
     }
   }
-  if (lastProd < 0) return trailing;
+  if (lastProd < 0) return ensureWindowEndsOn(selected, trailing, size);
   const start = Math.max(0, Math.min(lastProd - (size - 1), endI + 1 - max));
-  return days.slice(start, endI + 1);
+  return ensureWindowEndsOn(selected, days.slice(start, endI + 1), size);
+}
+
+/** Rightmost chart slot is always the oracle / selected day. */
+export function ensureWindowEndsOn(selected: string, win: readonly string[], size = 8): string[] {
+  if (!selected) return [...win];
+  const base = win.includes(selected) ? [...win] : [...win, selected].sort();
+  const anchored =
+    base.at(-1) === selected ? base : [...base.filter((d) => d !== selected), selected];
+  return anchored.slice(-size);
 }
 
 /**

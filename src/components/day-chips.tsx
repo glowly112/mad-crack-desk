@@ -6,7 +6,9 @@ import { cn } from "@/lib/utils";
 
 export function DayChips({ days }: { days: readonly string[] }) {
   const { day, today, setDay } = useDayScope();
-  const chips = [...days].reverse();
+  const merged = days.includes(today) ? days : [...days, today];
+  const sorted = [...merged].sort();
+  const chips = [...sorted].reverse();
   const row = useRef<HTMLDivElement>(null);
 
   return (
@@ -35,7 +37,7 @@ export function DayChips({ days }: { days: readonly string[] }) {
                 !on && "text-subtle hover:text-fg",
               )}
             >
-              {d === today ? "Today" : axisDay(d)}
+              {axisDay(d)}
             </button>
           );
         })}

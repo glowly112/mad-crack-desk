@@ -923,10 +923,49 @@ export type PipeBoard = {
   stuck: string;
 };
 
+export function isEmptyHoleHuntBoard(inventWhy: string): boolean {
+  return /empty-hole hunt|invent_empty|mill parked/i.test(inventWhy);
+}
+
+export type SquarePipeCounts = {
+  armed: number;
+  empty: number;
+  solid: number;
+};
+
 export function pipeBoard(
   pipe: { pitched: number; proving: number; closed: number; certified: number; scaling: number },
   fuseOn: boolean,
+  opts?: { inventWhy?: string; square?: SquarePipeCounts },
 ): PipeBoard {
+  const hunt = isEmptyHoleHuntBoard(opts?.inventWhy ?? "") && opts?.square;
+  if (hunt) {
+    const square = opts!.square!;
+    const { armed, empty, solid } = square;
+    const live = fuseOn ? pipe.scaling : 0;
+    const stages: PipeStage[] = [
+      { key: "empty", label: "Empty holes", count: empty, hint: "on the square", stuck: false },
+      { key: "armed", label: "Armed on mill", count: armed, hint: "", stuck: false },
+      { key: "certified", label: "Solid", count: solid, hint: "the score", stuck: false },
+      {
+        key: "live",
+        label: "Live",
+        count: live,
+        hint: fuseOn ? "" : "off while the fuse is off",
+        stuck: false,
+      },
+    ];
+    let stuckKey: string | null = !fuseOn ? "live" : null;
+    if (armed > 0 && solid === 0) stuckKey = "armed";
+    const marked = stages.map((s) => ({ ...s, stuck: s.key === stuckKey }));
+    const bits: string[] = [];
+    if (armed > 0) bits.push(`${armed} armed on the mill`);
+    if (empty > 0) bits.push(`${empty} empty on the square`);
+    if (solid > 0) bits.push(`${solid} solid`);
+    if (!fuseOn) bits.push("Live is off");
+    return { stages: marked, stuck: bits.length ? `${bits.join(". ")}.` : EMPTY };
+  }
+
   const live = fuseOn ? pipe.scaling : 0;
   const stages: PipeStage[] = [
     { key: "pitched", label: "New ideas", count: pipe.pitched, hint: "", stuck: false },
