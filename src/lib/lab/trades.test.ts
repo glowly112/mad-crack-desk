@@ -445,6 +445,58 @@ test("field spray packs do not count as paper or appear in settled", () => {
   assert.equal(settledPaperDayU(spray, "2026-09-03"), null);
 });
 
+test("two-odds same-tick pair is not field spray", () => {
+  const base = {
+    date: "2026-09-03",
+    cell_id: "H-20260903T120000Z-gb-nearoff-win-two-pick",
+    mode: "auto_dry",
+    status: "OPEN",
+    stake_gbp: 2,
+    placed_result: null,
+    side: "BACK",
+    ts: "2026-09-03T11:15:00Z",
+    t: "11:15:00",
+  };
+  const pair = [3.2, 4.5]
+    .map((odds, i) =>
+      fillFromRow({
+        ...base,
+        pick_id: `gb-two-pick-${i}`,
+        odds,
+      }),
+    )
+    .filter((f): f is NonNullable<typeof f> => Boolean(f));
+  assert.equal(fieldSprayFillIds(pair).size, 0);
+  assert.equal(honestOpenFills(pair).length, 2);
+});
+
+test("two-pick recipe settled pair stays on paper", () => {
+  const base = {
+    date: "2026-09-03",
+    cell_id: "H-20260903T120000Z-gb-nearoff-win-two-pick",
+    mode: "auto_dry",
+    status: "SETTLED",
+    stake_gbp: 2,
+    placed_result: false,
+    side: "BACK",
+    ts: "2026-09-03T11:16:00Z",
+    t: "11:16:00",
+    paper_pnl_gbp: -2,
+  };
+  const pair = [3.2, 4.5]
+    .map((odds, i) =>
+      fillFromRow({
+        ...base,
+        pick_id: `gb-two-pick-settled-${i}`,
+        odds,
+      }),
+    )
+    .filter((f): f is NonNullable<typeof f> => Boolean(f));
+  assert.equal(fieldSprayFillIds(pair).size, 0);
+  assert.equal(honestSettledFills(pair).length, 2);
+  assert.equal(settledPaperDayU(pair, "2026-09-03"), -2);
+});
+
 test("field spray open packs are hidden from Open tape", () => {
   const base = {
     date: "2026-09-03",

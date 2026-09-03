@@ -520,9 +520,49 @@ function fieldSprayGroupKey(fill: Fill): string {
   return `${fill.day}|${fillTickSecond(fill)}|${fillHoleKey(fill)}|${side}`;
 }
 
+/** Unbounded mill dumps — France 7-horse in-play packs, 5–8 runner sprays. */
+const FIELD_SPRAY_MIN_RUNNERS = 5;
+
+/** Recipe-declared pick count (two-pick, 3-pick, pack-4). One-pick is a strategy, not cap=1. */
+function recipePickCap(fill: Fill): number | null {
+  const blob = `${fill.recipeId} ${fill.recipe}`.toLowerCase().replace(/_/g, " ");
+  if (/two[\s-]?pick/.test(blob)) return 2;
+  if (/three[\s-]?pick/.test(blob)) return 3;
+  if (/four[\s-]?pick/.test(blob)) return 4;
+  const pack = /\bpack[\s-]?(\d+)\b/.exec(blob);
+  if (pack) {
+    const n = Number.parseInt(pack[1], 10);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  const nPick = /\b(\d+)[\s-]?pick\b/.exec(blob);
+  if (nPick) {
+    const n = Number.parseInt(nPick[1], 10);
+    if (Number.isFinite(n) && n > 1) return n;
+  }
+  return null;
+}
+
+function groupPickCap(group: readonly Fill[]): number | null {
+  let cap: number | null = null;
+  for (const f of group) {
+    const c = recipePickCap(f);
+    if (c != null) cap = cap == null ? c : Math.max(cap, c);
+  }
+  return cap;
+}
+
+function isFieldSprayGroup(group: readonly Fill[]): boolean {
+  if (group.length < FIELD_SPRAY_MIN_RUNNERS) return false;
+  const odds = new Set(group.map((f) => f.odds).filter((o) => o != null));
+  if (odds.size < 2) return false;
+  const cap = groupPickCap(group);
+  if (cap != null && group.length <= cap && odds.size <= cap) return false;
+  return group.length >= FIELD_SPRAY_MIN_RUNNERS || odds.size >= FIELD_SPRAY_MIN_RUNNERS;
+}
+
 /**
- * Same-second same-hole multi-runner BACK packs — mill field spray, not honest one-pick paper.
- * Scans open and settled rows. Plant VOID rows are left out (honoured separately).
+ * Same-second same-hole unbounded BACK field spray — not honest recipe-scoped books.
+ * Defined two-pick (etc.) at one tick stays visible; 5+ runner dumps without pick-cap hide.
  */
 export function fieldSprayFillIds(fills: readonly Fill[]): Set<string> {
   const groups = new Map<string, Fill[]>();
@@ -537,9 +577,7 @@ export function fieldSprayFillIds(fills: readonly Fill[]): Set<string> {
   }
   const out = new Set<string>();
   for (const group of groups.values()) {
-    if (group.length < 2) continue;
-    const odds = new Set(group.map((f) => f.odds).filter((o) => o != null));
-    if (odds.size < 2) continue;
+    if (!isFieldSprayGroup(group)) continue;
     for (const f of group) out.add(f.id);
   }
   return out;
