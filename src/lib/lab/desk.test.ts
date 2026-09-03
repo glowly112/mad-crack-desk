@@ -192,6 +192,34 @@ test("Floor facts are plant numbers, not a 100u quota", () => {
   assert.equal(facts.find((f) => f.id === "production")?.value, null);
   assert.equal(facts.find((f) => f.id === "live")?.value, null);
   assert.deepEqual(facts.map((f) => f.id), ["holes", "paper", "production", "live"]);
+  const hydeFacts = floorFacts(
+    {
+      ...STAMP,
+      trades: [
+        {
+          id: "hyde-1",
+          ts: "2026-09-03T12:00:00Z",
+          t: "12:00",
+          day: STAMP.day,
+          recipe: "GB morning WIN",
+          recipeId: "H-hyde-gb-morning-win",
+          market: "WIN",
+          book: "paper",
+          side: "BACK",
+          odds: 3,
+          stake: 1,
+          result: "lost",
+          flight: null,
+          liquidity: null,
+          pnl: -3.71,
+          horse: null,
+        },
+      ],
+    },
+    { day: STAMP.day, lookingBack: false },
+    emptyHoles,
+  );
+  assert.equal(hydeFacts.find((f) => f.id === "paper")?.value, null);
   const tally = hopTally(STAMP.moves);
   assert.ok(tally.some((t) => t.label === "Certified" && t.n === 1));
 });

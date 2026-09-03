@@ -2,7 +2,7 @@ import type { LiveStamp } from "./from-digest.ts";
 import { mergeMillPathRuns } from "./mill-paths.ts";
 import { cellName } from "./desk.ts";
 import type { Badge, Chip, Recipe } from "./stamp.ts";
-import { parseFills, parseWaitOpen } from "./trades.ts";
+import { parseFills, parseWaitOpen, settledPaperDayU } from "./trades.ts";
 import { parseHole, parseWindow, parseMarket, regionFromText, millHuntCaption, squareHoleKeyAndSide, normalizeSquareHoleKey, type ParsedSquareMarket, type SquareWindow } from "./boards.ts";
 import { isSprayClassInPlayEholeFirstBook } from "./mill-display.ts";
 import { cellIsPostEpochEhole, cellIsPostEpochParkedKeep } from "./board-reset.ts";
@@ -455,13 +455,8 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
     int(summary.n_distinct_certified_keep) ??
     int(scaling?.n_certified_keep);
 
-  const day_u =
-    num(paperLive?.day_u) ??
-    num(snap.paper_live_day_u) ??
-    num(snap.production_score_u) ??
-    num(boardUx?.hero_u) ??
-    num(scaling?.paper_live_day_u) ??
-    base.hero.day_u;
+  const recipes = recipesFromCells(cellsOf(snap));
+  const tradesParsed = Array.isArray(snap.fills) ? parseFills(snap.fills) : base.trades;
 
   let fuse_on = base.fuse_on;
   if (liveMoney) {
@@ -475,7 +470,6 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
   const researchKeepGbp =
     num(snap.pnlTotal) ?? num(summary.keep_pnl_gbp) ?? num(summary.keep_pnl_now_gbp) ?? base.researchKeepGbp;
 
-  const recipes = recipesFromCells(cellsOf(snap));
   const solids = recipes.filter((r) => r.badge === "Solid");
   const n_solid = nSolidExplicit ?? (recipes.length ? solids.length : base.n_solid);
   const cellList = cellsOf(snap);
@@ -489,6 +483,7 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
       : typeof snap.day === "string" && snap.day
         ? snap.day
         : base.day;
+  const firstBookPaper = settledPaperDayU(tradesParsed, date, recipes);
   const generated =
     (typeof snap.generatedAt === "string" && snap.generatedAt) ||
     (typeof snap.generated_at_utc === "string" && snap.generated_at_utc) ||
@@ -538,7 +533,7 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
       n_measuring: measuring,
       n_dropped: kill,
       n_solid,
-      paper_live_day_u: nSolidExplicit != null ? day_u : t.paper_live_day_u,
+      paper_live_day_u: firstBookPaper,
     };
   });
 
@@ -558,7 +553,7 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
     researchKeepGbp,
     hero: {
       ...base.hero,
-      day_u,
+      day_u: firstBookPaper,
     },
     counts: {
       ...base.counts,
@@ -581,7 +576,7 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
     seats: overlaySeats(base.seats, snap, inventWhy),
     kpis: overlayKpis(base.kpis, inventWhy, inventOn),
     trends,
-    trades: Array.isArray(snap.fills) ? parseFills(snap.fills) : base.trades,
+    trades: tradesParsed,
     wait_open: Array.isArray(snap.wait_open) ? parseWaitOpen(snap.wait_open) : (base.wait_open ?? []),
     holes: plantOracle
       ? (occupancyHoles ?? namedHolesFromCells).length

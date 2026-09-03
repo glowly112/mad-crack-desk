@@ -432,7 +432,7 @@ test("field spray packs do not count as paper or appear in settled", () => {
   const honest = fillFromRow({
     pick_id: "gb-one-pick",
     date: "2026-09-03",
-    cell_id: "H-20260903T120000Z-gb-nearoff-win-one-pick",
+    cell_id: "H-ehole-gb-nearoff-win-83959Z",
     mode: "auto_dry",
     status: "SETTLED",
     odds: 3.2,
@@ -480,7 +480,7 @@ test("two-odds same-tick pair is not field spray", () => {
 test("two-pick recipe settled pair stays on paper", () => {
   const base = {
     date: "2026-09-03",
-    cell_id: "H-20260903T120000Z-gb-nearoff-win-two-pick",
+    cell_id: "H-ehole-gb-nearoff-win-83959Z",
     mode: "auto_dry",
     status: "SETTLED",
     stake_gbp: 2,
@@ -502,6 +502,35 @@ test("two-pick recipe settled pair stays on paper", () => {
   assert.equal(fieldSprayFillIds(pair).size, 0);
   assert.equal(honestSettledFills(pair).length, 2);
   assert.equal(settledPaperDayU(pair, "2026-09-03"), -2);
+});
+
+test("Hyde and fast leftovers do not count as today's first-book paper", () => {
+  const hyde = fillFromRow({
+    pick_id: "hyde-1",
+    date: "2026-09-03",
+    cell_id: "H-hyde-gb-morning-win",
+    mode: "auto_dry",
+    status: "SETTLED",
+    stake_gbp: 2,
+    paper_pnl_gbp: -3.71,
+    placed_result: false,
+    side: "BACK",
+    ts: "2026-09-03T12:00:00Z",
+  });
+  const fast = fillFromRow({
+    pick_id: "fast-1",
+    date: "2026-09-03",
+    cell_id: "H-fast-gb-nearoff-win",
+    mode: "auto_dry",
+    status: "SETTLED",
+    stake_gbp: 2,
+    paper_pnl_gbp: -1,
+    placed_result: false,
+    side: "BACK",
+    ts: "2026-09-03T12:01:00Z",
+  });
+  assert.ok(hyde && fast);
+  assert.equal(settledPaperDayU([hyde!, fast!], "2026-09-03"), null);
 });
 
 test("field spray open packs are hidden from Open tape", () => {

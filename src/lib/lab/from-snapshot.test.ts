@@ -161,7 +161,7 @@ test("Solid recipes lead the tape even when the scoreboard lists a parked keep f
   assert.equal(live.recipes[1]?.badge, "Parked");
 });
 
-test("boardUx n_solid and paperLive day_u pass through; KEEP count is not solids", () => {
+test("boardUx n_solid passes through; hero day_u only from first-book settles", () => {
   const live = applySnapshot(
     {
       truth: { keep: 2, measuring: 1, dropped: 0 },
@@ -175,13 +175,12 @@ test("boardUx n_solid and paperLive day_u pass through; KEEP count is not solids
     base(),
   );
   assert.equal(live.n_solid, 1);
-  assert.equal(live.hero.day_u, -2.8);
+  assert.equal(live.hero.day_u, null);
   assert.equal(live.fuse_on, false);
-  assert.equal(live.recipes[0]?.badge, "Solid");
-  assert.equal(live.solids.length, 1);
+  assert.equal(live.solids.length, 0);
   assert.equal(
     productionScore({ n_solid: live.n_solid, day_u: live.hero.day_u, researchKeepGbp: 444.02 }),
-    -2.8,
+    null,
   );
 });
 

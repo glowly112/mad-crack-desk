@@ -131,6 +131,7 @@ export function filterPreEpochLeftovers(stamp: LiveStamp): LiveStamp {
   const trades = stamp.trades.filter(fillIsPostEpoch);
   const wait_open = filterWaitOpen(stamp.wait_open ?? [], stamp.recipes, recipes);
   const holes = stamp.holes.filter((h) => h.tone !== "parked");
+  const firstBookPaper = settledPaperDayU(trades, stamp.day, recipes);
 
   const trends = stamp.trends
     .filter((t) => t.day >= BOARD_RESET_DAY)
@@ -142,7 +143,7 @@ export function filterPreEpochLeftovers(stamp: LiveStamp): LiveStamp {
             n_measuring: stamp.counts.measuring,
             n_dropped: stamp.counts.kill,
             n_solid: stamp.n_solid,
-            paper_live_day_u: stamp.hero.day_u,
+            paper_live_day_u: firstBookPaper,
           }
         : t,
     );
@@ -151,7 +152,7 @@ export function filterPreEpochLeftovers(stamp: LiveStamp): LiveStamp {
     trends.find((t) => t.day === stamp.day) ??
     ({
       day: stamp.day,
-      paper_live_day_u: stamp.hero.day_u,
+      paper_live_day_u: firstBookPaper,
       factory_day_pnl_u: null,
       n_solid: stamp.n_solid,
       n_keep: stamp.counts.keep,
@@ -315,8 +316,18 @@ function boardResetSeatNow(seatId: string): string {
  * When n_armed is zero, paint the empty morning board.
  */
 function overlayPaperTape(stamp: LiveStamp): LiveStamp {
-  const paperU = settledPaperDayU(stamp.trades, stamp.day);
-  if (paperU == null) return stamp;
+  const paperU = settledPaperDayU(stamp.trades, stamp.day, stamp.recipes);
+  if (paperU == null) {
+    return {
+      ...stamp,
+      hero: { ...stamp.hero, day_u: null },
+      trends: stamp.trends.some((t) => t.day === stamp.day)
+        ? stamp.trends.map((t) =>
+            t.day === stamp.day ? { ...t, paper_live_day_u: null } : t,
+          )
+        : stamp.trends,
+    };
+  }
   const trends = stamp.trends.some((t) => t.day === stamp.day)
     ? stamp.trends.map((t) => (t.day === stamp.day ? { ...t, paper_live_day_u: paperU } : t))
     : [

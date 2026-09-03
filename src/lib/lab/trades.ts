@@ -516,6 +516,43 @@ export function paperSettledFills(fills: readonly Fill[], recipes: readonly Reci
   return honestSettledFills(fills, recipes).filter((f) => f.book === "paper" && f.result !== "void");
 }
 
+/** Hyde / fast / legacy tape — not today's post-epoch ehole first-book. */
+export function isFirstBookPaperFill(fill: Fill): boolean {
+  if (/^H-hyde-/i.test(fill.recipeId) || /^H-fast-/i.test(fill.recipeId)) return false;
+  return isPostEpochEholeRecipe({ id: fill.recipeId, title: fill.recipe });
+}
+
+/** Settled paper from post-epoch ehole first-books only — matches Office strategies. */
+export function firstBookPaperSettledFills(fills: readonly Fill[], recipes: readonly Recipe[] = []): Fill[] {
+  return paperSettledFills(fills, recipes).filter(isFirstBookPaperFill);
+}
+
+/** Settled paper u for one day — Floor tile and Office row sum. First-book only. */
+export function settledPaperDayU(
+  trades: readonly Fill[],
+  day: string,
+  recipes: readonly Recipe[] = [],
+): number | null {
+  const paper = firstBookPaperSettledFills(fillsOnDay(trades, day), recipes);
+  if (!paper.length) return null;
+  return paper.reduce((acc, f) => acc + (f.pnl ?? 0), 0);
+}
+
+/** Today's settled paper u for one strategy/book — null when no settles (Empty). */
+export function settledPaperUForRecipeIds(
+  trades: readonly Fill[],
+  day: string,
+  recipeIds: ReadonlySet<string>,
+  recipes: readonly Recipe[] = [],
+): number | null {
+  if (!recipeIds.size) return null;
+  const paper = firstBookPaperSettledFills(fillsOnDay(trades, day), recipes).filter((f) =>
+    recipeIds.has(f.recipeId),
+  );
+  if (!paper.length) return null;
+  return paper.reduce((acc, f) => acc + (f.pnl ?? 0), 0);
+}
+
 export type MillActivity = {
   open: Fill[];
   settledToday: Fill[];
@@ -535,7 +572,7 @@ export function millActivity(stamp: {
   const recipes = stamp.recipes ?? [];
   const open = honestOpenFills(dayFills, recipes);
   const settled = honestSettledFills(dayFills, recipes);
-  const paperSettled = paperSettledFills(dayFills, recipes);
+  const paperSettled = firstBookPaperSettledFills(dayFills, recipes);
   const paperDayU = paperSettled.length
     ? paperSettled.reduce((acc, f) => acc + (f.pnl ?? 0), 0)
     : null;
@@ -547,32 +584,6 @@ export function millActivity(stamp: {
     paperDayU,
     openCount: open.length,
   };
-}
-
-/** Settled paper u for one day — Floor tile matches Trades headline. */
-export function settledPaperDayU(
-  trades: readonly Fill[],
-  day: string,
-  recipes: readonly Recipe[] = [],
-): number | null {
-  const paper = paperSettledFills(fillsOnDay(trades, day), recipes);
-  if (!paper.length) return null;
-  return paper.reduce((acc, f) => acc + (f.pnl ?? 0), 0);
-}
-
-/** Today's settled paper u for one strategy/book — null when no settles (Empty). */
-export function settledPaperUForRecipeIds(
-  trades: readonly Fill[],
-  day: string,
-  recipeIds: ReadonlySet<string>,
-  recipes: readonly Recipe[] = [],
-): number | null {
-  if (!recipeIds.size) return null;
-  const paper = paperSettledFills(fillsOnDay(trades, day), recipes).filter((f) =>
-    recipeIds.has(f.recipeId),
-  );
-  if (!paper.length) return null;
-  return paper.reduce((acc, f) => acc + (f.pnl ?? 0), 0);
 }
 
 export function recipeForFill(recipes: readonly Recipe[], fill: Fill): Recipe | undefined {
