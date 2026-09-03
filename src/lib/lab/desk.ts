@@ -4,6 +4,8 @@ import type { Move, Recipe, TrendPoint } from "./stamp.ts";
 import { productionScore } from "./hero.ts";
 
 export const EMPTY = "Empty";
+/** Open or armed but not finished — not the same as unused. */
+export const WAITING = "Waiting";
 export const SOLID_EMPTY = "No solid recipes on the day tape.";
 
 export function recipePack(recipes: readonly Recipe[]) {
@@ -356,16 +358,22 @@ export function recipeResult(recipe: Recipe): string {
   return EMPTY;
 }
 
-/** Recipe as a board row. Missing ticket facts stay Empty. Never freeze P&L as income. */
+/** Recipe as a board row. Open-but-not-finished uses Waiting; unused stays Empty. */
 export function recipeDeskRow(recipe: Recipe): DeskRow {
+  const open =
+    recipe.chip === "Waiting for races" ||
+    recipe.status === "MEASURING" ||
+    recipe.badge === "Research";
+  const blob = `${recipe.region} ${recipe.title} ${recipe.id}`.toUpperCase();
+  const market = /\bPLACE\b/.test(blob) ? "PLACE" : /\bWIN\b/.test(blob) ? "WIN" : /\bLAY\b/.test(blob) ? "LAY" : null;
   return {
     id: recipe.id,
-    time: EMPTY,
+    time: open ? WAITING : EMPTY,
     name: strategyMark(recipe.title, recipe.id),
-    side: EMPTY,
-    odds: EMPTY,
-    stake: EMPTY,
-    book: EMPTY,
+    side: market ?? (open ? WAITING : EMPTY),
+    odds: open ? WAITING : EMPTY,
+    stake: open ? WAITING : EMPTY,
+    book: open ? "paper" : EMPTY,
     result: recipeResult(recipe),
     pnl: null,
     holdingId: recipe.id,

@@ -217,7 +217,10 @@ test("trade name is the mark plus horse; odds live in Odds", () => {
     why: "no size_ok candidates",
   });
   assert.equal(wait.name, "New Zealand · morning · winner · one-pick 2.5–4.49");
-  assert.equal(wait.odds, "Empty");
+  assert.equal(wait.side, "WIN");
+  assert.equal(wait.time, "Waiting");
+  assert.equal(wait.odds, "Waiting");
+  assert.equal(wait.stake, "Waiting");
   assert.equal(wait.book, "paper");
   assert.equal(wait.result, "Waiting for races");
 });
@@ -275,7 +278,33 @@ test("tradesWaitChips lists post-epoch ehole recipes and hides legacy KEEP steam
   assert.ok(rows.every((r) => r.result === "Waiting for races"));
   assert.ok(rows.every((r) => r.book === "paper"));
   assert.ok(rows.every((r) => r.pnl == null));
+  assert.ok(rows.every((r) => r.odds === "Waiting" && r.stake === "Waiting" && r.time === "Waiting"));
+  assert.ok(rows.every((r) => r.side === "WIN" || r.side === "PLACE"));
   assert.match(rows.find((r) => r.id === eholeAu.id)?.name ?? "", /Australia · morning · winner/);
+});
+
+test("open ticket shows real side/odds/stake; unsettled P&L stays Empty", () => {
+  const nzOpen = fillFromRow({
+    pick_id: "nz-open|1.26|102|BACK|2026-09-03",
+    ts: "2026-09-03T08:14:03Z",
+    date: "2026-09-03",
+    cell_id: "H-20260828T020000Z-nz-morning-win-one-pick-band-2-5-4-49",
+    mode: "auto_dry",
+    status: "OPEN",
+    odds: 3.55,
+    stake_gbp: 1,
+    side: "BACK",
+    horse: null,
+    paper_pnl_gbp: null,
+  });
+  assert.ok(nzOpen);
+  const row = fillDeskRow(nzOpen, false);
+  assert.equal(row.side, "BACK");
+  assert.equal(row.odds, "3.55");
+  assert.equal(row.stake, "1u");
+  assert.equal(row.time, "08:14:03");
+  assert.equal(row.result, "Open");
+  assert.equal(row.pnl, null);
 });
 
 test("booked clock is a real time, never Empty", () => {

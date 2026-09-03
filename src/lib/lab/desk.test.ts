@@ -105,9 +105,10 @@ test("recipe board row uses the same columns; missing facts are Empty", () => {
   assert.deepEqual([...DESK_HEADERS], ["Time", "Name", "Side", "Odds", "Stake", "Book", "Result", "P&L"]);
   const solid = recipeDeskRow(STAMP.recipes[0]);
   assert.equal(solid.name, "Britain · near-off · winner");
-  assert.equal(solid.time, "Empty");
-  assert.equal(solid.odds, "Empty");
-  assert.equal(solid.book, "Empty");
+  assert.equal(solid.time, "Waiting");
+  assert.equal(solid.side, "WIN");
+  assert.equal(solid.odds, "Waiting");
+  assert.equal(solid.book, "paper");
   assert.equal(solid.pnl, null);
   assert.equal(solid.result, "Waiting for races");
   const parked = STAMP.recipes.find((r) => r.badge === "Parked");

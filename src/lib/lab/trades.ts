@@ -2,7 +2,7 @@
 
 import { isPostEpochEholeMeasuring, isPostEpochEholeRecipe } from "./board-reset.ts";
 import { parseHole, parseMarket, parseWindow } from "./boards.ts";
-import { EMPTY, cellName, hopMoves, strategyMark, type DeskRow } from "./desk.ts";
+import { EMPTY, cellName, hopMoves, strategyMark, WAITING, type DeskRow } from "./desk.ts";
 import { hopVoice } from "./staff-voice.ts";
 import type { Move, Recipe } from "./stamp.ts";
 
@@ -191,31 +191,46 @@ export function fillResultWord(fill: Fill): string {
   return EMPTY;
 }
 
-/** Ticket as a board row. Open P&L is Empty. */
+/** Ticket as a board row. Open P&L is Empty until settled. */
 export function fillDeskRow(fill: Fill, fuseOn: boolean): DeskRow {
   const tape = tapePnl(fill, fuseOn);
+  const isOpen = fill.result === "waiting";
+  const time = bookedClock(fill.ts, fill.t);
+  const oddsStr = fmtOdds(fill.odds);
+  const stakeStr = fmtStake(fill.stake);
+  const sideStr = fill.side && fill.side !== EMPTY ? fill.side : "";
+  const pending = (value: string) => (value && value !== EMPTY ? value : isOpen ? WAITING : EMPTY);
   return {
     id: fill.id,
-    time: bookedClock(fill.ts, fill.t) || EMPTY,
+    time: pending(time),
     name: tradeName(fill),
-    side: fill.side && fill.side !== EMPTY ? fill.side : EMPTY,
-    odds: fmtOdds(fill.odds),
-    stake: fmtStake(fill.stake),
+    side: pending(sideStr),
+    odds: pending(oddsStr === EMPTY ? "" : oddsStr),
+    stake: pending(stakeStr === EMPTY ? "" : stakeStr),
     book: bookWord(fill.book),
     result: fillResultWord(fill),
-    pnl: tape.pnl,
+    pnl: isOpen ? null : tape.pnl,
   };
+}
+
+function chipMarketSide(chip: WaitOpen): string {
+  const hole = parseHole(chip.title) ?? parseHole(chip.id);
+  if (hole) return hole.market;
+  const ehole = /^H-ehole-[a-z]{2}-[a-z]+-(win|place|lay)/i.exec(chip.id);
+  if (ehole) return ehole[3].toUpperCase();
+  return WAITING;
 }
 
 /** Recipe armed with no fill. Not a ticket. */
 export function waitDeskRow(chip: WaitOpen): DeskRow {
+  const side = chipMarketSide(chip);
   return {
     id: chip.id,
-    time: EMPTY,
+    time: WAITING,
     name: strategyMark(chip.title, chip.id),
-    side: EMPTY,
-    odds: EMPTY,
-    stake: EMPTY,
+    side: side === WAITING ? WAITING : side,
+    odds: WAITING,
+    stake: WAITING,
     book: "paper",
     result: "Waiting for races",
     pnl: null,
