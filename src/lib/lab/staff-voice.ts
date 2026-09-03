@@ -187,7 +187,7 @@ function tapeSeatLines(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchStamp): 
     case "bauron": {
       const inventWhy = stamp.office?.inventWhy ?? "";
       const emptyHoleHunt = /empty-hole hunt|invent_empty/i.test(inventWhy);
-      const look = f.inventCell !== EMPTY ? speakLook(f.inventCell) : "";
+      const look = f.inventCell !== EMPTY ? f.inventCell : "";
       if (emptyHoleHunt) {
         const armed = (stamp as { mill_n_armed?: number }).mill_n_armed ?? 0;
         const parked =
@@ -274,9 +274,9 @@ function tapeSeatLines(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchStamp): 
       ];
     }
     case "mercator": {
-      const raw = f.inventCell !== EMPTY ? f.inventCell : "";
-      if (!raw) return [];
-      return [`Next empty market to look at: ${speakLook(raw)}.`];
+      const look = f.inventCell !== EMPTY ? f.inventCell : "";
+      if (!look) return [];
+      return [`Next empty market to look at: ${look}.`];
     }
     case "curator":
       if (!f.tapeName) return [];

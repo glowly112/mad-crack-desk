@@ -48,6 +48,66 @@ export function inventHole(why: string): string {
   return holeName(m[1]);
 }
 
+const HOLE_PIPE_KEY =
+  /\b(AU|GB|IE|US|NZ|ZA|HK|FR)\|[a-z_]+\|(WIN|PLACE|LAY)\b/gi;
+
+function isInPlayHoleKey(key: string): boolean {
+  return /in[\s_-]*play|in_play/i.test(key);
+}
+
+/** Parse Mercator-style lists: HK morning/late_pre/near_off WIN empties. */
+function mercatorEmptyLook(seatNow: string): string {
+  const slash =
+    /\b(AU|GB|IE|US|NZ|ZA|HK|FR)\b[\s·-]*((?:morning|late_pre|late-pre|near_off|near-off)(?:\/(?:morning|late_pre|late-pre|near_off|near-off))*)\s*(WIN|PLACE)\b/i.exec(
+      seatNow,
+    );
+  if (!slash) return EMPTY;
+  const region = slash[1].toUpperCase();
+  const windows = slash[2]
+    .split("/")
+    .map((w) => parseWindow(w.replace(/-/g, "_")))
+    .filter((w): w is SquareWindow => Boolean(w && w !== "in_play"));
+  if (!windows.length) return EMPTY;
+  const market = slash[3].toUpperCase() === "PLACE" ? "place" : "winner";
+  const wlabel = windows.map((w) => SQUARE_WINDOW_LABEL[w]).join(", ");
+  return `${countryName(region)} · ${wlabel} · ${market}`;
+}
+
+/**
+ * Live plant invent queue — seat.now and invent queue first.
+ * Never nominates in-play as a first empty hole.
+ */
+export function plantInventQueue(
+  seatNow: string,
+  inventWhy: string,
+  hunters: readonly { note: string }[] = [],
+): string {
+  const sources = [seatNow, inventWhy, ...hunters.map((h) => h.note)];
+  for (const src of sources) {
+    if (!src?.trim()) continue;
+    const merc = mercatorEmptyLook(src);
+    if (merc !== EMPTY) return merc;
+    for (const m of src.matchAll(
+      /(?:next hole|queue|hunt(?:ing)?)\s*:?\s*([A-Za-z0-9_|-]+)/gi,
+    )) {
+      const key = m[1];
+      if (!key.includes("|")) continue;
+      if (isInPlayHoleKey(key)) continue;
+      const named = holeName(key);
+      if (named !== EMPTY) return named;
+    }
+    const loose = inventHole(src);
+    if (loose !== EMPTY && !isInPlayHoleKey(src)) return loose;
+    for (const m of src.matchAll(HOLE_PIPE_KEY)) {
+      const key = m[0];
+      if (isInPlayHoleKey(key)) continue;
+      const named = holeName(key);
+      if (named !== EMPTY) return named;
+    }
+  }
+  return EMPTY;
+}
+
 /** `1 parked, 5 still being tested`. Both empty → Empty. */
 export function countrySentence(parked: number, testing: number): string {
   const bits: string[] = [];
@@ -580,10 +640,10 @@ export function racingSquareInputFromStamp(stamp: SquareStampSlice): RacingSquar
   };
 }
 
-/** First truly Empty cell on the square — not hunt / measuring / parked. */
+/** First truly Empty cell on the square — not hunt / measuring / parked. Skips in-play. */
 export function nextEmptySquareHole(stamp: SquareStampSlice): string {
   const holes = racingSquare(racingSquareInputFromStamp(stamp));
-  const pick = holes.find((h) => h.tone === "empty");
+  const pick = holes.find((h) => h.tone === "empty" && h.window !== "in_play");
   return pick ? holeName(`${pick.region}|${pick.window}|${pick.market}`) : EMPTY;
 }
 
@@ -1519,7 +1579,6 @@ export function staffBookFacts(seatNow: string, stamp: StaffWatchStamp) {
   const recipes = millDisplayRecipes(stamp.recipes ?? []);
   const inventWhy = stamp.office?.inventWhy ?? "";
   const onHunt = isEmptyHoleHuntBoard(inventWhy);
-  const nextEmpty = onHunt ? nextEmptySquareHole(stamp) : EMPTY;
   const solids = (stamp.solids?.length ? stamp.solids : recipes.filter((r) => r.badge === "Solid")) ?? [];
   const tape = solids[0] ?? recipes.find((r) => r.badge === "Solid") ?? null;
   const parked = recipes.filter((r) => r.badge === "Parked" || (r.status === "KEEP" && r.badge !== "Solid"));
@@ -1542,8 +1601,16 @@ export function staffBookFacts(seatNow: string, stamp: StaffWatchStamp) {
     }
   }
   const fillAdjKills = (stamp.moves ?? []).filter((m) => /fill-adj/i.test(m.why) && /dead/i.test(m.to));
+  const plantQueue = plantInventQueue(seatNow, inventWhy, stamp.hunters ?? []);
   const inventCell = onHunt
-    ? nextEmpty
+    ? plantQueue !== EMPTY
+      ? plantQueue
+      : inventHole(inventWhy) !== EMPTY
+        ? inventHole(inventWhy)
+        : (() => {
+            const q = /(?:next hole|queue)\s+([A-Za-z0-9_|-]+)/i.exec(blob);
+            return q && !isInPlayHoleKey(q[1]) ? holeName(q[1]) : EMPTY;
+          })()
     : inventHole(inventWhy) !== EMPTY
       ? inventHole(inventWhy)
       : inventHole(seatNow) !== EMPTY

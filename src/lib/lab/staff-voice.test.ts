@@ -155,3 +155,30 @@ test("Empty seat has no bubbles", () => {
   assert.ok(bubbles.length > 0);
   assert.equal(EMPTY, "Empty");
 });
+
+test("Staff hunt bubbles use plant seat.now, not in-play square scan", () => {
+  const stamp = {
+    ...STAMP,
+    day: "2026-09-03",
+    office: { ...STAMP.office, invent: true, inventWhy: "empty-hole hunt on · invent_empty_holes · mill parked" },
+    mill_n_armed: 23,
+    trades: [],
+    n_solid: 0,
+    solids: [],
+  };
+  const bauron = STAMP.seats.find((s) => s.id === "bauron")!;
+  const mercator = STAMP.seats.find((s) => s.id === "mercator")!;
+  const bText = seatBubbles({ ...bauron, now: "hunt HK|morning|WIN" }, stamp)
+    .map((b) => b.text)
+    .join(" ");
+  assert.match(bText, /Next empty hole: Hong Kong · morning · winner/);
+  assert.ok(!bText.includes("in-play"));
+  const mText = seatBubbles(
+    { ...mercator, now: "HK morning/late_pre/near_off WIN empties" },
+    stamp,
+  )
+    .map((b) => b.text)
+    .join(" ");
+  assert.match(mText, /Hong Kong · morning, late-pre, near-off · winner/);
+  assert.ok(!mText.includes("Australia"));
+});

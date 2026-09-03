@@ -19,6 +19,7 @@ import {
   holeSideOccupied,
   inventHole,
   inventWhatHappened,
+  plantInventQueue,
   bookPeriods,
   bookStageLine,
   bookStages,
@@ -319,7 +320,7 @@ test("office issues hide stale KEEP rows on empty hunt board", () => {
   assert.ok(!rows.some((r) => r.id === "keep-not-solid"));
 });
 
-test("next empty square hole skips occupied hunt cells", () => {
+test("next empty square hole skips occupied hunt cells and in-play", () => {
   const hole = nextEmptySquareHole({
     recipes: [{ ...STAMP.recipes[0], region: "ZA", title: "ZA morning WIN", status: "MEASURING" }],
     office: { inventWhy: "empty-hole hunt on · mill parked" },
@@ -327,6 +328,26 @@ test("next empty square hole skips occupied hunt cells", () => {
   });
   assert.ok(hole !== EMPTY);
   assert.ok(!/South Africa · morning · winner/i.test(hole));
+  assert.ok(!/in-play/i.test(hole));
+});
+
+test("plant invent queue prefers live seat.now and skips in-play", () => {
+  assert.equal(
+    plantInventQueue("hunt HK|morning|WIN · empty-hole fast-arm", "empty-hole hunt on · invent_empty_holes", []),
+    "Hong Kong · morning · winner",
+  );
+  assert.equal(
+    plantInventQueue(
+      "HK morning/late_pre/near_off WIN empties",
+      "empty-hole hunt on · invent_empty_holes",
+      [],
+    ),
+    "Hong Kong · morning, late-pre, near-off · winner",
+  );
+  assert.equal(plantInventQueue("next hole: AU|in_play|PLACE", "empty-hole hunt on", []), EMPTY);
+  assert.ok(
+    !plantInventQueue("", "empty-hole hunt on", [{ note: "queue AU|in_play|WIN" }]).includes("in-play"),
+  );
 });
 
 test("square glance is 64-hole occupancy, not mill cells", () => {
