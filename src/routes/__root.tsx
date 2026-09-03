@@ -5,6 +5,7 @@ import { PlantProvider } from "@/components/plant-provider";
 import { PrefsProvider } from "@/components/prefs-provider";
 import { AppShell } from "@/components/app-shell";
 import { AppErrorComponent, AppNotFoundComponent } from "@/lib/error-component";
+import { getPlant } from "@/lib/lab/get-plant";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "Mad Crack Lab";
@@ -15,8 +16,7 @@ export const Route = createRootRoute({
   errorComponent: AppErrorComponent,
   notFoundComponent: AppNotFoundComponent,
   loader: async () => {
-    const { loadPlant } = await import("@/lib/lab/load-plant.server.ts");
-    const plant = await loadPlant();
+    const plant = await getPlant();
     return { plant };
   },
   head: () => ({
