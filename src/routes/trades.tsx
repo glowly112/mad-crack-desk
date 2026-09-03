@@ -10,8 +10,8 @@ import {
   dayTapePnl,
   fillDeskRow,
   fillsOnDay,
-  honestOpenFills,
-  honestSettledFills,
+  honestFirstBookOpenFills,
+  honestFirstBookSettledFills,
   waitDeskRow,
   tradesWaitChips,
 } from "@/lib/lab/trades";
@@ -24,8 +24,8 @@ export function Trades() {
   const plant = usePlantSource();
   const scope = useDayScope();
   const dayFills = fillsOnDay(stamp.trades, scope.day);
-  const open = honestOpenFills(dayFills, stamp.recipes);
-  const settled = honestSettledFills(dayFills, stamp.recipes);
+  const open = honestFirstBookOpenFills(dayFills, stamp.recipes);
+  const settled = honestFirstBookSettledFills(dayFills, stamp.recipes);
   const chips = scope.lookingBack ? [] : tradesWaitChips(stamp.recipes, stamp.wait_open ?? [], open);
   const tape = dayTapePnl(settled, stamp.fuse_on);
   const live = plant.source === "oracle";

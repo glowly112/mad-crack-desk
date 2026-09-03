@@ -1,12 +1,12 @@
 import type { LiveStamp } from "./from-digest.ts";
 import { mergeMillPathRuns } from "./mill-paths.ts";
 import { cellName } from "./desk.ts";
+import { scrubPostResetTrendPaper } from "./desk.ts";
 import type { Badge, Chip, Recipe } from "./stamp.ts";
 import { parseFills, parseWaitOpen, settledPaperDayU } from "./trades.ts";
 import { parseHole, parseWindow, parseMarket, regionFromText, millHuntCaption, squareHoleKeyAndSide, normalizeSquareHoleKey, type ParsedSquareMarket, type SquareWindow } from "./boards.ts";
 import { isSprayClassInPlayEholeFirstBook } from "./mill-display.ts";
-import { cellIsPostEpochEhole, cellIsPostEpochParkedKeep } from "./board-reset.ts";
-import { matrixKeyFromScoreboardCell } from "./hollow-keys.ts";
+import { cellIsPostEpochEhole, cellIsPostEpochParkedKeep, recipeIsPostEpoch } from "./board-reset.ts";
 
 const REGIONS = ["AU", "GB", "IE", "US", "NZ", "ZA", "HK", "FR"] as const;
 const BADGES: Badge[] = ["Solid", "Research", "Parked", "Dead"];
@@ -113,15 +113,16 @@ function cellsOf(raw: Record<string, unknown>): Record<string, unknown>[] {
 }
 
 function recipesFromCells(cells: Record<string, unknown>[]): Recipe[] {
-  const measuring: Recipe[] = [];
+  const out: Recipe[] = [];
   for (const c of cells) {
-    if (!cellPaintsSquare(c)) continue;
     const status = statusOf(c);
-    if (status !== "MEASURING" && status !== "HUNTING") continue;
+    const id = String(c.id || c.title || "").trim();
+    if (/^H-hyde-/i.test(id)) continue;
+    if (status === "KILL") continue;
+    if (status !== "MEASURING" && status !== "HUNTING" && status !== "KEEP") continue;
+    if (!id) continue;
     const score = rec(c.score) ?? {};
     const stats = rec(c.stats) ?? {};
-    const id = String(c.id || c.title || "").trim();
-    if (!id) continue;
     const title = cellName(id, String(c.title || ""));
     const n = int(c.n) ?? int(score.n_size_ok) ?? int(c.n_size_ok) ?? 0;
     const roi = num(stats.roi) ?? num(score.roi_size_ok_pct) ?? num(c.roi) ?? 0;
@@ -131,7 +132,9 @@ function recipesFromCells(cells: Record<string, unknown>[]): Recipe[] {
         ? c.why
         : status === "HUNTING"
           ? "Looking for the next book."
-          : "Still proving. Not the score.";
+          : status === "KEEP"
+            ? "Research keep."
+            : "Still proving. Not the score.";
     const hunterName =
       typeof c.hunter_name === "string" && c.hunter_name.trim() ? c.hunter_name.trim() : null;
     const recipe: Recipe = {
@@ -147,9 +150,16 @@ function recipesFromCells(cells: Record<string, unknown>[]): Recipe[] {
       why,
       hunterName,
     };
-    measuring.push(recipe);
+    out.push(recipe);
   }
-  return measuring.slice(0, RECIPE_CAP);
+  out.sort((a, b) => {
+    if (a.badge === "Solid" && b.badge !== "Solid") return -1;
+    if (b.badge === "Solid" && a.badge !== "Solid") return 1;
+    if (a.status === "KEEP" && b.status !== "KEEP") return -1;
+    if (b.status === "KEEP" && a.status !== "KEEP") return 1;
+    return 0;
+  });
+  return out.slice(0, RECIPE_CAP);
 }
 
 function plantRegion(c: Record<string, unknown>): string | null {
@@ -220,38 +230,51 @@ function holePlacementsFromCell(c: Record<string, unknown>): LiveStamp["holes"] 
   ) {
     return [];
   }
-  const sideHit = squareHoleKeyAndSide(id, title, regionCode ?? undefined);
   const tone = holeToneFromStatus(status);
+  const out: LiveStamp["holes"] = [];
+  const seen = new Set<string>();
+
+  function pushHole(hole: LiveStamp["holes"][number]) {
+    const key = `${hole.region}|${hole.window}|${hole.market}`;
+    const rank = HOLE_TONE_RANK[hole.tone ?? "idea"] ?? 0;
+    const idx = out.findIndex((h) => `${h.region}|${h.window}|${h.market}` === key);
+    if (idx >= 0) {
+      const curRank = HOLE_TONE_RANK[out[idx]?.tone ?? "idea"] ?? 0;
+      if (rank > curRank) out[idx] = hole;
+    } else {
+      out.push(hole);
+      seen.add(key);
+    }
+  }
+
+  const sideHit = squareHoleKeyAndSide(id, title, regionCode ?? undefined);
   if (sideHit) {
     const parts = sideHit.id.split("|");
     const window = parseWindow(parts[1]) ?? (parts[1] as SquareWindow);
-    return [
-      {
-        region: parts[0],
-        window,
-        market: sideHit.market,
-        tone,
-        side: sideHit.side,
-      },
-    ];
+    pushHole({
+      region: parts[0],
+      window,
+      market: sideHit.market,
+      tone,
+      side: sideHit.side,
+    });
   }
+
   const blob = cellBlob(c);
   const parsed = parseHole(blob);
   const region = regionCode ?? parsed?.region ?? regionFromText(blob);
   const market = plantMarket(c) ?? parsed?.market;
-  if (!region || !market) return [];
+  if (!region || !market) return out;
   const plantW = plantWindow(c);
   const parsedW = parsed?.window;
   const windows: SquareWindow[] = [];
   if (plantW) windows.push(plantW);
   if (parsedW && !windows.includes(parsedW)) windows.push(parsedW);
   if (!windows.length && parsedW) windows.push(parsedW);
-  if (!windows.length) return [];
-  const out: LiveStamp["holes"] = [];
   for (const window of windows) {
     const norm = normalizeSquareHoleKey(region, window, market);
     if (!norm) continue;
-    out.push({
+    pushHole({
       region,
       window,
       market: norm.market,
@@ -302,25 +325,6 @@ function countEholeArms(cells: Record<string, unknown>[]): number {
 }
 
 /** Post-epoch occupancy from factory empty-hole hunt — not every MEASURING cell on the board. */
-function supplementOccupiedKeys(
-  keys: Set<string>,
-  cells: Record<string, unknown>[],
-  targetN: number,
-): void {
-  if (targetN <= 0 || keys.size >= targetN) return;
-  for (const c of cells) {
-    if (!cellIsPostEpochEhole(c)) continue;
-    const st = statusOf(c);
-    if (st !== "MEASURING" && st !== "HUNTING" && st !== "KEEP") continue;
-    const fromCell = matrixKeyFromScoreboardCell(c);
-    if (fromCell) keys.add(fromCell);
-    for (const h of holePlacementsFromCell(c)) {
-      keys.add(`${h.region}|${h.window}|${h.market}`);
-    }
-    if (keys.size >= targetN) return;
-  }
-}
-
 function holesFromOccupancyPostEpoch(
   snap: Record<string, unknown>,
   cells: Record<string, unknown>[],
@@ -335,9 +339,6 @@ function holesFromOccupancyPostEpoch(
 
   const keySet = new Set<string>();
   for (const key of list) keySet.add(String(key));
-  if (nOccupied != null && nOccupied > 0 && keySet.size < nOccupied) {
-    supplementOccupiedKeys(keySet, cells, nOccupied);
-  }
   let keysToPaint = [...keySet];
   if (nOccupied != null && nOccupied > 0 && keysToPaint.length > nOccupied) {
     keysToPaint = keysToPaint.slice(0, nOccupied);
@@ -470,8 +471,11 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
   const researchKeepGbp =
     num(snap.pnlTotal) ?? num(summary.keep_pnl_gbp) ?? num(summary.keep_pnl_now_gbp) ?? base.researchKeepGbp;
 
-  const solids = recipes.filter((r) => r.badge === "Solid");
-  const n_solid = nSolidExplicit ?? (recipes.length ? solids.length : base.n_solid);
+  const solids = recipes.filter((r) => r.badge === "Solid" && recipeIsPostEpoch(r));
+  const plantOracle = isPlantSnap(opened);
+  const n_solid =
+    nSolidExplicit ??
+    (recipes.length ? solids.length : plantOracle ? 0 : base.n_solid);
   const cellList = cellsOf(snap);
   const occupancyHoles = isPlantSnap(opened) ? holesFromOccupancyPostEpoch(snap, cellList) : null;
   const namedHolesFromCells = holesFromCells(cellList);
@@ -491,7 +495,6 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
     (typeof snap.ts === "string" && snap.ts) ||
     base.generated;
 
-  const plantOracle = isPlantSnap(opened);
   const inventCaption = plantOracle ? inventCaptionFromSnap(snap) : null;
   const inventWhyRaw = inventCaption ?? base.office.inventWhy;
   const inventOn = inventCaption ? inventIsOn(inventCaption) : base.office.invent;
@@ -525,17 +528,20 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
           factory_day_pnl_u: null,
         },
       ];
-  const trends = trendsBase.map((t) => {
-    if (t.day !== date) return t;
-    return {
-      ...t,
-      n_keep: keep,
-      n_measuring: measuring,
-      n_dropped: kill,
-      n_solid,
-      paper_live_day_u: firstBookPaper,
-    };
-  });
+  const trends = scrubPostResetTrendPaper(
+    trendsBase.map((t) => {
+      if (t.day !== date) return t;
+      return {
+        ...t,
+        n_keep: keep,
+        n_measuring: measuring,
+        n_dropped: kill,
+        n_solid,
+      };
+    }),
+    tradesParsed,
+    recipes,
+  );
 
   return {
     ...base,

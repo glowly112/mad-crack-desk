@@ -511,6 +511,22 @@ export function honestSettledFills(fills: readonly Fill[], _recipes: readonly Re
   return settledFills(fills).filter((f) => !junk.has(f.id));
 }
 
+/** Trades settled — Hyde / fast / legacy morning tape hidden. */
+export function honestFirstBookSettledFills(
+  fills: readonly Fill[],
+  recipes: readonly Recipe[] = [],
+): Fill[] {
+  return honestSettledFills(fills, recipes).filter(isFirstBookTapeFill);
+}
+
+/** Trades open — post-epoch ehole first-books only. */
+export function honestFirstBookOpenFills(
+  fills: readonly Fill[],
+  recipes: readonly Recipe[] = [],
+): Fill[] {
+  return honestOpenFills(fills, recipes).filter(isFirstBookTapeFill);
+}
+
 /** Paper settles that contribute to the day u total. */
 export function paperSettledFills(fills: readonly Fill[], recipes: readonly Recipe[] = []): Fill[] {
   return honestSettledFills(fills, recipes).filter((f) => f.book === "paper" && f.result !== "void");
@@ -520,6 +536,15 @@ export function paperSettledFills(fills: readonly Fill[], recipes: readonly Reci
 export function isFirstBookPaperFill(fill: Fill): boolean {
   if (/^H-hyde-/i.test(fill.recipeId) || /^H-fast-/i.test(fill.recipeId)) return false;
   return isPostEpochEholeRecipe({ id: fill.recipeId, title: fill.recipe });
+}
+
+/** Open or settled on today's mill tape — post-epoch ehole first-book only. */
+export function isFirstBookTapeFill(fill: Fill): boolean {
+  if (/^H-hyde-/i.test(fill.recipeId) || /^H-fast-/i.test(fill.recipeId)) return false;
+  if (fill.result === "waiting") {
+    return isPostEpochEholeRecipe({ id: fill.recipeId, title: fill.recipe });
+  }
+  return isFirstBookPaperFill(fill);
 }
 
 /** Settled paper from post-epoch ehole first-books only — matches Office strategies. */

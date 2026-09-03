@@ -1,6 +1,7 @@
 /** Display grouping for the desk. Never sums cells or invents a score. */
 
 import type { Move, Recipe, TrendPoint } from "./stamp.ts";
+import { BOARD_RESET_DAY } from "./board-reset.ts";
 import { settledPaperDayU } from "./trades.ts";
 
 export const EMPTY = "Empty";
@@ -134,6 +135,40 @@ export function floorDayValue(id: FloorFactId, point: TrendPoint | undefined): n
   return null;
 }
 
+/** Paper u for one day — post-reset from first-book tape only, never hero leftovers. */
+export function floorPaperForDay(
+  stamp: Pick<FloorStamp, "trades" | "recipes" | "trends">,
+  day: string,
+): number | null {
+  if (day >= BOARD_RESET_DAY) {
+    return settledPaperDayU(stamp.trades ?? [], day, stamp.recipes);
+  }
+  const trend = stamp.trends.find((t) => t.day === day);
+  return trend?.paper_live_day_u ?? null;
+}
+
+export function floorFactDayValue(
+  stamp: FloorStamp,
+  fact: FloorFactId,
+  day: string,
+): number | null {
+  if (fact === "paper") return floorPaperForDay(stamp, day);
+  const point = stamp.trends.find((t) => t.day === day);
+  return floorDayValue(fact, point);
+}
+
+/** Post-reset trend rows — paper_live_day_u from first-book tape, not hero day_u. */
+export function scrubPostResetTrendPaper(
+  trends: readonly TrendPoint[],
+  trades: readonly import("./trades.ts").Fill[],
+  recipes: readonly Recipe[],
+): TrendPoint[] {
+  return trends.map((t) => {
+    if (t.day < BOARD_RESET_DAY) return t;
+    return { ...t, paper_live_day_u: settledPaperDayU(trades, t.day, recipes) };
+  });
+}
+
 /** Independent Floor facts. No aim, mill, or quota language. */
 export function floorFacts(
   stamp: FloorStamp,
@@ -148,7 +183,7 @@ export function floorFacts(
   let paper: number | null;
   let paperHint: string;
   if (scope.lookingBack) {
-    paper = trend?.paper_live_day_u ?? null;
+    paper = floorPaperForDay(stamp, scope.day);
     paperHint = paper != null ? `${dayHint} · paper` : dayHint;
   } else if (tapePaper != null) {
     paper = tapePaper;

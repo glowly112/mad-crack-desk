@@ -18,6 +18,8 @@ import {
   dayWindow,
   ensureWindowEndsOn,
   floorFacts,
+  floorFactDayValue,
+  scrubPostResetTrendPaper,
   hopTally,
   floorSeats,
   hopMoves,
@@ -164,10 +166,10 @@ test("daily window and domain keep Empty days off the scale", () => {
   assert.ok(ahead.includes("2026-09-02"));
   const anchored = ensureWindowEndsOn("2026-09-03", ["2026-08-27", "2026-09-02"], 8);
   assert.equal(anchored.at(-1), "2026-09-03");
-  const win = chartWindow(STAMP.trends, "2026-09-02", 8);
-  assert.equal(win.at(-1), "2026-09-02");
-  assert.ok(win.includes("2026-08-26"));
-  assert.equal(win.length, 8);
+  const win = chartWindow(STAMP.trends, "2026-08-25", 8);
+  assert.equal(win.at(-1), "2026-08-25");
+  assert.ok(win.includes("2026-08-19"));
+  assert.equal(win.length, 7);
   const nums = win.map((d) => STAMP.trends.find((t) => t.day === d)?.paper_live_day_u);
   const [lo, hi] = dailyDomain(nums);
   assert.ok(lo <= -60);
@@ -222,4 +224,27 @@ test("Floor facts are plant numbers, not a 100u quota", () => {
   assert.equal(hydeFacts.find((f) => f.id === "paper")?.value, null);
   const tally = hopTally(STAMP.moves);
   assert.ok(tally.some((t) => t.label === "Certified" && t.n === 1));
+});
+
+test("Floor paper chart uses first-book tape on post-reset days", () => {
+  const stamp = {
+    ...STAMP,
+    day: "2026-09-03",
+    trades: [],
+    trends: [
+      ...STAMP.trends,
+      {
+        day: "2026-09-03",
+        paper_live_day_u: -3.71 as number | null,
+        n_solid: 0,
+        n_keep: 0,
+        n_measuring: 0,
+        n_dropped: 0,
+        factory_day_pnl_u: null,
+      },
+    ],
+  };
+  assert.equal(floorFactDayValue(stamp, "paper", "2026-09-03"), null);
+  const scrubbed = scrubPostResetTrendPaper(stamp.trends, [], stamp.recipes);
+  assert.equal(scrubbed.find((t) => t.day === "2026-09-03")?.paper_live_day_u, null);
 });

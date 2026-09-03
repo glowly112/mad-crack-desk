@@ -9,7 +9,7 @@ import {
   dailyDomain,
   dailyTicks,
   EMPTY,
-  floorDayValue,
+  floorFactDayValue,
   floorFacts,
   seriesWindow,
   ensureWindowEndsOn,
@@ -126,12 +126,7 @@ function DailyBars({ fact }: { fact: FloorFactId }) {
   const days = stamp.trends.map((t) => t.day);
   const points = ensureWindowEndsOn(
     scope.today,
-    seriesWindow(days, scope.today, (d) =>
-      floorDayValue(
-        fact,
-        stamp.trends.find((t) => t.day === d),
-      ),
-    ),
+    seriesWindow(days, scope.today, (d) => floorFactDayValue(stamp, fact, d)),
     8,
   );
   const series = points.map((d) => {
@@ -148,7 +143,7 @@ function DailyBars({ fact }: { fact: FloorFactId }) {
       }
     );
   });
-  const nums = series.map((p) => floorDayValue(fact, p));
+  const nums = series.map((p) => floorFactDayValue(stamp, fact, p.day));
   const vacant = fact === "holes" || nums.every((v) => v == null);
   if (vacant) {
     return (
@@ -211,7 +206,7 @@ function DailyBars({ fact }: { fact: FloorFactId }) {
         {series.map((p, i) => {
           const selected = p.day === scope.day;
           const oracleEnd = p.day === scope.today;
-          const v = floorDayValue(fact, p);
+          const v = floorFactDayValue(stamp, fact, p.day);
           const cx = xAt(i);
           const barW = Math.max(6, slot * 0.55);
           return (

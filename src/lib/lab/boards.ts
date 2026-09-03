@@ -2,6 +2,7 @@
 
 import { EMPTY, cellName, recipePack, recipeBookName, bookDisplayName, strategyMark } from "./desk.ts";
 import { isSprayClassInPlayEholeFirstBook, millDisplayRecipes } from "./mill-display.ts";
+import { isPostEpochEholeRecipe } from "./board-reset.ts";
 import type { Move, Recipe, Seat } from "./stamp.ts";
 
 export const REGIONS = ["AU", "GB", "IE", "US", "NZ", "ZA", "HK", "FR"] as const;
@@ -428,22 +429,9 @@ export function floorRacingSquare(input: {
   );
 }
 
-/** Floor morning board: no red whole-cell kills — voids and one-day drops stay Empty. */
+/** Floor morning board: legacy recipe roll-up kills are stripped upstream; oracle named holes keep KILL. */
 export function stripFloorWholeCellKills(cells: readonly HoleCell[]): HoleCell[] {
-  const strip = (tone: MarketTone | undefined): MarketTone => (tone === "loss" ? "empty" : tone ?? "empty");
-  return cells.map((cell) => {
-    const backTone = strip(cell.backTone);
-    const layTone = strip(cell.layTone);
-    const tone =
-      TONE_RANK[backTone] >= TONE_RANK[layTone]
-        ? backTone !== "empty"
-          ? backTone
-          : layTone
-        : layTone !== "empty"
-          ? layTone
-          : "empty";
-    return { ...cell, backTone, layTone, tone };
-  });
+  return cells.map((cell) => ({ ...cell }));
 }
 
 /**
@@ -488,12 +476,24 @@ export function racingSquare(input: RacingSquareInput): HoleCell[] {
       const side = (h.side ?? "").toUpperCase() === "LAY" ? "LAY" : "BACK";
       occupySide(occ, norm.id, side, tone);
     }
-    const displayRecipes = millDisplayRecipes(input.recipes ?? []);
-    for (const r of displayRecipes) {
-      if (isSprayClassInPlayEholeFirstBook(r)) continue;
-      const parsed = squareHoleKeyAndSide(r.id, r.title, r.region);
-      if (!parsed) continue;
-      occupySide(occ, parsed.id, parsed.side, recipeTone(r));
+    if (!input.floorOnly) {
+      const displayRecipes = millDisplayRecipes(input.recipes ?? []);
+      for (const r of displayRecipes) {
+        if (isSprayClassInPlayEholeFirstBook(r)) continue;
+        const parsed = squareHoleKeyAndSide(r.id, r.title, r.region);
+        if (!parsed) continue;
+        occupySide(occ, parsed.id, parsed.side, recipeTone(r));
+      }
+    } else {
+      const displayRecipes = millDisplayRecipes(
+        (input.recipes ?? []).filter((r) => isPostEpochEholeRecipe(r)),
+      );
+      for (const r of displayRecipes) {
+        if (isSprayClassInPlayEholeFirstBook(r)) continue;
+        const parsed = squareHoleKeyAndSide(r.id, r.title, r.region);
+        if (!parsed) continue;
+        occupySide(occ, parsed.id, parsed.side, recipeTone(r));
+      }
     }
     for (const f of input.openFills ?? []) {
       const hit = squareHoleFromOpenFill(f);

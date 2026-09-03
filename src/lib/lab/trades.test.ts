@@ -14,6 +14,7 @@ import {
   settledFills,
   honestSettledFills,
   honestOpenFills,
+  honestFirstBookSettledFills,
   paperSettledFills,
   fieldSprayFillIds,
   settledPaperDayU,
@@ -531,6 +532,36 @@ test("Hyde and fast leftovers do not count as today's first-book paper", () => {
   });
   assert.ok(hyde && fast);
   assert.equal(settledPaperDayU([hyde!, fast!], "2026-09-03"), null);
+  assert.equal(honestFirstBookSettledFills([hyde!, fast!]).length, 0);
+});
+
+test("Trades settled hides Hyde; ehole first-book still shows", () => {
+  const hyde = fillFromRow({
+    pick_id: "hyde-1",
+    date: "2026-09-03",
+    cell_id: "H-hyde-gb-morning-win",
+    mode: "auto_dry",
+    status: "SETTLED",
+    stake_gbp: 2,
+    paper_pnl_gbp: -3.71,
+    placed_result: false,
+    side: "BACK",
+    ts: "2026-09-03T12:00:00Z",
+  })!;
+  const ehole = fillFromRow({
+    pick_id: "eh-1",
+    date: "2026-09-03",
+    cell_id: "H-ehole-gb-nearoff-win-83959Z",
+    mode: "auto_dry",
+    status: "SETTLED",
+    stake_gbp: 2,
+    paper_pnl_gbp: 1,
+    placed_result: true,
+    side: "BACK",
+    ts: "2026-09-03T12:05:00Z",
+  })!;
+  assert.equal(honestFirstBookSettledFills([hyde, ehole]).length, 1);
+  assert.equal(honestFirstBookSettledFills([hyde, ehole])[0]?.id, "eh-1");
 });
 
 test("field spray open packs are hidden from Open tape", () => {

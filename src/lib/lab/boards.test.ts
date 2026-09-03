@@ -37,6 +37,7 @@ import {
   staffLine,
   waffleCols,
 } from "./boards.ts";
+import { scrubMillVoidNamedHoles } from "./junk-fills.ts";
 import { EMPTY } from "./desk.ts";
 import { STAMP } from "./stamp.ts";
 
@@ -179,11 +180,53 @@ test("square cells show BACK and LAY on the same WIN/PLACE hole", () => {
 });
 
 test("floor morning board strips whole-cell kills — voids stay Empty", () => {
-  const holes = floorRacingSquare({
-    namedHoles: [
+  const voidFills = [
+    {
+      id: "za-void",
+      ts: "2026-09-03T10:00:00Z",
+      t: "10:00",
+      day: "2026-09-03",
+      recipe: "ZA morning WIN",
+      recipeId: "H-ehole-za-morning-win-73506Z",
+      market: "WIN",
+      book: "paper",
+      side: "BACK",
+      odds: 2,
+      stake: 1,
+      result: "void",
+      flight: null,
+      liquidity: null,
+      pnl: 0,
+      horse: null,
+    },
+    {
+      id: "gb-void",
+      ts: "2026-09-03T10:05:00Z",
+      t: "10:05",
+      day: "2026-09-03",
+      recipe: "GB late-pre WIN",
+      recipeId: "H-ehole-gb-latepre-win-34829Z",
+      market: "WIN",
+      book: "paper",
+      side: "BACK",
+      odds: 2,
+      stake: 1,
+      result: "void",
+      flight: null,
+      liquidity: null,
+      pnl: 0,
+      horse: null,
+    },
+  ] as const;
+  const named = scrubMillVoidNamedHoles(
+    [
       { region: "ZA", window: "morning", market: "WIN", tone: "loss" },
       { region: "GB", window: "late_pre", market: "WIN", tone: "kill" },
     ],
+    voidFills,
+  );
+  const holes = floorRacingSquare({
+    namedHoles: named,
     recipes: [
       {
         id: "H-killed-book",

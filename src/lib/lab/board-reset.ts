@@ -1,10 +1,10 @@
 /** Board reset epoch — hide pre-run leftovers only; post-epoch arms stay on the board. */
 
 import { parseMarket, parseWindow } from "./boards.ts";
-import { EMPTY } from "./desk.ts";
+import { EMPTY, scrubPostResetTrendPaper } from "./desk.ts";
 import type { LiveStamp } from "./from-digest.ts";
 import type { Fill } from "./trades.ts";
-import { honestOpenFills, settledPaperDayU } from "./trades.ts";
+import { honestFirstBookOpenFills, settledPaperDayU, isFirstBookTapeFill } from "./trades.ts";
 import type { Recipe } from "./stamp.ts";
 
 export const BOARD_RESET_EPOCH = "20260902T101756Z";
@@ -128,14 +128,13 @@ function filterWaitOpen(
 export function filterPreEpochLeftovers(stamp: LiveStamp): LiveStamp {
   const recipes = stamp.recipes.filter(recipeIsPostEpoch);
   const solids = recipes.filter((r) => r.badge === "Solid");
-  const trades = stamp.trades.filter(fillIsPostEpoch);
+  const trades = stamp.trades.filter((f) => fillIsPostEpoch(f) && isFirstBookTapeFill(f));
   const wait_open = filterWaitOpen(stamp.wait_open ?? [], stamp.recipes, recipes);
   const holes = stamp.holes.filter((h) => h.tone !== "parked");
   const firstBookPaper = settledPaperDayU(trades, stamp.day, recipes);
 
-  const trends = stamp.trends
-    .filter((t) => t.day >= BOARD_RESET_DAY)
-    .map((t) =>
+  const trends = scrubPostResetTrendPaper(
+    stamp.trends.filter((t) => t.day >= BOARD_RESET_DAY).map((t) =>
       t.day === stamp.day
         ? {
             ...t,
@@ -143,10 +142,12 @@ export function filterPreEpochLeftovers(stamp: LiveStamp): LiveStamp {
             n_measuring: stamp.counts.measuring,
             n_dropped: stamp.counts.kill,
             n_solid: stamp.n_solid,
-            paper_live_day_u: firstBookPaper,
           }
         : t,
-    );
+    ),
+    trades,
+    recipes,
+  );
 
   const dayTrend =
     trends.find((t) => t.day === stamp.day) ??
@@ -167,6 +168,7 @@ export function filterPreEpochLeftovers(stamp: LiveStamp): LiveStamp {
     trades,
     wait_open,
     holes,
+    hero: { ...stamp.hero, day_u: firstBookPaper },
     n_solid: solids.length > 0 ? solids.length : recipes.length ? stamp.n_solid : 0,
     trends: trends.length ? trends : [dayTrend],
     moves: stamp.moves.filter((m) => {
@@ -196,8 +198,8 @@ export function isBoardResetView(stamp: {
   const recipes = (stamp.recipes ?? []) as Recipe[];
   const trades = (stamp.trades ?? []) as Fill[];
   const postRecipes = recipes.filter(recipeIsPostEpoch);
-  const postTrades = trades.filter(fillIsPostEpoch);
-  if (postTrades.length > 0 || honestOpenFills(postTrades).length > 0) return false;
+  const postTrades = trades.filter((f) => fillIsPostEpoch(f) && isFirstBookTapeFill(f));
+  if (postTrades.length > 0 || honestFirstBookOpenFills(postTrades, postRecipes).length > 0) return false;
   const day = stamp.day ?? "";
   if (day && settledPaperDayU(postTrades, day) != null) return false;
   return (
