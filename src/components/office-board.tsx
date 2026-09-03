@@ -12,6 +12,7 @@ import {
   inventWhatHappened,
   officeIssuesForBoard,
   officeWorkers,
+  isEmptyHoleHuntBoard,
   pipeBoard,
   SQUARE_HOLE_COUNT,
   dedupeRecipesByHole,
@@ -89,6 +90,7 @@ export function FactoryLine() {
     square: { armed, empty: emptyN, solid: stamp.n_solid },
   });
   const squares = factorySquares(board.stages);
+  const hunt = isEmptyHoleHuntBoard(stamp.office.inventWhy);
   const glance = board.stages
     .map((s) => `${s.label} ${s.count === 0 ? EMPTY : s.count}`)
     .join(". ");
@@ -97,7 +99,9 @@ export function FactoryLine() {
     <section className="space-y-5">
       <header className="mb-2 flex items-baseline justify-between gap-3 border-b border-border pb-2">
         <h2 className="text-sm font-medium">Factory line</h2>
-        <p className="text-xs text-subtle">New ideas to live</p>
+        <p className="text-xs text-subtle">
+          {hunt ? "Armed and empty on the square" : "New ideas to live"}
+        </p>
       </header>
       {board.stuck === EMPTY ? (
         <EmptyState copy={EMPTY} />
@@ -179,7 +183,7 @@ export function InventHappened() {
 export function RecipesNotEarning() {
   const stamp = useStamp();
   const pack = recipePack(stamp.recipes);
-  const workers = officeWorkers(stamp.hunters, stamp.office.activeHunter);
+  const workers = officeWorkers(stamp.hunters, stamp.office.activeHunter, stamp.office.inventWhy);
 
   return (
     <div className="space-y-8">

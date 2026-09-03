@@ -349,6 +349,36 @@ export function racingSquare(input: RacingSquareInput): HoleCell[] {
   return grid.map((cell) => occ.get(cell.id) ?? cell);
 }
 
+/** Stamp fields needed to paint the racing square for empty-hole hunt. */
+export type SquareStampSlice = {
+  recipes: readonly Recipe[];
+  coverage?: readonly { region: string; keep: number; measuring: number; note?: string }[];
+  moves?: readonly Move[];
+  floorLog?: readonly { kind?: string; line: string }[];
+  holes?: readonly { region: string; window: string; market: string; tone?: string }[];
+  office?: { invent?: boolean; inventWhy?: string };
+  hunters?: readonly { id: string; note: string }[];
+};
+
+export function racingSquareInputFromStamp(stamp: SquareStampSlice): RacingSquareInput {
+  const huntNotes = [stamp.office?.inventWhy ?? "", ...(stamp.hunters ?? []).map((h) => h.note)];
+  return {
+    recipes: stamp.recipes,
+    coverage: stamp.coverage,
+    moves: stamp.moves,
+    floorLog: stamp.floorLog,
+    huntNotes,
+    namedHoles: stamp.holes,
+  };
+}
+
+/** First truly Empty cell on the square — not hunt / measuring / parked. */
+export function nextEmptySquareHole(stamp: SquareStampSlice): string {
+  const holes = racingSquare(racingSquareInputFromStamp(stamp));
+  const pick = holes.find((h) => h.tone === "empty");
+  return pick ? holeName(`${pick.region}|${pick.window}|${pick.market}`) : EMPTY;
+}
+
 export type BookPeriods = {
   paperN: number;
   paperU: number | null;
@@ -864,9 +894,13 @@ export function hunterName(id: string): string {
 }
 
 /** What a hunter is doing, in English. FLOWING / pitched= / conv% never reach the surface. */
-export function hunterWork(note: string): string {
+export function hunterWork(note: string, opts?: { huntBoard?: boolean }): string {
   const raw = note ?? "";
   if (!raw.trim() || /no open deals/i.test(raw)) return EMPTY;
+  if (opts?.huntBoard && /\bFLOWING\b/i.test(raw)) {
+    if (/watching empty square/i.test(raw)) return "Watching the empty square.";
+    return "Hunting empty holes on the square.";
+  }
   const queue = /queue\s+([^·]+)/i.exec(raw);
   if (queue) {
     const named = holeName(queue[1].trim());
@@ -902,9 +936,15 @@ export type WorkerRow = { id: string; name: string; work: string };
 export function officeWorkers(
   hunters: readonly { id: string; note: string }[],
   activeId?: string | null,
+  inventWhy?: string,
 ): WorkerRow[] {
+  const huntBoard = isEmptyHoleHuntBoard(inventWhy ?? "");
   const rows = hunters
-    .map((h) => ({ id: h.id, name: hunterName(h.id), work: hunterWork(h.note) }))
+    .map((h) => ({
+      id: h.id,
+      name: hunterName(h.id),
+      work: hunterWork(h.note, { huntBoard }),
+    }))
     .filter((h) => h.work !== EMPTY);
   if (!activeId) return rows;
   return [...rows].sort((a, b) => Number(b.id === activeId) - Number(a.id === activeId));
@@ -1032,8 +1072,13 @@ function groupOf(status: string): HealthGroup {
   return "fine";
 }
 
-function healthKnown(k: { id: string; label: string; detail: string; status: string }): HealthRow | null {
+function healthKnown(
+  k: { id: string; label: string; detail: string; status: string },
+  opts?: { hunters?: readonly { id: string; note: string }[]; inventWhy?: string },
+): HealthRow | null {
   const d = k.detail ?? "";
+  const huntBoard = isEmptyHoleHuntBoard(opts?.inventWhy ?? "");
+  const hunterNote = (id: string) => opts?.hunters?.find((h) => h.id === id)?.note ?? "";
   switch (k.id) {
     case "invent":
       return {
@@ -1076,6 +1121,15 @@ function healthKnown(k: { id: string; label: string; detail: string; status: str
         why: "A keep is parked, not certified for today.",
       };
     case "residual": {
+      const note = hunterNote("residual");
+      if (/\bFLOWING\b/i.test(note)) {
+        return {
+          id: k.id,
+          group: "fine",
+          sentence: huntBoard ? "Hunting empty holes on the square." : "The hunter is live.",
+          why: "FLOWING — not lagging behind.",
+        };
+      }
       const m = /Lag\s+(\d+)\s*d/i.exec(d);
       const n = m?.[1];
       return {
@@ -1086,6 +1140,15 @@ function healthKnown(k: { id: string; label: string; detail: string; status: str
       };
     }
     case "card": {
+      const note = hunterNote("card");
+      if (/\bFLOWING\b/i.test(note)) {
+        return {
+          id: k.id,
+          group: "fine",
+          sentence: huntBoard ? "Hunting empty holes on the square." : "The hunter is live.",
+          why: "FLOWING — joins still landing.",
+        };
+      }
       const m = /ok=(\d+)/i.exec(d);
       return {
         id: k.id,
@@ -1106,9 +1169,12 @@ function healthKnown(k: { id: string; label: string; detail: string; status: str
   }
 }
 
-export function healthRow(k: { id: string; label: string; detail: string; status: string }): HealthRow {
+export function healthRow(
+  k: { id: string; label: string; detail: string; status: string },
+  opts?: { hunters?: readonly { id: string; note: string }[]; inventWhy?: string },
+): HealthRow {
   return (
-    healthKnown(k) ?? {
+    healthKnown(k, opts) ?? {
       id: k.id,
       group: groupOf(k.status),
       sentence: k.label.replace(/\.$/, "") + ".",
@@ -1117,8 +1183,11 @@ export function healthRow(k: { id: string; label: string; detail: string; status
   );
 }
 
-export function healthBoard(kpis: readonly { id: string; label: string; detail: string; status: string }[]) {
-  const rows = kpis.map(healthRow);
+export function healthBoard(
+  kpis: readonly { id: string; label: string; detail: string; status: string }[],
+  opts?: { hunters?: readonly { id: string; note: string }[]; inventWhy?: string },
+) {
+  const rows = kpis.map((k) => healthRow(k, opts));
   return {
     broken: rows.filter((r) => r.group === "broken"),
     watching: rows.filter((r) => r.group === "watching"),
@@ -1172,12 +1241,8 @@ export function issueBoard(iss: { id: string; owner: string; title: string; deta
   };
 }
 
-export type StaffWatchStamp = {
-  recipes: readonly Recipe[];
+export type StaffWatchStamp = SquareStampSlice & {
   solids?: readonly Recipe[];
-  moves?: readonly Move[];
-  office?: { invent?: boolean; inventWhy?: string };
-  hunters?: readonly { id: string; note: string }[];
   issues?: readonly { id: string; title?: string; owner?: string }[];
 };
 
@@ -1205,6 +1270,9 @@ function firstRecipeId(text: string): string {
 export function staffBookFacts(seatNow: string, stamp: StaffWatchStamp) {
   const blob = [seatNow, stamp.office?.inventWhy ?? "", ...(stamp.hunters ?? []).map((h) => h.note)].join(" ");
   const recipes = stamp.recipes ?? [];
+  const inventWhy = stamp.office?.inventWhy ?? "";
+  const onHunt = isEmptyHoleHuntBoard(inventWhy);
+  const nextEmpty = onHunt ? nextEmptySquareHole(stamp) : EMPTY;
   const solids = (stamp.solids?.length ? stamp.solids : recipes.filter((r) => r.badge === "Solid")) ?? [];
   const tape = solids[0] ?? recipes.find((r) => r.badge === "Solid") ?? null;
   const parked = recipes.filter((r) => r.badge === "Parked" || (r.status === "KEEP" && r.badge !== "Solid"));
@@ -1227,16 +1295,16 @@ export function staffBookFacts(seatNow: string, stamp: StaffWatchStamp) {
     }
   }
   const fillAdjKills = (stamp.moves ?? []).filter((m) => /fill-adj/i.test(m.why) && /dead/i.test(m.to));
-  const inventCell =
-    inventHole(stamp.office?.inventWhy ?? "") !== EMPTY
-      ? inventHole(stamp.office?.inventWhy ?? "")
+  const inventCell = onHunt
+    ? nextEmpty
+    : inventHole(inventWhy) !== EMPTY
+      ? inventHole(inventWhy)
       : inventHole(seatNow) !== EMPTY
         ? inventHole(seatNow)
         : (() => {
             const q = /(?:next hole|queue)\s+([A-Za-z0-9_|-]+)/i.exec(blob);
             return q ? holeName(q[1]) : EMPTY;
           })();
-  const inventWhy = stamp.office?.inventWhy ?? "";
   const densify =
     /\bdensify\b/i.test(inventWhy) && !/empty-hole hunt|invent_empty/i.test(inventWhy);
   const holdId = firstRecipeId(seatNow);

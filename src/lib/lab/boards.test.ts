@@ -11,6 +11,7 @@ import {
   hunterWork,
   issueBoard,
   marketGlance,
+  nextEmptySquareHole,
   officeCountries,
   officeWorkers,
   factorySquares,
@@ -202,6 +203,16 @@ test("office issues hide stale KEEP rows on empty hunt board", () => {
   assert.ok(!rows.some((r) => r.id === "keep-not-solid"));
 });
 
+test("next empty square hole skips occupied hunt cells", () => {
+  const hole = nextEmptySquareHole({
+    recipes: [{ ...STAMP.recipes[0], region: "ZA", title: "ZA morning WIN", status: "MEASURING" }],
+    office: { inventWhy: "empty-hole hunt on · mill parked" },
+    hunters: [{ id: "geo", note: "FLOWING · queue ZA|morning|WIN" }],
+  });
+  assert.ok(hole !== EMPTY);
+  assert.ok(!/South Africa · morning · winner/i.test(hole));
+});
+
 test("square glance is 64-hole occupancy, not mill cells", () => {
   assert.match(
     squareGlanceLine({ occupied: 55, n_solid: 0, kill: 0 }),
@@ -262,10 +273,25 @@ test("recipe status drops holdout_n_too_small", () => {
 });
 
 test("hunter work drops FLOWING, pitched=, and conv%", () => {
+  assert.equal(
+    hunterWork("FLOWING · pitched=3 · proving=6 · conv 0.0%", { huntBoard: true }),
+    "Hunting empty holes on the square.",
+  );
   assert.equal(hunterWork("FLOWING · pitched=3 · proving=6 · conv 0.0%"), "Working 3 new ideas, 6 still being tested");
   assert.equal(hunterWork("FLOWING · no open deals"), EMPTY);
   assert.equal(hunterWork("FLOWING · queue ZA|morning|WIN"), "Looking at South Africa · morning · winner");
   assert.ok(officeWorkers(STAMP.hunters, "geo")[0]?.id === "geo");
+});
+
+test("health residual uses live hunter note when FLOWING on hunt board", () => {
+  const board = healthBoard(STAMP.kpis, {
+    hunters: STAMP.hunters,
+    inventWhy: "empty-hole hunt on · invent_empty_holes · mill parked",
+  });
+  const residual = board.fine.find((r) => r.id === "residual");
+  assert.ok(residual);
+  assert.match(residual!.sentence, /Hunting empty holes/);
+  assert.ok(!residual!.sentence.includes("behind"));
 });
 
 test("Pipe stages are the factory line; Live is 0 while fuse is off", () => {

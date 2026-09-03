@@ -10,7 +10,10 @@ export const Route = createFileRoute("/health")({ component: Health });
 
 export function Health() {
   const stamp = useStamp();
-  const board = healthBoard(stamp.kpis);
+  const board = healthBoard(stamp.kpis, {
+    hunters: stamp.hunters,
+    inventWhy: stamp.office.inventWhy,
+  });
 
   return (
     <div className="space-y-8">
