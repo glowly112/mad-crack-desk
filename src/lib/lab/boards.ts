@@ -518,6 +518,37 @@ export function bookPeriods(recipe: Recipe): BookPeriods {
   };
 }
 
+/** Mill hunt caption — fast-arm when armed; never "mill parked" on an active hunt. */
+export function millHuntCaption(
+  why: string,
+  opts?: { mill_mode?: string; mill_n_armed?: number; n_armed?: number },
+): string {
+  const raw = why?.trim() ?? "";
+  if (!raw) return EMPTY;
+  const armed = opts?.mill_n_armed ?? opts?.n_armed ?? 0;
+  const mode = String(opts?.mill_mode ?? "").toLowerCase().replace(/_/g, "-");
+  const hunt = /empty-hole hunt|invent_empty/i.test(raw);
+  if (!hunt) return raw;
+
+  let line = raw
+    .replace(/\s*·\s*mill parked/gi, "")
+    .replace(/mill parked\s*·\s*/gi, "")
+    .replace(/\bmill parked\b/gi, "")
+    .replace(/\s*·\s*·/g, " · ")
+    .trim();
+
+  const fastArm =
+    /fast-arm|fastarm/i.test(line) ||
+    /fast-arm|fastarm/i.test(mode) ||
+    armed > 0;
+
+  if (fastArm && !/fast-arm|fastarm/i.test(line)) {
+    line = line.replace(/empty-hole hunt on/gi, "empty-hole fast-arm hunt on");
+  }
+
+  return line.replace(/\s*·\s*·/g, " · ").trim();
+}
+
 export function rejectEnglish(raw: string): string {
   const t = raw.trim();
   if (!t) return EMPTY;
@@ -538,11 +569,18 @@ export function inventWhatHappened(input: {
   pitched: number;
   hunters: readonly { id: string; note: string }[];
   rejects?: readonly string[];
+  mill_mode?: string;
+  mill_n_armed?: number;
+  n_armed?: number;
 }): string {
-  const why = input.inventWhy?.trim() ?? "";
+  const why = millHuntCaption(input.inventWhy ?? "", {
+    mill_mode: input.mill_mode,
+    mill_n_armed: input.mill_n_armed,
+    n_armed: input.n_armed,
+  });
   const emptyHoleHunt = /empty-hole hunt|invent_empty/i.test(why);
-  if (emptyHoleHunt || /mill parked/i.test(why)) {
-    return why || (input.invent ? "empty-hole hunt on · invent_empty_holes · mill parked" : EMPTY);
+  if (emptyHoleHunt) {
+    return why || (input.invent ? "empty-hole fast-arm hunt on · invent_empty_holes" : EMPTY);
   }
 
   const notes = [why, ...input.hunters.map((h) => h.note), ...(input.rejects ?? [])];

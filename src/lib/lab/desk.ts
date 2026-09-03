@@ -399,13 +399,24 @@ export function prettyTitle(title: string): string {
   return cellName(title);
 }
 
-/** One board: Time · Name · Side · Odds · Stake · Book · Result · P&L */
-export const DESK_HEADERS = ["Time", "Name", "Side", "Odds", "Stake", "Book", "Result", "P&L"] as const;
+/** One board: Time · Name · Market · Side · Odds · Stake · Book · Result · P&L */
+export const DESK_HEADERS = [
+  "Time",
+  "Name",
+  "Market",
+  "Side",
+  "Odds",
+  "Stake",
+  "Book",
+  "Result",
+  "P&L",
+] as const;
 
 export type DeskRow = {
   id: string;
   time: string;
   name: string;
+  market: string;
   side: string;
   odds: string;
   stake: string;
@@ -416,6 +427,33 @@ export type DeskRow = {
   selected?: boolean;
   onPick?: () => void;
 };
+
+/** Desk Market column — WIN or PLACE only. LAY lives in Side. */
+export function deskMarketFromParts(...parts: string[]): string {
+  const id = parts[0] ?? "";
+  const blob = parts.join(" ");
+  const ehole = /^H-ehole-[a-z]{2}-[a-z]+-(win|place|lay)/i.exec(id.trim());
+  if (ehole) {
+    const seg = (ehole[1] ?? "").toLowerCase();
+    if (seg === "place") return "PLACE";
+    return "WIN";
+  }
+  const upper = blob.toUpperCase().replace(/_/g, " ");
+  if (/\bPLACE\b/.test(upper)) return "PLACE";
+  if (/\bWIN\b/.test(upper)) return "WIN";
+  return EMPTY;
+}
+
+/** Stamped side on a recipe row — BACK/LAY from id, not market type. */
+export function deskStampedSide(...parts: string[]): string {
+  const id = parts[0] ?? "";
+  const ehole = /^H-ehole-[a-z]{2}-[a-z]+-(win|place|lay)/i.exec(id.trim());
+  if (ehole?.[1]?.toLowerCase() === "lay") return "LAY";
+  const blob = parts.join(" ").toUpperCase().replace(/_/g, " ");
+  if (/(?:^|[^A-Z])LAY(?:[^A-Z]|$)/.test(blob) && /-lay-/i.test(id)) return "LAY";
+  if (/\bBACK\b/.test(blob) && /\bBACK\b/.test(id)) return "BACK";
+  return EMPTY;
+}
 
 export type DeskGroup = {
   id: string;
@@ -439,13 +477,14 @@ export function recipeDeskRow(recipe: Recipe): DeskRow {
     recipe.chip === "Waiting for races" ||
     recipe.status === "MEASURING" ||
     recipe.badge === "Research";
-  const blob = `${recipe.region} ${recipe.title} ${recipe.id}`.toUpperCase();
-  const market = /\bPLACE\b/.test(blob) ? "PLACE" : /\bWIN\b/.test(blob) ? "WIN" : /\bLAY\b/.test(blob) ? "LAY" : null;
+  const market = deskMarketFromParts(recipe.id, recipe.title, recipe.region);
+  const stamped = deskStampedSide(recipe.id, recipe.title);
   return {
     id: recipe.id,
     time: open ? WAITING : EMPTY,
     name: recipeBookName(recipe),
-    side: market ?? (open ? WAITING : EMPTY),
+    market: market !== EMPTY ? market : open ? WAITING : EMPTY,
+    side: stamped !== EMPTY ? stamped : EMPTY,
     odds: open ? WAITING : EMPTY,
     stake: open ? WAITING : EMPTY,
     book: open ? "paper" : EMPTY,

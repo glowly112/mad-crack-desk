@@ -188,11 +188,16 @@ function tapeSeatLines(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchStamp): 
       const emptyHoleHunt = /empty-hole hunt|invent_empty/i.test(inventWhy);
       const look = f.inventCell !== EMPTY ? speakLook(f.inventCell) : "";
       if (emptyHoleHunt) {
+        const armed = (stamp as { mill_n_armed?: number }).mill_n_armed ?? 0;
+        const parked =
+          armed <= 0 &&
+          /mill parked/i.test(inventWhy) &&
+          !/fast-arm|fastarm/i.test(inventWhy);
         return [
           look ? `Next empty hole: ${look}.` : "Invent is on.",
-          /mill parked/i.test(inventWhy)
+          parked
             ? "Mill parked — hunting empty cells on the square."
-            : "Hunting empty holes, not densifying the tape.",
+            : "Empty-hole fast-arm hunt — not densifying the tape.",
         ].filter(Boolean);
       }
       const idea = look ? speakBook(f.inventCell) : "";

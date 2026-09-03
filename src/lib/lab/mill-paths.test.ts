@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { mergeMillPathRuns, pathRunsOf } from "./mill-paths.ts";
-import { laySideSlotRows, waitDeskRow, fillFromRow } from "./trades.ts";
+import { waitDeskRow, fillFromRow, fillDeskRow } from "./trades.ts";
 import { EMPTY } from "./desk.ts";
 
 test("mergeMillPathRuns adds cells and fills from path_runs same turn", () => {
@@ -38,31 +38,36 @@ test("mergeMillPathRuns adds cells and fills from path_runs same turn", () => {
   assert.equal(pathRunsOf(snap).length, 2);
 });
 
-test("lay side slot shows LAY with Empty book fields until ticket exists", () => {
-  const open = [
-    fillFromRow({
-      pick_id: "za-near|1|1|BACK|2026-09-03",
-      cell_id: "H-ehole-za-nearoff-win-73508Z",
-      status: "OPEN",
-      side: "BACK",
-      odds: 4.2,
-      date: "2026-09-03",
-      ts: "2026-09-03T12:00:00Z",
-    })!,
-  ];
-  const slots = laySideSlotRows(open, []);
-  assert.equal(slots.length, 1);
-  assert.equal(slots[0]?.side, "LAY");
-  assert.equal(slots[0]?.book, EMPTY);
-  assert.equal(slots[0]?.odds, EMPTY);
-});
-
-test("waiting chips keep Side Empty not WIN", () => {
+test("waiting chips show Market WIN/PLACE and Side Empty unless stamped LAY", () => {
   const row = waitDeskRow({
     id: "H-ehole-nz-latepre-place-00206Z",
     title: "ehole_nz_late_pre_place_00206Z",
     why: null,
   });
+  assert.equal(row.market, "PLACE");
   assert.equal(row.side, EMPTY);
   assert.match(row.name, /place/i);
+
+  const lay = waitDeskRow({
+    id: "H-ehole-au-morning-lay-73508Z",
+    title: "ehole_au_morning_lay",
+    why: null,
+  });
+  assert.equal(lay.market, "WIN");
+  assert.equal(lay.side, "LAY");
+});
+
+test("open BACK ticket shows Market and Side separately", () => {
+  const fill = fillFromRow({
+    pick_id: "za-near|1|1|BACK|2026-09-03",
+    cell_id: "H-ehole-za-nearoff-win-73508Z",
+    status: "OPEN",
+    side: "BACK",
+    odds: 4.2,
+    date: "2026-09-03",
+    ts: "2026-09-03T12:00:00Z",
+  })!;
+  const row = fillDeskRow(fill, false);
+  assert.equal(row.market, "WIN");
+  assert.equal(row.side, "BACK");
 });

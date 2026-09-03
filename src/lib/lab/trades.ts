@@ -4,16 +4,17 @@ import {
   isPostEpochEholeMeasuring,
   isPostEpochEholeRecipe,
 } from "./board-reset.ts";
-import { holeKeyFromParts } from "./mill-paths.ts";
 import {
   eholeChipRunOrder,
   isSprayClassInPlayEholeFirstBook,
   millDisplayRecipes,
   recipeDisplayHoleKey,
 } from "./mill-display.ts";
-import { parseHole, parseMarket, parseWindow } from "./boards.ts";
+import { parseHole, parseWindow, millHuntCaption } from "./boards.ts";
 import {
   bookDisplayName,
+  deskMarketFromParts,
+  deskStampedSide,
   EMPTY,
   cellName,
   hopMoves,
@@ -232,13 +233,17 @@ export function fillDeskRow(fill: Fill, fuseOn: boolean): DeskRow {
   const time = bookedClock(fill.ts, fill.t);
   const oddsStr = fmtOdds(fill.odds);
   const stakeStr = fmtStake(fill.stake);
-  const sideStr = fill.side && fill.side !== EMPTY ? fill.side : "";
+  const market = deskMarketFromParts(fill.recipeId, fill.recipe);
+  const rawSide = (fill.side ?? "").toUpperCase();
+  const sideStr =
+    rawSide === "BACK" || rawSide === "LAY" ? rawSide : deskStampedSide(fill.recipeId, fill.recipe);
   const pending = (value: string) => (value && value !== EMPTY ? value : isOpen ? WAITING : EMPTY);
   return {
     id: fill.id,
     time: pending(time),
     name: tradeName(fill),
-    side: pending(sideStr),
+    market: market !== EMPTY ? market : isOpen ? WAITING : EMPTY,
+    side: sideStr !== EMPTY ? sideStr : EMPTY,
     odds: pending(oddsStr === EMPTY ? "" : oddsStr),
     stake: pending(stakeStr === EMPTY ? "" : stakeStr),
     book: bookWord(fill.book),
@@ -247,51 +252,16 @@ export function fillDeskRow(fill: Fill, fuseOn: boolean): DeskRow {
   };
 }
 
-/** LAY side of the same hole — Empty until the mill books a lay ticket. */
-export function laySideSlotRows(open: readonly Fill[], chips: readonly WaitOpen[]): DeskRow[] {
-  const names = new Map<string, string>();
-  const layKeys = new Set<string>();
-
-  for (const f of open) {
-    const key = fillHoleKey(f);
-    const side = (f.side ?? "").toUpperCase();
-    if (side === "LAY") {
-      layKeys.add(key);
-      continue;
-    }
-    if (!names.has(key)) names.set(key, tradeName(f));
-  }
-  for (const c of chips) {
-    const key = recipeDisplayHoleKey(c) ?? holeKeyFromParts(c);
-    if (!key) continue;
-    if (!names.has(key)) names.set(key, strategyMark(c.title, c.id));
-  }
-
-  const out: DeskRow[] = [];
-  for (const [key, name] of names) {
-    if (layKeys.has(key)) continue;
-    out.push({
-      id: `lay-slot|${key}`,
-      time: EMPTY,
-      name,
-      side: "LAY",
-      odds: EMPTY,
-      stake: EMPTY,
-      book: EMPTY,
-      result: EMPTY,
-      pnl: null,
-    });
-  }
-  return out;
-}
-
-/** Recipe armed with no fill. Not a ticket — Side is Empty; market lives in the name. */
+/** Recipe armed with no fill. Market from hole; Side only when stamped (LAY recipe, etc.). */
 export function waitDeskRow(chip: WaitOpen): DeskRow {
+  const market = deskMarketFromParts(chip.id, chip.title);
+  const stamped = deskStampedSide(chip.id, chip.title);
   return {
     id: chip.id,
     time: WAITING,
     name: strategyMark(chip.title, chip.id),
-    side: EMPTY,
+    market: market !== EMPTY ? market : WAITING,
+    side: stamped !== EMPTY ? stamped : EMPTY,
     odds: WAITING,
     stake: WAITING,
     book: "paper",
@@ -445,6 +415,7 @@ export function millTapeRows(stamp: {
   trades?: readonly Fill[];
   mill_n_armed?: number;
   n_armed?: number;
+  mill_mode?: string;
   office?: { inventWhy?: string };
 }): MillTapeRow[] {
   const hops = hopMoves(stamp.moves ?? []);
@@ -459,7 +430,7 @@ export function millTapeRows(stamp: {
   const act = millActivity({ day, trades: stamp.trades ?? [] });
   const recipes = stamp.recipes ?? [];
   const rows: MillTapeRow[] = [];
-  const why = stamp.office?.inventWhy?.trim() ?? "";
+  const rawWhy = stamp.office?.inventWhy?.trim() ?? "";
 
   if (act.lastSettled) {
     const name = fillTradeName(act.lastSettled, recipes);
@@ -502,8 +473,13 @@ export function millTapeRows(stamp: {
   const armed = stamp.mill_n_armed ?? stamp.n_armed ?? 0;
   if (armed <= 0 && chips.length === 0) return rows;
 
-  if (/empty-hole hunt|invent_empty|mill parked/i.test(why)) {
-    rows.push({ at: "", text: why });
+  const huntWhy = millHuntCaption(rawWhy, {
+    mill_mode: stamp.mill_mode,
+    mill_n_armed: armed,
+    n_armed: stamp.n_armed,
+  });
+  if (/empty-hole hunt|invent_empty/i.test(huntWhy)) {
+    rows.push({ at: "", text: huntWhy });
   }
   const n = armed > 0 ? armed : chips.length;
   rows.push({

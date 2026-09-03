@@ -3,7 +3,7 @@ import { mergeMillPathRuns } from "./mill-paths.ts";
 import { cellName } from "./desk.ts";
 import type { Badge, Chip, Recipe } from "./stamp.ts";
 import { parseFills, parseWaitOpen } from "./trades.ts";
-import { parseHole, parseWindow, parseMarket, regionFromText, type SquareWindow } from "./boards.ts";
+import { parseHole, parseWindow, parseMarket, regionFromText, millHuntCaption, type SquareWindow } from "./boards.ts";
 import { cellIsPostEpochEhole, cellIsPostEpochParkedKeep } from "./board-reset.ts";
 import { matrixKeyFromScoreboardCell } from "./hollow-occupancy.ts";
 
@@ -349,7 +349,17 @@ function armedFromSnap(
   eholeArms: number,
 ): { mill_n_armed?: number; n_armed?: number } {
   const snapArmed = int(snap.n_armed) ?? int(snap.mill_n_armed);
-  if (millParked && snapArmed != null && snapArmed > 0) {
+  const huntStamp = rec(snap.empty_hole_hunt) ?? rec(snap.factory_empty_hole_hunt);
+  const millMode = String(
+    snap.mill_mode ?? rec(snap.invent_mill)?.mill_mode ?? huntStamp?.mill_mode ?? "",
+  ).toLowerCase();
+  const inventBlob = String(snap.invent ?? snap.invent_mode ?? "");
+  const huntOn = /empty-hole hunt|invent_empty/i.test(inventBlob);
+  if (
+    snapArmed != null &&
+    snapArmed > 0 &&
+    (millParked || millMode === "parked" || huntOn)
+  ) {
     const mill = int(snap.mill_n_armed);
     return {
       mill_n_armed: mill != null && mill > 0 ? mill : snapArmed,
@@ -446,10 +456,18 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
 
   const plantOracle = isPlantSnap(opened);
   const inventCaption = plantOracle ? inventCaptionFromSnap(snap) : null;
-  const inventWhy = inventCaption ?? base.office.inventWhy;
+  const inventWhyRaw = inventCaption ?? base.office.inventWhy;
   const inventOn = inventCaption ? inventIsOn(inventCaption) : base.office.invent;
   const millParked = plantOracle && isMillParked(snap, inventCaption);
   const armed = armedFromSnap(snap, plantOracle, millParked, eholeArms);
+  const inventWhy = millHuntCaption(inventWhyRaw, {
+    mill_mode:
+      typeof snap.mill_mode === "string"
+        ? snap.mill_mode
+        : String(rec(snap.invent_mill)?.mill_mode ?? rec(snap.empty_hole_hunt)?.mill_mode ?? ""),
+    mill_n_armed: armed.mill_n_armed,
+    n_armed: armed.n_armed,
+  });
   const occRec =
     rec(snap.occupancy_post_epoch) ??
     rec(rec(snap.empty_hole_hunt)?.occupancy_post_epoch) ??
@@ -494,7 +512,7 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
     fuse_on,
     fuse: fuse_on ? "Real betting: ON" : "Real betting: OFF",
     plantHealth: plantOracle ? plantHealthFromSnap(snap, base) : base.plantHealth,
-    plantLine: inventCaption ? plantLineFromInvent(inventCaption) : base.plantLine,
+    plantLine: inventWhy ? plantLineFromInvent(inventWhy) : base.plantLine,
     researchKeepGbp,
     hero: {
       ...base.hero,
@@ -518,8 +536,8 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
     },
     recipes: plantOracle ? recipes : recipes.length ? recipes : base.recipes,
     solids: plantOracle ? solids : recipes.length ? solids : n_solid > 0 ? base.solids : [],
-    seats: overlaySeats(base.seats, snap, inventCaption),
-    kpis: overlayKpis(base.kpis, inventCaption, inventOn),
+    seats: overlaySeats(base.seats, snap, inventWhy),
+    kpis: overlayKpis(base.kpis, inventWhy, inventOn),
     trends,
     trades: Array.isArray(snap.fills) ? parseFills(snap.fills) : base.trades,
     wait_open: Array.isArray(snap.wait_open) ? parseWaitOpen(snap.wait_open) : (base.wait_open ?? []),
@@ -686,13 +704,17 @@ function inventIsOn(caption: string): boolean {
 }
 
 function isMillParked(snap: Record<string, unknown>, inventCaption: string | null): boolean {
-  if (inventCaption && /mill parked/i.test(inventCaption)) return true;
   const modes = [
     snap.mill_mode,
     rec(snap.invent_mill)?.mill_mode,
     rec(snap.empty_hole_hunt)?.mill_mode,
   ];
-  return modes.some((m) => String(m ?? "").toLowerCase() === "parked");
+  const parkedMode = modes.some((m) => String(m ?? "").toLowerCase() === "parked");
+  const armed =
+    int(snap.mill_n_armed) ?? int(snap.n_armed) ?? int(rec(snap.invent_mill)?.n_armed) ?? 0;
+  if (armed > 0 && /empty-hole hunt|invent_empty/i.test(inventCaption ?? "")) return false;
+  if (parkedMode && armed <= 0) return true;
+  return inventCaption != null && /mill parked/i.test(inventCaption) && armed <= 0;
 }
 
 function plantLineFromInvent(caption: string): string {

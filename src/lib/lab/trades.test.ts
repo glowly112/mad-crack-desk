@@ -211,6 +211,7 @@ test("trade name is the mark plus horse; odds live in Odds", () => {
   assert.equal(new Set(rows.map((r) => r.name)).size, 4);
   assert.ok(rows.every((r) => r.book === "paper"));
   assert.ok(rows.every((r) => r.side === "BACK"));
+  assert.ok(rows.every((r) => r.market === "WIN"));
   assert.ok(rows.every((r) => r.stake === "1u"));
   assert.ok(rows.every((r) => r.result === "Open"));
   assert.ok(rows.every((r) => r.pnl == null));
@@ -232,6 +233,7 @@ test("trade name is the mark plus horse; odds live in Odds", () => {
     why: "no size_ok candidates",
   });
   assert.equal(wait.name, "New Zealand · morning · winner · one-pick 2.5–4.49");
+  assert.equal(wait.market, "WIN");
   assert.equal(wait.side, EMPTY);
   assert.equal(wait.time, "Waiting");
   assert.equal(wait.odds, "Waiting");
@@ -296,6 +298,7 @@ test("tradesWaitChips lists post-epoch ehole recipes and hides legacy KEEP steam
   assert.ok(rows.every((r) => r.pnl == null));
   assert.ok(rows.every((r) => r.odds === "Waiting" && r.stake === "Waiting" && r.time === "Waiting"));
   assert.ok(rows.every((r) => r.side === EMPTY));
+  assert.ok(rows.every((r) => r.market === "WIN" || r.market === "PLACE"));
   assert.ok(rows.every((r) => !/^(WIN|PLACE|LAY)$/.test(r.side)));
   assert.match(rows.find((r) => r.id === eholeAu.id)?.name ?? "", /Australia · morning · winner/);
 });
@@ -333,6 +336,7 @@ test("open ticket shows real side/odds/stake; unsettled P&L stays Empty", () => 
   });
   assert.ok(nzOpen);
   const row = fillDeskRow(nzOpen, false);
+  assert.equal(row.market, "WIN");
   assert.equal(row.side, "BACK");
   assert.equal(row.odds, "3.55");
   assert.equal(row.stake, "1u");
@@ -395,7 +399,8 @@ test("mill tape shows hunt arms when hops are empty and no tickets", () => {
     office: { inventWhy: "empty-hole hunt on · invent_empty_holes · mill parked" },
   });
   assert.ok(rows.length >= 2);
-  assert.match(rows[0].text, /empty-hole hunt/);
+  assert.match(rows[0].text, /empty-hole fast-arm hunt/);
+  assert.ok(!rows[0].text.includes("mill parked"));
   assert.match(rows.at(-1)?.text ?? "", /52 armed/);
   assert.ok(!rows.at(-1)?.text.includes("recipe, not a ticket"));
 });

@@ -280,8 +280,8 @@ test("oracle snapshot invent replaces bundled digest densify plantLine", () => {
     },
     base(),
   );
-  assert.match(live.plantLine, /empty-hole hunt/);
-  assert.match(live.plantLine, /mill parked/);
+  assert.match(live.plantLine, /empty-hole fast-arm hunt/);
+  assert.ok(!live.plantLine.includes("mill parked"));
   assert.ok(!/densify/i.test(live.plantLine));
   assert.match(live.office.inventWhy, /invent_empty_holes/);
   assert.equal(live.office.invent, true);
@@ -295,6 +295,7 @@ test("oracle snapshot invent overlays staff seats and Invent fire KPI without de
     invent: "empty-hole hunt on · invent_empty_holes · mill parked",
     invent_mode: "invent_empty_holes",
     mill_mode: "parked",
+    n_armed: 23,
     staff: [
       {
         seat: "Bauron",
@@ -308,12 +309,12 @@ test("oracle snapshot invent overlays staff seats and Invent fire KPI without de
   const live = applySnapshot(snap, base());
   const bauron = live.seats.find((s) => s.id === "bauron");
   assert.ok(bauron);
-  assert.match(bauron!.now, /empty-hole hunt/);
-  assert.match(bauron!.now, /mill parked/);
+  assert.match(bauron!.now, /empty-hole fast-arm hunt/);
+  assert.ok(!bauron!.now.includes("mill parked"));
   assert.ok(!/densify/i.test(bauron!.now));
   const inventKpi = live.kpis.find((k) => k.id === "invent");
   assert.ok(inventKpi);
-  assert.match(inventKpi!.detail, /empty-hole hunt/);
+  assert.match(inventKpi!.detail, /empty-hole fast-arm hunt/);
   assert.ok(!/densify/i.test(inventKpi!.detail));
 });
 

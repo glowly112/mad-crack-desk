@@ -5,7 +5,7 @@ import { DESK_HEADERS, EMPTY, type DeskGroup, type DeskRow } from "@/lib/lab/des
 import { cn, fmtU } from "@/lib/utils";
 
 const RIGHT = new Set(["Odds", "Stake", "P&L"]);
-const MONO = new Set(["Time", "Side", "Odds", "Stake", "P&L"]);
+const MONO = new Set(["Time", "Market", "Side", "Odds", "Stake", "P&L"]);
 
 /** Aligned desk board. Quiet headers. Colour only on P&L. No pills. */
 export function DeskTable({ groups, empty }: { groups: DeskGroup[]; empty: string }) {
@@ -18,6 +18,7 @@ export function DeskTable({ groups, empty }: { groups: DeskGroup[]; empty: strin
         <colgroup>
           <col className="w-[4.5rem]" />
           <col />
+          <col className="w-[3.25rem]" />
           <col className="w-[3.25rem]" />
           <col className="w-[3.25rem]" />
           <col className="w-12" />
@@ -95,6 +96,7 @@ function DataRow({ row }: { row: DeskRow }) {
     >
       <Cell k="Time" v={row.time} />
       <Cell k="Name" v={row.name} />
+      <Cell k="Market" v={row.market} />
       <Cell k="Side" v={row.side} />
       <Cell k="Odds" v={row.odds} />
       <Cell k="Stake" v={row.stake} />

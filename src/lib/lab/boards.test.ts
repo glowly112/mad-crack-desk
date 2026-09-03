@@ -248,9 +248,10 @@ test("invent what happened names the queue and a known reject", () => {
     inventWhy: "empty-hole hunt on · invent_empty_holes · mill parked",
     pitched: 12,
     hunters: [],
+    mill_n_armed: 52,
   });
-  assert.match(hunt, /empty-hole hunt/);
-  assert.match(hunt, /mill parked/);
+  assert.match(hunt, /empty-hole fast-arm hunt/);
+  assert.ok(!hunt.includes("mill parked"));
   assert.ok(!hunt.includes("12 new ideas"));
   const rejected = inventWhatHappened({
     invent: true,

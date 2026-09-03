@@ -7,6 +7,7 @@ import {
   countryMarket,
   floorRacingSquare,
   inventHole,
+  millHuntCaption,
   officeCountries,
   plantMarkets,
   racingSquare,
@@ -92,8 +93,12 @@ export function CountryPack() {
     n_solid: stamp.counts.certified,
     kill: stamp.counts.kill,
   });
-  const inventWhy = stamp.office.inventWhy?.trim() ?? "";
-  const huntLine = /empty-hole hunt|invent_empty|mill parked/i.test(inventWhy)
+  const inventWhy = millHuntCaption(stamp.office.inventWhy?.trim() ?? "", {
+    mill_mode: (stamp as { mill_mode?: string }).mill_mode,
+    mill_n_armed: (stamp as { mill_n_armed?: number }).mill_n_armed,
+    n_armed: (stamp as { n_armed?: number }).n_armed,
+  });
+  const huntLine = /empty-hole hunt|invent_empty/i.test(inventWhy)
     ? inventWhy
     : (huntNotes.map(inventHole).find((n) => n !== EMPTY) ?? EMPTY);
   const emptyN = holes.length - occupiedN;

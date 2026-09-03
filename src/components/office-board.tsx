@@ -162,6 +162,9 @@ export function InventHappened() {
     pitched: stamp.pipe.pitched,
     hunters: stamp.hunters,
     rejects: stamp.office.rejects,
+    mill_mode: (stamp as { mill_mode?: string }).mill_mode,
+    mill_n_armed: (stamp as { mill_n_armed?: number }).mill_n_armed,
+    n_armed: (stamp as { n_armed?: number }).n_armed,
   });
 
   return (

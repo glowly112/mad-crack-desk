@@ -12,8 +12,6 @@ import {
   fillsOnDay,
   honestOpenFills,
   honestSettledFills,
-  laySideSlotRows,
-  openFills,
   waitDeskRow,
   tradesWaitChips,
 } from "@/lib/lab/trades";
@@ -52,18 +50,11 @@ export function Trades() {
       id: "wait",
       label: "Waiting for races",
       hint: "Recipe · not a ticket",
-      rows: [
-        ...chips.map((chip) => ({
-          ...waitDeskRow(chip),
-          selected: selected === chip.id,
-          onPick: pick(chip.id),
-        })),
-        ...laySideSlotRows(open, chips).map((row) => ({
-          ...row,
-          selected: selected === row.id,
-          onPick: pick(row.id),
-        })),
-      ],
+      rows: chips.map((chip) => ({
+        ...waitDeskRow(chip),
+        selected: selected === chip.id,
+        onPick: pick(chip.id),
+      })),
     },
     {
       id: "settled",
