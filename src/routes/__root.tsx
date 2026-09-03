@@ -54,7 +54,7 @@ export const Route = createRootRoute({
 function RootDocument() {
   const { plant } = Route.useLoaderData();
   return (
-    <html lang="en" className="antialiased" suppressHydrationWarning>
+    <html lang="en" className="antialiased" data-theme="charcoal" data-font="satoshi" data-size="m" suppressHydrationWarning>
       <head>
         <HeadContent />
         <script dangerouslySetInnerHTML={{ __html: PREFS_BOOT }} />

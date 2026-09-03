@@ -1,4 +1,5 @@
 import type { LiveStamp } from "./from-digest.ts";
+import { mergeMillPathRuns } from "./mill-paths.ts";
 import { cellName } from "./desk.ts";
 import type { Badge, Chip, Recipe } from "./stamp.ts";
 import { parseFills, parseWaitOpen } from "./trades.ts";
@@ -375,7 +376,8 @@ function seatKey(name: string): string {
 export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
   const opened = rec(raw);
   if (!opened || !isPlantSnap(opened)) return base;
-  const snap = unwrap(opened);
+  const merged = mergeMillPathRuns(opened);
+  const snap = unwrap(merged);
 
   const truth = rec(snap.truth) ?? {};
   const summary = rec(snap.summary) ?? snap;

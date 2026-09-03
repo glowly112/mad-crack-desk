@@ -4,6 +4,7 @@ import {
   isPostEpochEholeMeasuring,
   isPostEpochEholeRecipe,
 } from "./board-reset.ts";
+import { holeKeyFromParts } from "./mill-paths.ts";
 import {
   eholeChipRunOrder,
   isSprayClassInPlayEholeFirstBook,
@@ -244,6 +245,44 @@ export function fillDeskRow(fill: Fill, fuseOn: boolean): DeskRow {
     result: fillResultWord(fill),
     pnl: isOpen ? null : tape.pnl,
   };
+}
+
+/** LAY side of the same hole — Empty until the mill books a lay ticket. */
+export function laySideSlotRows(open: readonly Fill[], chips: readonly WaitOpen[]): DeskRow[] {
+  const names = new Map<string, string>();
+  const layKeys = new Set<string>();
+
+  for (const f of open) {
+    const key = fillHoleKey(f);
+    const side = (f.side ?? "").toUpperCase();
+    if (side === "LAY") {
+      layKeys.add(key);
+      continue;
+    }
+    if (!names.has(key)) names.set(key, tradeName(f));
+  }
+  for (const c of chips) {
+    const key = recipeDisplayHoleKey(c) ?? holeKeyFromParts(c);
+    if (!key) continue;
+    if (!names.has(key)) names.set(key, strategyMark(c.title, c.id));
+  }
+
+  const out: DeskRow[] = [];
+  for (const [key, name] of names) {
+    if (layKeys.has(key)) continue;
+    out.push({
+      id: `lay-slot|${key}`,
+      time: EMPTY,
+      name,
+      side: "LAY",
+      odds: EMPTY,
+      stake: EMPTY,
+      book: EMPTY,
+      result: EMPTY,
+      pnl: null,
+    });
+  }
+  return out;
 }
 
 /** Recipe armed with no fill. Not a ticket — Side is Empty; market lives in the name. */

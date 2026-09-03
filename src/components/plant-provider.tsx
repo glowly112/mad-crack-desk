@@ -25,7 +25,8 @@ export function PlantProvider({
         });
     };
     pull();
-    const t = window.setInterval(pull, 60_000);
+    const ms = boot.source === "oracle" ? 15_000 : 60_000;
+    const t = window.setInterval(pull, ms);
     return () => {
       on = false;
       window.clearInterval(t);

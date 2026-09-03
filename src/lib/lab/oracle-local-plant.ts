@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { computeHollowOccupiedKeys } from "./hollow-occupancy.ts";
+import { mergeMillPathRuns } from "./mill-paths.ts";
 
 function rec(v: unknown): Record<string, unknown> | null {
   return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
@@ -239,7 +240,7 @@ export async function readLocalOraclePlant(): Promise<Record<string, unknown> | 
         ? { n_occupied_cells, occupied_cells }
         : stampOcc ?? snapInner.occupancy_post_epoch;
 
-    return {
+    const merged = mergeMillPathRuns({
       ...snapInner,
       ...digest,
       ...sb,
@@ -255,11 +256,14 @@ export async function readLocalOraclePlant(): Promise<Record<string, unknown> | 
       invent_mode: huntStamp?.invent_mode ?? inventMill?.hunt_mode,
       invent_mill: inventMill,
       empty_hole_hunt: huntStamp,
+      live_fast: await readJsonOptional(liveFastPath()),
       mill_n_armed,
       n_armed,
       fills,
       wait_open,
-    };
+    });
+
+    return merged;
   } catch {
     return null;
   }

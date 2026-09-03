@@ -62,6 +62,14 @@ if lf.exists():
     except Exception:
         pass
 d["wait_open"] = wait_open
+lf_p = pathlib.Path.home() / "bbb/data/firm/lab/latest/live_fast_auto.json"
+if lf_p.exists():
+    try:
+        lf = json.loads(lf_p.read_text())
+        d["live_fast"] = lf
+        d["path_runs"] = lf.get("path_runs") or []
+    except Exception:
+        pass
 d["mill_n_armed"] = d.get("mill_n_armed")
 d["n_armed"] = d.get("n_armed")
 if d.get("ts"):
