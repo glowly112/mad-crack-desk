@@ -56,6 +56,8 @@ function RootDocument() {
   return (
     <html lang="en" className="antialiased" data-theme="charcoal" data-font="satoshi" data-size="m" suppressHydrationWarning>
       <head>
+        {/* Blocking stylesheet — must paint styled before route chunks hydrate */}
+        <link rel="stylesheet" href={appCss} />
         <HeadContent />
         <script dangerouslySetInnerHTML={{ __html: PREFS_BOOT }} />
       </head>
