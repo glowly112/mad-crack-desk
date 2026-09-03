@@ -1,15 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { EmptyState } from "@/components/empty-state";
+import { OracleStampLine } from "@/components/oracle-stamp-line";
 import { LiveDot } from "@/components/live-dot";
-import { useStamp } from "@/components/plant-context";
+import { usePlantSource, useStamp } from "@/components/plant-context";
 import { healthBoard, type HealthRow } from "@/lib/lab/boards";
 import { EMPTY } from "@/lib/lab/desk";
+import { ukStampLine } from "@/lib/lab/uk-time";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/health")({ component: Health });
 
 export function Health() {
   const stamp = useStamp();
+  const plant = usePlantSource();
+  const live = plant.source === "oracle";
   const board = healthBoard(stamp.kpis, {
     hunters: stamp.hunters,
     inventWhy: stamp.office.inventWhy,
@@ -21,6 +25,14 @@ export function Health() {
         <h1 className="text-2xl">Health</h1>
         <p className="mt-1 text-sm text-muted">Is the plant okay.</p>
         <p className="mt-2 text-sm text-subtle">{board.glance}</p>
+        <div className="mt-3">
+          <OracleStampLine
+            generated={stamp.generated}
+            live={live}
+            detail={ukStampLine(stamp.generated)}
+            tone={live ? "ok" : "warn"}
+          />
+        </div>
       </header>
 
       <Group title="Broken" items={board.broken} tone="bad" />

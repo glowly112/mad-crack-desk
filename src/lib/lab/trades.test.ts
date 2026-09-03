@@ -85,7 +85,7 @@ test("auto_dry SETTLED maps to paper, not production or live", () => {
   assert.equal(fill.result, "lost");
   assert.equal(fill.recipe, "NZ morning WIN · one-pick 2.5–4.49");
   assert.equal(fill.market, "WIN 3.35");
-  assert.equal(fill.t, "00:07:45");
+  assert.equal(fill.t, "01:07:45");
   assert.equal(fill.day, "2026-09-02");
   assert.equal(fill.pnl, -1);
   assert.equal(fill.flight, null);
@@ -340,16 +340,17 @@ test("open ticket shows real side/odds/stake; unsettled P&L stays Empty", () => 
   assert.equal(row.side, "BACK");
   assert.equal(row.odds, "3.55");
   assert.equal(row.stake, "1u");
-  assert.equal(row.time, "08:14:03");
+  assert.equal(row.time, "09:14:03");
   assert.equal(row.result, "Open");
   assert.match(row.name, /New Zealand · morning · winner/);
   assert.match(row.name, /3\.55 BACK/);
   assert.equal(row.pnl, null);
 });
 
-test("booked clock is a real time, never Empty", () => {
-  assert.equal(bookedClock("2026-09-02T10:59:45Z"), "10:59:45");
-  assert.equal(bookedClock("", "14:03"), "14:03");
+test("booked clock is UK wall time in London, never Empty", () => {
+  assert.equal(bookedClock("2026-09-02T10:59:45Z"), "11:59:45");
+  assert.equal(bookedClock("2026-09-03T08:14:03Z"), "09:14:03");
+  assert.equal(bookedClock("", "14:03"), "14:03:00");
   assert.equal(bookedClock(undefined, "Empty", "09:12:00"), "09:12:00");
   const offOnly = fillFromRow({
     pick_id: "off-1",
@@ -359,9 +360,9 @@ test("booked clock is a real time, never Empty", () => {
     mode: "auto_dry",
   });
   assert.ok(offOnly);
-  assert.equal(offOnly.t, "15:22");
+  assert.equal(offOnly.t, "15:22:00");
   assert.notEqual(offOnly.t, "Empty");
-  assert.equal(bookedClock(offOnly.ts, offOnly.t), "15:22");
+  assert.equal(bookedClock(offOnly.ts, offOnly.t), "15:22:00");
 });
 
 test("tradeCounts, stake u, and day tape Empty when no production", () => {

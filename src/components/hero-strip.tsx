@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { DayChips } from "@/components/day-chips";
 import { useDayScope } from "@/components/day-scope";
-import { LiveDot } from "@/components/live-dot";
+import { OracleStampLine } from "@/components/oracle-stamp-line";
 import { usePlantSource, useStamp } from "@/components/plant-context";
 import { EmptyState } from "@/components/empty-state";
 import {
@@ -48,12 +48,12 @@ export function PlantPane() {
 
   return (
     <section className="space-y-4">
-      <p className="inline-flex items-center gap-2 font-mono text-xs text-subtle">
-        <LiveDot tone={live ? "ok" : "warn"} tick={stamp.generated} />
-        <span key={stamp.generated} className="stamp-tick">
-          {live ? `${stamp.generated} · live oracle` : plant.detail}
-        </span>
-      </p>
+      <OracleStampLine
+        generated={stamp.generated}
+        live={live}
+        detail={plant.detail}
+        tone={live ? "ok" : "warn"}
+      />
 
       <div role="tablist" aria-label="Plant" className="flex flex-wrap border-b border-border">
         {facts.map((f) => (

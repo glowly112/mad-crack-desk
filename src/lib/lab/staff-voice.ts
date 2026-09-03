@@ -1,6 +1,7 @@
 /** Ordinary-English staff bubbles. Stamp facts only. Never invents P&L. */
 
 import { EMPTY, hopMoves, recipeBookName, bookDisplayName } from "./desk.ts";
+import { ukHopAt } from "./uk-time.ts";
 import { isBoardResetView } from "./board-reset.ts";
 import { bookStages, bookLabel, holeName, staffBookFacts, staffLine, type StaffWatchStamp } from "./boards.ts";
 import { millActivity, fillTradeName } from "./trades.ts";
@@ -73,7 +74,7 @@ function olderFor(seatId: string, stamp: StaffWatchStamp): SeatBubble[] {
       (seatId === "clerk" && dead) ||
       (seatId === "hyde" && (certified || parked)) ||
       (seatId === "foreman" && (certified || parked));
-    if (mine) out.push({ text, at: m.at, older: true });
+    if (mine) out.push({ text, at: ukHopAt(m.at) || m.at, older: true });
   }
   return out;
 }
@@ -317,7 +318,7 @@ export function staffPeopleHops(stamp: StaffWatchStamp): SeatBubble[] {
         : certified || parked
           ? "Hyde · Foreman"
           : "Staff";
-    out.push({ text: `${who}: ${text}`, at: m.at, older: true });
+    out.push({ text: `${who}: ${text}`, at: ukHopAt(m.at) || m.at, older: true });
   }
   return out;
 }

@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { DayChips } from "@/components/day-chips";
 import { useDayScope } from "@/components/day-scope";
 import { DeskTable } from "@/components/desk-table";
-import { LiveDot } from "@/components/live-dot";
+import { OracleStampLine } from "@/components/oracle-stamp-line";
 import { usePlantSource, useStamp } from "@/components/plant-context";
 import { axisDay, EMPTY, type DeskGroup } from "@/lib/lab/desk";
 import {
@@ -80,12 +80,12 @@ export function Trades() {
       <DayChips days={days} />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="inline-flex items-center gap-2 font-mono text-xs text-subtle">
-          <LiveDot tone={live ? "ok" : "warn"} tick={stamp.generated} />
-          <span key={stamp.generated} className="stamp-tick">
-            {live ? `${stamp.generated} · live oracle` : plant.detail}
-          </span>
-        </p>
+        <OracleStampLine
+          generated={stamp.generated}
+          live={live}
+          detail={plant.detail}
+          tone={live ? "ok" : "warn"}
+        />
         <p className="font-mono text-xs text-subtle">
           paper {tape.paper == null ? "Empty" : fmtU(tape.paper)} · production{" "}
           {tape.production == null ? "Empty" : fmtU(tape.production)} · live{" "}

@@ -24,6 +24,7 @@ import {
   type DeskRow,
 } from "./desk.ts";
 import { hopVoice } from "./staff-voice.ts";
+import { ukClock, ukHopAt } from "./uk-time.ts";
 import type { Move, Recipe } from "./stamp.ts";
 
 export type FillBook = "paper" | "production" | "live";
@@ -73,23 +74,13 @@ function num(v: unknown): number | null {
   return null;
 }
 
-/** A real clock. Never Empty. */
+/** A real UK wall clock. Never Empty. */
 export function bookedClock(...raws: Array<string | null | undefined>): string {
-  for (const raw of raws) {
-    if (!raw || raw === "Empty") continue;
-    const iso = /T(\d{2}:\d{2})(?::(\d{2}))?/.exec(raw);
-    if (iso) return iso[2] ? `${iso[1]}:${iso[2]}` : `${iso[1]}:00`;
-    const hm = /^(\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(raw.trim());
-    if (hm) {
-      const hh = hm[1].padStart(2, "0");
-      return hm[3] ? `${hh}:${hm[2]}:${hm[3]}` : `${hh}:${hm[2]}`;
-    }
-  }
-  return "";
+  return ukClock(...raws);
 }
 
 function clock(ts: string): string {
-  return bookedClock(ts);
+  return ukClock(ts);
 }
 
 function marketOf(title: string, odds: number | null): string {
@@ -421,7 +412,7 @@ export function millTapeRows(stamp: {
   const hops = hopMoves(stamp.moves ?? []);
   if (hops.length) {
     return hops.map((m) => ({
-      at: m.at,
+      at: ukHopAt(m.at) || m.at,
       text: hopVoice(m) || bookDisplayName({ id: m.recipe, title: m.recipe }),
     }));
   }
