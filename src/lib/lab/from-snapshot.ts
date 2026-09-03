@@ -270,6 +270,8 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
     day: date,
     generated,
     source: "oracle",
+    mill_n_armed: int(snap.mill_n_armed),
+    n_armed: int(snap.n_armed),
     n_solid,
     fuse_on,
     fuse: fuse_on ? "Real betting: ON" : "Real betting: OFF",
@@ -307,7 +309,7 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
       ...base.office,
       rejects: rejectsFromSnap(snap) ?? base.office.rejects,
     },
-  };
+  } as LiveStamp;
 }
 
 function holesFromSnap(snap: Record<string, unknown>): LiveStamp["holes"] | null {

@@ -14,6 +14,11 @@ const PREFS_BOOT = `(function(){try{var p=JSON.parse(localStorage.getItem("mcl.p
 export const Route = createRootRoute({
   errorComponent: AppErrorComponent,
   notFoundComponent: AppNotFoundComponent,
+  loader: async () => {
+    const { loadPlant } = await import("@/lib/lab/load-plant.server.ts");
+    const plant = await loadPlant();
+    return { plant };
+  },
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -43,7 +48,12 @@ export const Route = createRootRoute({
       },
     ],
   }),
-  component: () => (
+  component: RootDocument,
+});
+
+function RootDocument() {
+  const { plant } = Route.useLoaderData();
+  return (
     <html lang="en" className="antialiased" suppressHydrationWarning>
       <head>
         <HeadContent />
@@ -53,15 +63,15 @@ export const Route = createRootRoute({
         <PreviewHostBridge />
         <AuthProvider>
           <PrefsProvider>
-            <PlantProvider>
-            <AppShell>
-              <Outlet />
-            </AppShell>
+            <PlantProvider initial={plant}>
+              <AppShell>
+                <Outlet />
+              </AppShell>
             </PlantProvider>
           </PrefsProvider>
         </AuthProvider>
         <Scripts />
       </body>
     </html>
-  ),
-});
+  );
+}

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import liveSnap from "./live-snapshot.json" with { type: "json" };
-import { applyBoardResetView, isBoardResetView } from "./board-reset.ts";
+import { applyBoardResetView, isBoardResetView, hasLivePlantArms } from "./board-reset.ts";
 import { applySnapshot } from "./from-snapshot.ts";
 import { readLocalOraclePlant } from "./oracle-local-plant.ts";
 import { bootStamp, digestStamp, plantFromTape, type PlantPayload } from "./plant-boot.ts";
@@ -62,10 +62,19 @@ if lf.exists():
     except Exception:
         pass
 d["wait_open"] = wait_open
+d["mill_n_armed"] = d.get("mill_n_armed")
+d["n_armed"] = d.get("n_armed")
+if d.get("ts"):
+    d["generated_at_utc"] = d.get("ts")
+    d["generatedAt"] = d.get("ts")
+snap_inner = d.get("snapshot") if isinstance(d.get("snapshot"), dict) else {}
+if snap_inner.get("mill_n_armed") and not d.get("mill_n_armed"):
+    d["mill_n_armed"] = snap_inner.get("mill_n_armed")
+if snap_inner.get("n_armed") and not d.get("n_armed"):
+    d["n_armed"] = snap_inner.get("n_armed")
 print(json.dumps(d))
 `.trim();
 
-const LAB_SNAPSHOT = "https://stridesmart.uk/lab/api/snapshot";
 const LOOPBACK = ["http://127.0.0.1:8788/api/snapshot", "http://127.0.0.1:8780/api/snapshot"];
 
 function onVercel(): boolean {
@@ -76,12 +85,7 @@ function snapshotUrls(): string[] {
   const out: string[] = [];
   const envUrl = process.env.ORACLE_SNAPSHOT_URL?.trim();
   if (envUrl) out.push(envUrl);
-  // Live lab console. Auth required; 401 is a miss. On Vercel always try so
-  // ORACLE_BASIC_AUTH in project env actually wires the floor. Off-box preview
-  // only hits it when auth is set (bare TLS hung the last poll).
-  if (process.env.ORACLE_BASIC_AUTH?.trim() || onVercel()) {
-    if (!out.includes(LAB_SNAPSHOT)) out.push(LAB_SNAPSHOT);
-  }
+  // Never default to stridesmart.uk/lab — nginx 302s to /desk HTML, not JSON.
   if (!onVercel()) {
     for (const u of LOOPBACK) {
       if (!out.includes(u)) out.push(u);
@@ -121,7 +125,12 @@ async function tryHttp(base: LiveStamp): Promise<PlantPayload | null> {
           headers: { ...headers, Accept: "application/json", "Cache-Control": "no-cache" },
         });
         if (!res.ok) return null;
-        const snap = (await res.json()) as unknown;
+        const ctype = res.headers.get("content-type") ?? "";
+        const text = await res.text();
+        const trimmed = text.trimStart();
+        if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return null;
+        if (ctype.includes("text/html") || trimmed.startsWith("<!")) return null;
+        const snap = JSON.parse(text) as unknown;
         const stamp = applySnapshot(snap, base);
         if (stamp.source !== "oracle") return null;
         return { stamp, source: "oracle" as const, detail: url };
@@ -195,48 +204,43 @@ function fromLiveFile(base: LiveStamp): PlantPayload {
   };
 }
 
+function finishOraclePayload(hit: PlantPayload): PlantPayload {
+  const stamp = applyBoardResetView(hit.stamp);
+  const detail = hasLivePlantArms(stamp)
+    ? `live oracle · ${stamp.recipes.length} on board · ${stamp.holes?.length ?? 0} holes · stamp ${stamp.generated}`
+    : isBoardResetView(stamp)
+      ? "new run · board reset"
+      : `live oracle · post-reset arms (${stamp.recipes.length} recipes · ${stamp.trades.length} fills)`;
+  return { ...hit, stamp, detail };
+}
+
 export async function loadPlant(): Promise<PlantPayload> {
   try {
     const base = digestStamp();
     const remote = Promise.race([
       (async () => {
-        const [local, http, ssh] = await Promise.all([tryLocal(base), tryHttp(base), trySsh(base)]);
-        let hit: PlantPayload | null = local;
-        if (http && ssh) {
-          const trades =
-            http.stamp.trades.length === 0 && ssh.stamp.trades.length > 0
-              ? ssh.stamp.trades
-              : http.stamp.trades;
-          const wait_open =
-            (http.stamp.wait_open?.length ?? 0) === 0 && (ssh.stamp.wait_open?.length ?? 0) > 0
-              ? ssh.stamp.wait_open
-              : (http.stamp.wait_open ?? []);
-          hit = { ...http, stamp: { ...http.stamp, trades, wait_open } };
-        } else if (!hit) {
-          hit = http ?? ssh;
-        } else if (http || ssh) {
-          const remote = http ?? ssh!;
+        const local = await tryLocal(base);
+        const ssh = local ? null : await trySsh(base);
+        const http = local || ssh ? null : await tryHttp(base);
+
+        let hit: PlantPayload | null = local ?? ssh ?? http;
+        if (!hit) return null;
+
+        if (local && ssh) {
           hit = {
-            ...hit,
+            ...local,
             stamp: {
-              ...hit.stamp,
-              trades: hit.stamp.trades.length ? hit.stamp.trades : remote.stamp.trades,
+              ...local.stamp,
+              trades: local.stamp.trades.length ? local.stamp.trades : ssh.stamp.trades,
               wait_open:
-                (hit.stamp.wait_open?.length ?? 0) > 0
-                  ? hit.stamp.wait_open
-                  : remote.stamp.wait_open,
+                (local.stamp.wait_open?.length ?? 0) > 0
+                  ? local.stamp.wait_open
+                  : ssh.stamp.wait_open,
             },
           };
         }
-        if (!hit) return null;
-        const stamp = applyBoardResetView(hit.stamp);
-        const detail =
-          hit.source === "oracle"
-            ? isBoardResetView(stamp)
-              ? "new run · board reset"
-              : `live oracle · post-reset arms (${stamp.recipes.length} recipes · ${stamp.trades.length} fills)`
-            : hit.detail;
-        return { ...hit, stamp, detail };
+
+        return finishOraclePayload(hit);
       })(),
       new Promise<null>((resolve) => {
         setTimeout(() => resolve(null), 10_000);

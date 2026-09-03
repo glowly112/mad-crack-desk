@@ -29,6 +29,12 @@ export function recipeIsPostEpoch(recipe: Recipe): boolean {
   return false;
 }
 
+export function hasPostEpochEholeRecipes(recipes: readonly Recipe[]): boolean {
+  return recipes.some(
+    (r) => /^H-ehole-/i.test(r.id) || /^ehole_/i.test(r.title) || recipeIsPostEpoch(r),
+  );
+}
+
 function stampGeneratedPostEpoch(stamp: LiveStamp): boolean {
   const g = compactEpoch(stamp.generated);
   return g ? isPostEpochCompact(g) : false;
@@ -46,8 +52,27 @@ export function fillIsPostEpoch(fill: Fill): boolean {
 export function countArmed(stamp: {
   recipes?: readonly Recipe[];
   wait_open?: readonly { id: string }[];
+  mill_n_armed?: number;
+  n_armed?: number;
 }): number {
+  const mill = stamp.mill_n_armed ?? 0;
+  const armed = stamp.n_armed ?? 0;
+  if (mill > 0) return mill;
+  if (armed > 0) return armed;
   return (stamp.recipes?.length ?? 0) + (stamp.wait_open?.length ?? 0);
+}
+
+/** Live mill or scoreboard has post-reset arms — never paint the empty overlay. */
+export function hasLivePlantArms(stamp: LiveStamp): boolean {
+  if (stamp.source !== "oracle") return false;
+  const mill = (stamp as LiveStamp & { mill_n_armed?: number }).mill_n_armed ?? 0;
+  const armed = (stamp as LiveStamp & { n_armed?: number }).n_armed ?? 0;
+  if (mill > 0 || armed > 0) return true;
+  if ((stamp.counts?.measuring ?? 0) > 0 || (stamp.counts?.hunting ?? 0) > 0) return true;
+  if ((stamp.holes?.length ?? 0) > 0) return true;
+  if (hasPostEpochEholeRecipes(stamp.recipes)) return true;
+  if (countArmed({ recipes: stamp.recipes, wait_open: stamp.wait_open }) > 0) return true;
+  return false;
 }
 
 function recipeHoleId(recipe: Recipe): string | null {
@@ -75,6 +100,7 @@ function filterWaitOpen(
 
 /** Drop legacy tape, recipes, and fills — keep post-epoch plant facts. */
 export function filterPreEpochLeftovers(stamp: LiveStamp): LiveStamp {
+  if (hasLivePlantArms(stamp)) return stamp;
   if (stamp.source === "oracle" && stampGeneratedPostEpoch(stamp)) {
     return stamp;
   }
@@ -134,13 +160,24 @@ export function isBoardResetView(stamp: {
   recipes?: readonly unknown[];
   trades?: readonly unknown[];
   wait_open?: readonly unknown[];
+  source?: string;
+  counts?: { measuring?: number; hunting?: number };
+  holes?: readonly unknown[];
+  mill_n_armed?: number;
+  n_armed?: number;
 }): boolean {
+  if (hasLivePlantArms(stamp as LiveStamp)) return false;
   const recipes = (stamp.recipes ?? []) as Recipe[];
   const trades = (stamp.trades ?? []) as Fill[];
   const postRecipes = recipes.filter(recipeIsPostEpoch);
   const postTrades = trades.filter(fillIsPostEpoch);
   return (
-    countArmed({ recipes: postRecipes, wait_open: stamp.wait_open as { id: string }[] | undefined }) === 0 &&
+    countArmed({
+      recipes: postRecipes,
+      wait_open: stamp.wait_open as { id: string }[] | undefined,
+      mill_n_armed: stamp.mill_n_armed,
+      n_armed: stamp.n_armed,
+    }) === 0 &&
     postTrades.length === 0
   );
 }
@@ -251,6 +288,13 @@ function boardResetSeatNow(seatId: string): string {
  * When n_armed is zero, paint the empty morning board.
  */
 export function applyBoardResetView(stamp: LiveStamp): LiveStamp {
+  if (hasLivePlantArms(stamp)) {
+    return {
+      ...stamp,
+      fuse_on: false,
+      fuse: "Real betting: OFF",
+    };
+  }
   const filtered = filterPreEpochLeftovers(stamp);
   if (!isBoardResetView(filtered)) {
     return {

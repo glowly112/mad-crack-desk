@@ -8,6 +8,15 @@ function rec(v: unknown): Record<string, unknown> | null {
   return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
 }
 
+function int(v: unknown): number {
+  if (typeof v === "number" && Number.isFinite(v)) return Math.trunc(v);
+  if (typeof v === "string" && v.trim()) {
+    const n = Number.parseFloat(v);
+    if (Number.isFinite(n)) return Math.trunc(n);
+  }
+  return 0;
+}
+
 function labLatestDir(): string {
   const root = process.env.BBB_ROOT?.trim() || join(homedir(), "bbb");
   return join(root, "data/firm/lab/latest");
@@ -142,38 +151,47 @@ export async function readLocalOraclePlant(): Promise<Record<string, unknown> | 
     } catch {
       /* digest optional */
     }
-    const summary = rec(sb.summary) ?? {};
+    const snapInner = rec(digest.snapshot) ?? {};
+    const summary = rec(sb.summary) ?? rec(snapInner.summary) ?? {};
     const cliff = rec(summary.settled_total_cliff);
     const day =
       (typeof digest.date === "string" && digest.date) ||
       (typeof digest.day === "string" && digest.day) ||
+      (typeof snapInner.day === "string" && snapInner.day) ||
       (typeof sb.date === "string" && sb.date) ||
       (typeof sb.day === "string" && sb.day) ||
       "";
     const generated =
+      (typeof digest.ts === "string" && digest.ts) ||
       (typeof cliff?.new_ts === "string" && cliff.new_ts) ||
       (typeof sb.generated_at_utc === "string" && sb.generated_at_utc) ||
       (typeof digest.generated_at_utc === "string" && digest.generated_at_utc) ||
       (typeof digest.generatedAt === "string" && digest.generatedAt) ||
       "";
 
-    const measuring = Number(summary.n_measuring ?? rec(summary.by_status)?.MEASURING ?? 0);
-    const hunting = Number(summary.n_hunting ?? rec(summary.by_status)?.HUNTING ?? 0);
-    const n_armed = Number(digest.n_armed ?? sb.n_armed ?? measuring + hunting);
+    const byStatus = rec(summary.by_status) ?? {};
+    const measuring = int(summary.n_measuring ?? byStatus.MEASURING);
+    const hunting = int(summary.n_hunting ?? byStatus.HUNTING);
+    const mill_n_armed = int(
+      digest.mill_n_armed ?? snapInner.mill_n_armed ?? digest.n_armed ?? snapInner.n_armed,
+    );
+    const n_armed = mill_n_armed > 0 ? mill_n_armed : int(digest.n_armed ?? sb.n_armed ?? measuring + hunting);
 
     const fills = day ? await readRecentFills(day) : [];
     const wait_open = await readWaitOpen();
 
     return {
+      ...snapInner,
       ...digest,
       ...sb,
       cells: sb.cells,
       summary,
-      truth: sb.truth ?? digest.truth,
+      truth: sb.truth ?? digest.truth ?? snapInner.truth,
       date: day,
       day,
       generated_at_utc: generated,
       generatedAt: generated,
+      mill_n_armed,
       n_armed,
       fills,
       wait_open,
