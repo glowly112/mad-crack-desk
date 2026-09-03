@@ -1,5 +1,6 @@
 import type { LiveStamp } from "./from-digest.ts";
 import { mergeMillPathRuns } from "./mill-paths.ts";
+import { filterIngestMillFillRows, scrubMillWatchingLine } from "./mill-ingest.ts";
 import { cellName } from "./desk.ts";
 import { scrubPostResetTrendPaper } from "./desk.ts";
 import type { Badge, Chip, Recipe } from "./stamp.ts";
@@ -117,8 +118,10 @@ function recipesFromCells(cells: Record<string, unknown>[]): Recipe[] {
   for (const c of cells) {
     const status = statusOf(c);
     const id = String(c.id || c.title || "").trim();
-    if (/^H-hyde-/i.test(id)) continue;
+    if (/^H-hyde-/i.test(id) || /^H-fast-/i.test(id)) continue;
     if (status === "KILL") continue;
+    if (status === "KEEP" && !cellIsPostEpochParkedKeep(c) && !cellIsPostEpochEhole(c)) continue;
+    if ((status === "MEASURING" || status === "HUNTING") && !cellIsPostEpochEhole(c)) continue;
     if (status !== "MEASURING" && status !== "HUNTING" && status !== "KEEP") continue;
     if (!id) continue;
     const score = rec(c.score) ?? {};
@@ -441,9 +444,13 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
   const paperLive = rec(snap.paperLive) ?? rec(snap.paper_live);
   const scaling = rec(rec(snap.trading_floor)?.scaling_desk) ?? rec(snap.scaling_desk);
   const pipeline = rec(rec(snap.trading_floor)?.pipeline) ?? rec(snap.pipeline);
+  const plantOracle = isPlantSnap(opened);
 
-  const keep =
-    int(truth.keep) ?? int(summary.n_keep) ?? int(snap.n_keep) ?? int(by.KEEP) ?? base.counts.keep;
+  const recipes = recipesFromCells(cellsOf(snap));
+  const keepBoard = recipes.filter((r) => r.status === "KEEP").length;
+  const keep = plantOracle
+    ? keepBoard
+    : int(truth.keep) ?? int(summary.n_keep) ?? int(snap.n_keep) ?? int(by.KEEP) ?? base.counts.keep;
   const measuring =
     int(truth.measuring) ?? int(summary.n_measuring) ?? int(by.MEASURING) ?? base.counts.measuring;
   const hunting = int(truth.gathering) ?? int(by.HUNTING) ?? base.counts.hunting;
@@ -456,28 +463,18 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
     int(summary.n_distinct_certified_keep) ??
     int(scaling?.n_certified_keep);
 
-  const recipes = recipesFromCells(cellsOf(snap));
-  const tradesParsed = Array.isArray(snap.fills) ? parseFills(snap.fills) : base.trades;
+  const rawFillRows = Array.isArray(snap.fills) ? filterIngestMillFillRows(snap.fills) : null;
+  const tradesParsed = rawFillRows != null ? parseFills(rawFillRows) : base.trades;
 
-  let fuse_on = base.fuse_on;
-  if (liveMoney) {
-    fuse_on = Boolean(liveMoney.live_on) && Boolean(liveMoney.place_on ?? liveMoney.place_orders);
-  } else if (snap.fuse_live === false || snap.live === false) {
-    fuse_on = false;
-  } else if (typeof boardUx?.fuse === "string") {
-    fuse_on = /real betting:\s*on/i.test(boardUx.fuse) || boardUx.fuse.toUpperCase() === "ON";
-  }
+  let fuse_on = false;
 
-  const researchKeepGbp =
-    num(snap.pnlTotal) ?? num(summary.keep_pnl_gbp) ?? num(summary.keep_pnl_now_gbp) ?? base.researchKeepGbp;
+  const researchKeepGbp = 0;
 
   const solids = recipes.filter((r) => r.badge === "Solid" && recipeIsPostEpoch(r));
-  const plantOracle = isPlantSnap(opened);
   const n_solid =
     nSolidExplicit ??
     (recipes.length ? solids.length : plantOracle ? 0 : base.n_solid);
   const cellList = cellsOf(snap);
-  const occupancyHoles = isPlantSnap(opened) ? holesFromOccupancyPostEpoch(snap, cellList) : null;
   const namedHolesFromCells = holesFromCells(cellList);
   const eholeArms = countEholeArms(cellList);
 
@@ -512,7 +509,7 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
     rec(snap.occupancy_post_epoch) ??
     rec(rec(snap.empty_hole_hunt)?.occupancy_post_epoch) ??
     rec(rec(snap.factory_empty_hole_hunt)?.occupancy_post_epoch);
-  const square_occupied_n = int(occRec?.n_occupied_cells);
+  const square_occupied_n = plantOracle ? undefined : int(occRec?.n_occupied_cells);
 
   const trendsBase = base.trends.some((t) => t.day === date)
     ? base.trends
@@ -585,8 +582,8 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
     trades: tradesParsed,
     wait_open: Array.isArray(snap.wait_open) ? parseWaitOpen(snap.wait_open) : (base.wait_open ?? []),
     holes: plantOracle
-      ? (occupancyHoles ?? namedHolesFromCells).length
-        ? occupancyHoles ?? namedHolesFromCells
+      ? namedHolesFromCells.length
+        ? namedHolesFromCells
         : holesFromSnap(snap) ?? []
       : holesFromSnap(snap) ?? (namedHolesFromCells.length ? namedHolesFromCells : base.holes),
     office: {
@@ -657,7 +654,7 @@ function overlaySeats(
     }
     const status = String(r.status || seat.status);
     const rawNow = typeof r.watching === "string" && r.watching ? r.watching : seat.now;
-    const now = overlaySeatNow(seat.id, rawNow, inventCaption);
+    const now = overlaySeatNow(seat.id, scrubMillWatchingLine(rawNow), inventCaption);
     return {
       ...seat,
       status: (status as LiveStamp["seats"][number]["status"]) || seat.status,

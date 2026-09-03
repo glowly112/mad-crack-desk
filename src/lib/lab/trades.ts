@@ -691,6 +691,15 @@ export function archiveTradesTape(
   return out.sort((a, b) => b.ts.localeCompare(a.ts));
 }
 
+/** Parsed fills through archive gate — ingest boundary for Trades/Floor/Office. */
+export function ingestMillFills(
+  trades: readonly Fill[],
+  day: string,
+  recipes: readonly Recipe[] = [],
+): Fill[] {
+  return archiveTradesTape(trades, day, recipes);
+}
+
 /** One roll-up for Trades › Settled, Floor paper tile, Trades header, and Office. */
 export type DeskSettledTapeRollup = {
   fills: Fill[];

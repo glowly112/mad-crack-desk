@@ -40,10 +40,9 @@ export function PlantPane() {
       side: f.side,
     })),
   });
-  const authOccupied = (stamp as { square_occupied_n?: number }).square_occupied_n;
+  const authOccupied = undefined;
   const paintedOccupied = holes.filter((h) => holeSideOccupied(h)).length;
-  const occupiedN =
-    authOccupied != null && authOccupied > paintedOccupied ? authOccupied : paintedOccupied;
+  const occupiedN = paintedOccupied;
   const emptyHoles = holes.length - occupiedN;
   const facts = floorFacts(stamp, scope, emptyHoles);
   const selected = facts.find((f) => f.id === fact) ?? facts[0];

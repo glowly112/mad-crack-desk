@@ -30,8 +30,8 @@ test("Linear snapshot overlays KEEP/measuring and never puts KEEP paper on the h
           stats: { roi: 19.5 },
         },
         {
-          id: "gb-late-pre-win",
-          title: "GB late-pre win",
+          id: "H-ehole-gb-latepre-win-83959Z",
+          title: "ehole_gb_latepre_win",
           status: "MEASURING",
           n: 31,
           stats: { roi: 13.3 },
@@ -41,22 +41,19 @@ test("Linear snapshot overlays KEEP/measuring and never puts KEEP paper on the h
     base(),
   );
   assert.equal(live.source, "oracle");
-  assert.equal(live.counts.keep, 2);
+  assert.equal(live.counts.keep, 0);
   assert.equal(live.counts.measuring, 18);
   assert.equal(live.counts.kill, 113);
   assert.equal(live.n_solid, 0);
   assert.equal(live.hero.day_u, null);
-  assert.equal(live.researchKeepGbp, 444.02);
+  assert.equal(live.researchKeepGbp, 0);
   assert.equal(live.fuse_on, false);
   assert.equal(
     productionScore({ n_solid: live.n_solid, day_u: live.hero.day_u, researchKeepGbp: live.researchKeepGbp }),
     null,
   );
-  assert.equal(live.recipes[0]?.id, "H-fast-au-nearoff-place");
-  assert.equal(live.recipes[0]?.badge, "Parked");
-  assert.equal(live.recipes[0]?.region, "AU");
-  assert.equal(live.recipes[1]?.badge, "Research");
-  assert.equal(live.recipes[1]?.region, "GB");
+  assert.equal(live.recipes.length, 1);
+  assert.equal(live.recipes[0]?.id, "H-ehole-gb-latepre-win-83959Z");
 });
 
 test("small field does not become Ireland", () => {
@@ -65,8 +62,8 @@ test("small field does not become Ireland", () => {
       date: "2026-09-02",
       cells: [
         {
-          id: "H-20260831T141500Z-us-inplay-place-smallfield",
-          title: "US in-play PLACE · one-pick small field",
+          id: "H-ehole-us-inplay-place-14150Z",
+          title: "ehole_us_inplay_place_smallfield",
           status: "MEASURING",
           n: 18,
         },
@@ -95,15 +92,13 @@ test("firm scoreboard by_status and cells overlay without inventing solids", () 
     base(),
   );
   assert.equal(live.source, "oracle");
-  assert.equal(live.counts.keep, 2);
+  assert.equal(live.counts.keep, 0);
   assert.equal(live.counts.measuring, 18);
   assert.equal(live.counts.hunting, 3);
   assert.equal(live.n_solid, 0);
   assert.equal(live.hero.day_u, null);
-  assert.equal(live.researchKeepGbp, 444.02);
-  assert.equal(live.recipes[0]?.region, "IE");
-  assert.equal(live.recipes[0]?.badge, "Parked");
-  assert.equal(live.recipes[0]?.n, 54);
+  assert.equal(live.researchKeepGbp, 0);
+  assert.equal(live.recipes.length, 0);
 });
 
 test("missing liveMoney leaves the digest fuse alone", () => {
@@ -112,7 +107,7 @@ test("missing liveMoney leaves the digest fuse alone", () => {
   assert.equal(live.fuse, "Real betting: OFF");
 });
 
-test("liveMoney live_on and place_on is the only path that opens the fuse", () => {
+test("oracle fuse stays off even when liveMoney requests live", () => {
   const live = applySnapshot(
     {
       truth: { keep: 2, measuring: 18, dropped: 113 },
@@ -120,8 +115,8 @@ test("liveMoney live_on and place_on is the only path that opens the fuse", () =
     },
     base(),
   );
-  assert.equal(live.fuse_on, true);
-  assert.equal(live.fuse, "Real betting: ON");
+  assert.equal(live.fuse_on, false);
+  assert.equal(live.fuse, "Real betting: OFF");
 });
 
 test("live_on without place_on does not open the fuse", () => {
@@ -135,17 +130,23 @@ test("live_on without place_on does not open the fuse", () => {
   assert.equal(live.fuse_on, false);
 });
 
-test("Solid recipes lead the tape even when the scoreboard lists a parked keep first", () => {
+test("Solid ehole recipes sort before parked on the tape", () => {
   const live = applySnapshot(
     {
-      truth: { keep: 2, measuring: 0, dropped: 0 },
+      truth: { keep: 0, measuring: 2, dropped: 0 },
       n_solid: 1,
       paper_live_day_u: null,
       cells: [
-        { id: "parked_nz", title: "NZ morning win", status: "KEEP", keep_badge: "Parked", n: 68 },
         {
-          id: "solid_gb",
-          title: "GB win near-off",
+          id: "H-ehole-nz-morning-win-73508Z",
+          title: "ehole_nz_morning_win",
+          status: "KEEP",
+          keep_badge: "Parked",
+          n: 68,
+        },
+        {
+          id: "H-ehole-gb-nearoff-win-83959Z",
+          title: "ehole_gb_nearoff_win",
           status: "KEEP",
           keep_badge: "Solid",
           status_chip: "Waiting for races",
@@ -156,7 +157,7 @@ test("Solid recipes lead the tape even when the scoreboard lists a parked keep f
     },
     base(),
   );
-  assert.equal(live.recipes[0]?.id, "solid_gb");
+  assert.equal(live.recipes[0]?.id, "H-ehole-gb-nearoff-win-83959Z");
   assert.equal(live.recipes[0]?.badge, "Solid");
   assert.equal(live.recipes[1]?.badge, "Parked");
 });
@@ -221,26 +222,27 @@ test("fills overlay lists today's paper tape and does not invent production", ()
   );
 });
 
-test("empty fills array is Empty, missing fills keeps the digest tape", () => {
+test("empty fills array clears tape; missing fills keeps prior first-book tape", () => {
   const withTape = applySnapshot(
     {
-      truth: { keep: 2 },
+      truth: { keep: 0 },
       fills: [
         {
           pick_id: "keep-me",
-          ts: "2026-09-02T00:00:00Z",
-          cell_id: "H-20260828T020000Z-nz-morning-win-one-pick-band-2-5-4-49",
+          ts: "2026-09-03T00:00:00Z",
+          date: "2026-09-03",
+          cell_id: "H-ehole-nz-morning-win-73508Z",
           mode: "auto_dry",
           status: "OPEN",
         },
       ],
     },
-    base(),
+    applyDigest(digest as Digest, STAMP),
   );
   assert.equal(withTape.trades.length, 1);
-  const cleared = applySnapshot({ truth: { keep: 2 }, fills: [] }, withTape);
+  const cleared = applySnapshot({ truth: { keep: 0 }, fills: [] }, withTape);
   assert.deepEqual(cleared.trades, []);
-  const kept = applySnapshot({ truth: { keep: 2 } }, withTape);
+  const kept = applySnapshot({ truth: { keep: 0 } }, withTape);
   assert.equal(kept.trades.length, 1);
   assert.equal(kept.trades[0]?.id, "keep-me");
 });
@@ -317,7 +319,7 @@ test("oracle snapshot invent overlays staff seats and Invent fire KPI without de
   assert.ok(!/densify/i.test(inventKpi!.detail));
 });
 
-test("mill parked uses occupancy_post_epoch holes and invent n_armed not all measuring cells", () => {
+test("ehole cells paint the square without occupancy_post_epoch dumps", () => {
   const live = applySnapshot(
     {
       truth: { keep: 1, measuring: 54, gathering: 6, dropped: 4 },

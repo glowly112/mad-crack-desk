@@ -2,6 +2,7 @@ import digest from "./digest.json" with { type: "json" };
 import liveSnap from "./live-snapshot.json" with { type: "json" };
 import { applyDigest, type Digest, type LiveStamp } from "./from-digest.ts";
 import { applySnapshot } from "./from-snapshot.ts";
+import { scrubDigestStampArchive } from "./mill-ingest.ts";
 import { STAMP } from "./stamp.ts";
 
 export type PlantPayload = {
@@ -11,7 +12,7 @@ export type PlantPayload = {
 };
 
 export function digestStamp(): LiveStamp {
-  return applyDigest(digest as Digest, STAMP);
+  return scrubDigestStampArchive(applyDigest(digest as Digest, STAMP));
 }
 
 export function bootStamp(): LiveStamp {

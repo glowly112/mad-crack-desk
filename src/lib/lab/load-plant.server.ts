@@ -7,7 +7,7 @@ import liveSnap from "./live-snapshot.json" with { type: "json" };
 import { applyBoardResetView, isBoardResetView, hasLivePlantArms } from "./board-reset.ts";
 import { applySnapshot } from "./from-snapshot.ts";
 import { readLocalOraclePlant, oracleScoreboardExists, readFullBookDayFills } from "./oracle-local-plant.ts";
-import { archiveTradesTape, parseFills, refreshTapeFromBook } from "./trades.ts";
+import { archiveTradesTape, parseFills, refreshTapeFromBook, ingestMillFills } from "./trades.ts";
 import { bootStamp, digestStamp, plantFromTape, type PlantPayload } from "./plant-boot.ts";
 import type { LiveStamp } from "./from-digest.ts";
 
@@ -253,7 +253,7 @@ async function finishOraclePayload(hit: PlantPayload): Promise<PlantPayload> {
       const refreshed = refreshTapeFromBook(stamp.trades, bookFills, stamp.day);
       stamp = applyBoardResetView({
         ...stamp,
-        trades: archiveTradesTape(refreshed, stamp.day, stamp.recipes),
+        trades: ingestMillFills(refreshed, stamp.day, stamp.recipes),
       });
     }
   }

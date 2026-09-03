@@ -201,7 +201,7 @@ export function floorFacts(
     paperHint = `${dayHint} · paper`;
   }
 
-  const production = trend?.factory_day_pnl_u ?? null;
+  const production = null;
   const productionHint =
     nKeep <= 0 ? "KEEP 0 · no later-race score" : `${dayHint} · later-race KEEP`;
 

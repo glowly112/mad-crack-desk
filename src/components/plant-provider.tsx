@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { DayScopeProvider } from "@/components/day-scope";
 import { PlantCtx, plantInitial, type PlantState } from "@/components/plant-context";
 import { getPlant } from "@/lib/lab/get-plant";
-import { mergeMillTradesTape } from "@/lib/lab/trades";
+import { mergeMillTradesTape, ingestMillFills } from "@/lib/lab/trades";
 
 export function PlantProvider({
   children,
@@ -21,7 +21,8 @@ export function PlantProvider({
         .then((p) => {
           if (on) {
             setState((prev) => {
-              const trades = mergeMillTradesTape(prev.stamp.trades, p.stamp.trades, p.stamp.day);
+              const merged = mergeMillTradesTape(prev.stamp.trades, p.stamp.trades, p.stamp.day);
+              const trades = ingestMillFills(merged, p.stamp.day, p.stamp.recipes);
               return {
                 stamp: { ...p.stamp, trades },
                 source: p.source,

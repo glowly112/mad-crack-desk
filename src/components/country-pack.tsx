@@ -56,10 +56,9 @@ export function FloorSquare() {
     })),
   });
   const markets = squareGridMarkets();
-  const authOccupied = (stamp as { square_occupied_n?: number }).square_occupied_n;
+  const authOccupied = undefined;
   const paintedOccupied = holes.filter((h) => holeSideOccupied(h)).length;
-  const occupiedN =
-    authOccupied != null && authOccupied > paintedOccupied ? authOccupied : paintedOccupied;
+  const occupiedN = paintedOccupied;
   const emptyN = holes.length - occupiedN;
   const glance = `${emptyN} empty of ${holes.length} holes on the square`;
 
@@ -101,10 +100,9 @@ export function CountryPack() {
   });
   const markets = squareGridMarkets();
   const countries = countryMarket(officeCountries(stamp.coverage, millDisplayRecipes(stamp.recipes)));
-  const authOccupied = (stamp as { square_occupied_n?: number }).square_occupied_n;
+  const authOccupied = undefined;
   const paintedOccupied = holes.filter((h) => holeSideOccupied(h)).length;
-  const occupiedN =
-    authOccupied != null && authOccupied > paintedOccupied ? authOccupied : paintedOccupied;
+  const occupiedN = paintedOccupied;
   const cap = squareGlanceLine({
     occupied: occupiedN,
     n_solid: stamp.counts.certified,

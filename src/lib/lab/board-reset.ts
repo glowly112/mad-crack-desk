@@ -4,6 +4,7 @@ import { parseMarket, parseWindow } from "./boards.ts";
 import { EMPTY, scrubPostResetTrendPaper } from "./desk.ts";
 import type { LiveStamp } from "./from-digest.ts";
 import type { Fill } from "./trades.ts";
+import { scrubDeskStampArchive } from "./mill-ingest.ts";
 import { honestFirstBookOpenFills, settledPaperDayU, isFirstBookTapeFill, deskSettledTapeRollup, archiveTradesTape } from "./trades.ts";
 import type { Recipe } from "./stamp.ts";
 
@@ -356,18 +357,22 @@ function overlayPaperTape(stamp: LiveStamp): LiveStamp {
 export function applyBoardResetView(stamp: LiveStamp): LiveStamp {
   const filtered = filterPreEpochLeftovers(stamp);
   if (hasLivePlantArms(filtered)) {
-    return overlayPaperTape({
-      ...filtered,
-      fuse_on: false,
-      fuse: "Real betting: OFF",
-    });
+    return scrubDeskStampArchive(
+      overlayPaperTape({
+        ...filtered,
+        fuse_on: false,
+        fuse: "Real betting: OFF",
+      }),
+    );
   }
   if (!isBoardResetView(filtered)) {
-    return overlayPaperTape({
-      ...filtered,
-      fuse_on: false,
-      fuse: filtered.fuse_on ? "Real betting: ON" : "Real betting: OFF",
-    });
+    return scrubDeskStampArchive(
+      overlayPaperTape({
+        ...filtered,
+        fuse_on: false,
+        fuse: filtered.fuse_on ? "Real betting: ON" : "Real betting: OFF",
+      }),
+    );
   }
-  return applyEmptyBoardOverlay(filtered);
+  return scrubDeskStampArchive(applyEmptyBoardOverlay(filtered));
 }
