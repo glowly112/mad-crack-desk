@@ -3,13 +3,13 @@ import { useStamp } from "@/components/plant-context";
 import {
   SQUARE_WINDOW_LABEL,
   SQUARE_WINDOWS,
-  capitalisingLine,
   countryMarket,
   floorRacingSquare,
   inventHole,
   officeCountries,
   plantMarkets,
   racingSquare,
+  squareGlanceLine,
 } from "@/lib/lab/boards";
 import { EMPTY } from "@/lib/lab/desk";
 import type { CountryRow, HoleCell, MarketSquare, SquareMarket } from "@/lib/lab/boards";
@@ -82,11 +82,21 @@ export function CountryPack() {
   });
   const markets = plantMarkets(holes.map((h) => h.market));
   const countries = countryMarket(officeCountries(stamp.coverage, stamp.recipes));
-  const cap = capitalisingLine(stamp.counts);
-  const hole =
-    huntNotes.map(inventHole).find((n) => n !== EMPTY) ?? EMPTY;
-  const emptyN = holes.filter((h) => h.tone === "empty").length;
-  const glance = `${holes.length} holes. ${emptyN} Empty. WIN beside PLACE. ${cap}`;
+  const authOccupied = (stamp as { square_occupied_n?: number }).square_occupied_n;
+  const paintedOccupied = holes.filter((h) => h.tone !== "empty").length;
+  const occupiedN =
+    authOccupied != null && authOccupied > paintedOccupied ? authOccupied : paintedOccupied;
+  const cap = squareGlanceLine({
+    occupied: occupiedN,
+    n_solid: stamp.counts.certified,
+    kill: stamp.counts.kill,
+  });
+  const inventWhy = stamp.office.inventWhy?.trim() ?? "";
+  const huntLine = /empty-hole hunt|invent_empty|mill parked/i.test(inventWhy)
+    ? inventWhy
+    : (huntNotes.map(inventHole).find((n) => n !== EMPTY) ?? EMPTY);
+  const emptyN = holes.length - occupiedN;
+  const glance = `${emptyN} empty of ${holes.length} holes. WIN beside PLACE. ${cap}`;
 
   return (
     <section>
@@ -109,10 +119,10 @@ export function CountryPack() {
             <SquareGrid holes={holes} markets={markets} />
           </div>
           <p className="mt-2 text-sm text-muted">
-            {emptyN} Empty of {holes.length} holes. WIN beside PLACE.
+            {emptyN} empty of {holes.length} holes. WIN beside PLACE.
           </p>
-          <p className="mt-0.5 text-xs text-subtle">Opened mill: {cap}</p>
-          {hole !== EMPTY ? <p className="mt-0.5 text-xs text-subtle">Looking at {hole}.</p> : null}
+          <p className="mt-0.5 text-xs text-subtle">Square: {cap}</p>
+          {huntLine !== EMPTY ? <p className="mt-0.5 text-xs text-subtle">{huntLine}</p> : null}
           <CountryRowList rows={countries} />
         </div>
       )}

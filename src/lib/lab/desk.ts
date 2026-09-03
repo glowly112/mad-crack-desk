@@ -145,7 +145,7 @@ export function floorFacts(
         researchKeepGbp: stamp.researchKeepGbp,
       });
   const production = trend?.factory_day_pnl_u ?? null;
-  const dayHint = scope.lookingBack ? axisDay(scope.day) : "today";
+  const dayHint = axisDay(scope.day);
   return [
     {
       id: "holes",
@@ -373,15 +373,24 @@ export function recipeDeskRow(recipe: Recipe): DeskRow {
 }
 
 
-/** Last `size` days ending at `selected`. */
+/** Last `size` days ending at `selected`. Oracle today may run ahead of the trends tail. */
 export function dayWindow(days: readonly string[], selected: string, size = 8): string[] {
   const i = days.indexOf(selected);
-  const end = i < 0 ? days.length : i + 1;
-  const start = Math.max(0, end - size);
-  return days.slice(start, end);
+  if (i >= 0) {
+    const start = Math.max(0, i + 1 - size);
+    return days.slice(start, i + 1);
+  }
+  if (!days.length) return selected ? [selected] : [];
+  const last = days[days.length - 1]!;
+  if (selected > last) {
+    const tail = days.slice(Math.max(0, days.length - (size - 1)));
+    return [...tail, selected];
+  }
+  const end = days.length;
+  return days.slice(Math.max(0, end - size), end);
 }
 
-/** Window ending at `selected`. Stretch back only when the trailing days are Empty. */
+/** Window ending at `selected`. Stretch back only when trailing has production — else anchor on selected. */
 export function seriesWindow(
   days: readonly string[],
   selected: string,
@@ -391,6 +400,8 @@ export function seriesWindow(
 ): string[] {
   const trailing = dayWindow(days, selected, size);
   if (trailing.some((d) => valueOf(d) != null)) return trailing;
+  const lastDay = days[days.length - 1];
+  if (lastDay && selected > lastDay) return trailing;
   let lastProd = -1;
   const end = days.indexOf(selected);
   const endI = end < 0 ? days.length - 1 : end;

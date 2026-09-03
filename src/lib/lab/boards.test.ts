@@ -20,6 +20,7 @@ import {
   bookStageLine,
   bookStages,
   officeIssues,
+  officeIssuesForBoard,
   pipeBoard,
   plantMarkets,
   racingSquare,
@@ -28,6 +29,7 @@ import {
   recipeStatus,
   sizeMarket,
   sizePackBoxes,
+  squareGlanceLine,
   seatWatching,
   staffLine,
   waffleCols,
@@ -194,6 +196,19 @@ test("fuse off is the law, not a thing to fix", () => {
   assert.ok(rows.some((r) => r.id === "keep-hold-paper"));
 });
 
+test("office issues hide stale KEEP rows on empty hunt board", () => {
+  const rows = officeIssuesForBoard(STAMP.issues, { n_solid: 0, mill_n_armed: 52 });
+  assert.ok(!rows.some((r) => r.id === "keep-hold-paper"));
+  assert.ok(!rows.some((r) => r.id === "keep-not-solid"));
+});
+
+test("square glance is 64-hole occupancy, not mill cells", () => {
+  assert.match(
+    squareGlanceLine({ occupied: 55, n_solid: 0, kill: 0 }),
+    /0 solid\. 55 armed of 64 holes\. 9 empty/,
+  );
+});
+
 test("paper and holdout are two periods of one book", () => {
   const solid = STAMP.recipes.find((r) => r.badge === "Solid");
   const proving = STAMP.recipes.find((r) => r.status === "MEASURING");
@@ -217,6 +232,15 @@ test("invent what happened names the queue and a known reject", () => {
   assert.match(line, /12 new ideas/);
   assert.match(line, /South Africa · morning · winner/);
   assert.match(line, /not stalled/);
+  const hunt = inventWhatHappened({
+    invent: true,
+    inventWhy: "empty-hole hunt on · invent_empty_holes · mill parked",
+    pitched: 12,
+    hunters: [],
+  });
+  assert.match(hunt, /empty-hole hunt/);
+  assert.match(hunt, /mill parked/);
+  assert.ok(!hunt.includes("12 new ideas"));
   const rejected = inventWhatHappened({
     invent: true,
     inventWhy: STAMP.office.inventWhy,

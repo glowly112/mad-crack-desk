@@ -114,9 +114,20 @@ function DailyBars({ fact }: { fact: FloorFactId }) {
       stamp.trends.find((t) => t.day === d),
     ),
   );
-  const series = points
-    .map((d) => stamp.trends.find((t) => t.day === d))
-    .filter(Boolean) as typeof stamp.trends;
+  const series = points.map((d) => {
+    const hit = stamp.trends.find((t) => t.day === d);
+    return (
+      hit ?? {
+        day: d,
+        paper_live_day_u: null,
+        n_solid: 0,
+        n_keep: 0,
+        n_measuring: 0,
+        n_dropped: 0,
+        factory_day_pnl_u: null,
+      }
+    );
+  });
   const nums = series.map((p) => floorDayValue(fact, p));
   const vacant = fact === "holes" || nums.every((v) => v == null);
   if (vacant) {

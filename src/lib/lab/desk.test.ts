@@ -118,9 +118,13 @@ test("recipe board row uses the same columns; missing facts are Empty", () => {
 test("daily window and domain keep Empty days off the scale", () => {
   assert.equal(axisDay("2026-08-19"), "19 Aug");
   assert.equal(axisDay("2026-09-02"), "2 Sep");
+  assert.equal(axisDay("2026-09-03"), "3 Sep");
   const days = STAMP.trends.map((t) => t.day);
   assert.deepEqual(dayWindow(days, "2026-09-02", 8).at(-1), "2026-09-02");
   assert.equal(dayWindow(days, "2026-09-02", 8).length, 8);
+  const ahead = dayWindow(days, "2026-09-03", 8);
+  assert.equal(ahead.at(-1), "2026-09-03");
+  assert.ok(ahead.includes("2026-09-02"));
   const win = chartWindow(STAMP.trends, "2026-09-02", 8);
   assert.equal(win.at(-1), "2026-09-02");
   assert.ok(win.includes("2026-08-25"));

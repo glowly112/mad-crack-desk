@@ -451,7 +451,21 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
     rec(rec(snap.factory_empty_hole_hunt)?.occupancy_post_epoch);
   const square_occupied_n = int(occRec?.n_occupied_cells);
 
-  const trends = base.trends.map((t) => {
+  const trendsBase = base.trends.some((t) => t.day === date)
+    ? base.trends
+    : [
+        ...base.trends,
+        {
+          day: date,
+          paper_live_day_u: null,
+          n_keep: keep,
+          n_measuring: measuring,
+          n_dropped: kill,
+          n_solid,
+          factory_day_pnl_u: null,
+        },
+      ];
+  const trends = trendsBase.map((t) => {
     if (t.day !== date) return t;
     return {
       ...t,

@@ -1,8 +1,10 @@
 /** Display mapping for the clerk book. Never invents tickets or sums P&L. */
 
 import { isPostEpochEholeMeasuring, isPostEpochEholeRecipe } from "./board-reset.ts";
-import { EMPTY, cellName, strategyMark, type DeskRow } from "./desk.ts";
-import type { Recipe } from "./stamp.ts";
+import { parseHole, parseMarket, parseWindow } from "./boards.ts";
+import { EMPTY, cellName, hopMoves, strategyMark, type DeskRow } from "./desk.ts";
+import { hopVoice } from "./staff-voice.ts";
+import type { Move, Recipe } from "./stamp.ts";
 
 export type FillBook = "paper" | "production" | "live";
 export type FillResult = "won" | "lost" | "void" | "waiting";
@@ -327,7 +329,70 @@ export function tradesWaitChips(
   const postEholeWait = waitOpen.filter((w) => isPostEpochEholeRecipe({ id: w.id, title: w.title }));
   const fromWait = waitOpenChips(postEholeWait, open);
   const fromRecipes = measuringEholeWaitChips(recipes, open, fromWait);
-  return [...fromWait, ...fromRecipes];
+  return dedupeWaitChipsByHole([...fromWait, ...fromRecipes]);
+}
+
+function waitChipHoleKey(chip: WaitOpen): string {
+  const hole = parseHole(chip.title) ?? parseHole(chip.id);
+  if (hole) return `${hole.region}|${hole.window}|${hole.market}`;
+  const ehole = /^H-ehole-([a-z]{2})-([a-z]+)-(win|place|lay)/i.exec(chip.id);
+  if (ehole) {
+    const region = ehole[1].toUpperCase();
+    const window = parseWindow(ehole[2]);
+    const market = ehole[3].toUpperCase();
+    if (window) return `${region}|${window}|${market}`;
+  }
+  return chip.id;
+}
+
+/** One Trades row per country × window × WIN/PLACE. */
+export function dedupeWaitChipsByHole(chips: readonly WaitOpen[]): WaitOpen[] {
+  const seen = new Set<string>();
+  const out: WaitOpen[] = [];
+  for (const c of chips) {
+    const key = waitChipHoleKey(c);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(c);
+  }
+  return out;
+}
+
+export type MillTapeRow = { at: string; text: string };
+
+/** State hops when present; else live hunt arms (not Empty when mill_n_armed > 0). */
+export function millTapeRows(stamp: {
+  moves?: readonly Move[];
+  recipes: readonly Recipe[];
+  wait_open?: readonly WaitOpen[];
+  trades?: readonly Fill[];
+  mill_n_armed?: number;
+  n_armed?: number;
+  office?: { inventWhy?: string };
+}): MillTapeRow[] {
+  const hops = hopMoves(stamp.moves ?? []);
+  if (hops.length) {
+    return hops.map((m) => ({
+      at: m.at,
+      text: hopVoice(m) || strategyMark(m.recipe),
+    }));
+  }
+  const open = openFills(stamp.trades ?? []);
+  const chips = tradesWaitChips(stamp.recipes, stamp.wait_open ?? [], open);
+  const armed = stamp.mill_n_armed ?? stamp.n_armed ?? 0;
+  if (armed <= 0 && chips.length === 0) return [];
+
+  const rows: MillTapeRow[] = [];
+  const why = stamp.office?.inventWhy?.trim() ?? "";
+  if (/empty-hole hunt|invent_empty|mill parked/i.test(why)) {
+    rows.push({ at: "", text: why });
+  }
+  const n = armed > 0 ? armed : chips.length;
+  rows.push({
+    at: "",
+    text: `${n} armed on the mill · waiting for races (recipe, not a ticket).`,
+  });
+  return rows;
 }
 
 export function fillsOnDay(fills: readonly Fill[], day: string): Fill[] {

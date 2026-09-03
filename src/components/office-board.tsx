@@ -9,9 +9,10 @@ import { useStamp } from "@/components/plant-context";
 import {
   factorySquares,
   inventWhatHappened,
-  officeIssues,
+  officeIssuesForBoard,
   officeWorkers,
   pipeBoard,
+  dedupeRecipesByHole,
   waffleCols,
 } from "@/lib/lab/boards";
 import { EMPTY, recipeDeskRow, recipePack } from "@/lib/lab/desk";
@@ -21,7 +22,7 @@ import { cn } from "@/lib/utils";
 /** Next action first. */
 export function ThingsToFix() {
   const stamp = useStamp();
-  const rows = officeIssues(stamp.issues);
+  const rows = officeIssuesForBoard(stamp.issues, stamp);
 
   return (
     <section>
@@ -168,8 +169,8 @@ export function RecipesNotEarning() {
     <div className="space-y-8">
       <CountryPack />
 
-      <RecipeGroup title="Parked" hint="Not income" rows={pack.keeps} />
-      <RecipeGroup title="Still being tested" hint="Not the score" rows={pack.proving} />
+      <RecipeGroup title="Parked" hint="Not income" rows={dedupeRecipesByHole(pack.keeps)} />
+      <RecipeGroup title="Still being tested" hint="Not the score" rows={dedupeRecipesByHole(pack.proving)} />
 
       <section>
         <header className="mb-2 flex items-baseline justify-between gap-3 border-b border-border pb-2">

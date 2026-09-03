@@ -19,6 +19,8 @@ import {
   tradeName,
   waitDeskRow,
   measuringEholeWaitChips,
+  dedupeWaitChipsByHole,
+  millTapeRows,
   tradesWaitChips,
   waitOpenChips,
 } from "./trades.ts";
@@ -303,4 +305,25 @@ test("tradeCounts, stake u, and day tape Empty when no production", () => {
   assert.equal(tape.production, null);
   assert.equal(tape.live, 0);
   assert.ok(tape.paper != null);
+});
+
+test("mill tape shows hunt arms when hops are empty", () => {
+  const rows = millTapeRows({
+    moves: [],
+    recipes: [],
+    mill_n_armed: 52,
+    office: { inventWhy: "empty-hole hunt on · invent_empty_holes · mill parked" },
+  });
+  assert.ok(rows.length >= 2);
+  assert.match(rows[0].text, /empty-hole hunt/);
+  assert.match(rows.at(-1)?.text ?? "", /52 armed/);
+});
+
+test("wait chips dedupe by country window market", () => {
+  const chips = dedupeWaitChipsByHole([
+    { id: "a", title: "GB late-pre PLACE", why: null },
+    { id: "b", title: "GB late-pre PLACE · copy", why: null },
+    { id: "c", title: "NZ morning WIN", why: null },
+  ]);
+  assert.equal(chips.length, 2);
 });

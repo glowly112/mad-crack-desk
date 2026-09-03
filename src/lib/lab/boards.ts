@@ -444,6 +444,21 @@ export function officeIssues(
   return issues.filter((iss) => !isLawNotIssue(iss)).map(issueBoard);
 }
 
+/** Hide stale KEEP/Hyde issues on a new-run hunt board with no certified books. */
+export function officeIssuesForBoard(
+  issues: readonly { id: string; owner: string; title: string; detail: string; fix: string }[],
+  stamp: { n_solid?: number; mill_n_armed?: number; n_armed?: number },
+): IssueRow[] {
+  const armed = stamp.mill_n_armed ?? stamp.n_armed ?? 0;
+  const onHuntBoard = (stamp.n_solid ?? 0) === 0 && armed > 0;
+  const filtered = onHuntBoard
+    ? issues.filter(
+        (i) => !isLawNotIssue(i) && i.id !== "keep-hold-paper" && i.id !== "keep-not-solid",
+      )
+    : issues.filter((i) => !isLawNotIssue(i));
+  return filtered.map(issueBoard);
+}
+
 /** Paper and holdout as two periods of one book. Never recomputes P&L. */
 export function bookPeriods(recipe: Recipe): BookPeriods {
   const paperN = Number.isFinite(recipe.n) ? recipe.n : 0;
@@ -493,7 +508,13 @@ export function inventWhatHappened(input: {
   hunters: readonly { id: string; note: string }[];
   rejects?: readonly string[];
 }): string {
-  const notes = [input.inventWhy, ...input.hunters.map((h) => h.note), ...(input.rejects ?? [])];
+  const why = input.inventWhy?.trim() ?? "";
+  const emptyHoleHunt = /empty-hole hunt|invent_empty/i.test(why);
+  if (emptyHoleHunt || /mill parked/i.test(why)) {
+    return why || (input.invent ? "empty-hole hunt on · invent_empty_holes · mill parked" : EMPTY);
+  }
+
+  const notes = [why, ...input.hunters.map((h) => h.note), ...(input.rejects ?? [])];
   const bits: string[] = [];
   if (input.invent) bits.push("Invent is on.");
   if (input.pitched > 0) bits.push(`${input.pitched} new ideas in the queue.`);
@@ -562,6 +583,39 @@ export function capitalisingLine(counts: {
   const bits = [`${counts.certified} solid of ${counts.cells} cells`];
   if (counts.kill > 0) bits.push(`${counts.kill} killed`);
   return `${bits.join(". ")}.`;
+}
+
+export const SQUARE_HOLE_COUNT = REGIONS.length * SQUARE_WINDOWS.length * 2;
+
+/** Morning square occupancy — 64 holes, not legacy mill cell roll-up. */
+export function squareGlanceLine(input: {
+  occupied: number;
+  total?: number;
+  n_solid?: number;
+  kill?: number;
+}): string {
+  const total = input.total ?? SQUARE_HOLE_COUNT;
+  const occupied = Math.max(0, Math.min(input.occupied, total));
+  const empty = Math.max(0, total - occupied);
+  const solid = input.n_solid ?? 0;
+  const bits = [`${solid} solid`, `${occupied} armed of ${total} holes`, `${empty} empty`];
+  if (input.kill != null && input.kill > 0) bits.push(`${input.kill} killed on the square`);
+  return `${bits.join(". ")}.`;
+}
+
+/** One recipe row per country × window × WIN/PLACE. */
+export function dedupeRecipesByHole(recipes: readonly Recipe[]): Recipe[] {
+  const seen = new Set<string>();
+  const out: Recipe[] = [];
+  for (const r of recipes) {
+    const w = parseWindow(r.title);
+    const m = parseMarket(r.title);
+    const key = w && m ? `${r.region}|${w}|${m}` : r.id;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(r);
+  }
+  return out;
 }
 
 export function marketGlance(
