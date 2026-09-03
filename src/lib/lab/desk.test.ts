@@ -9,6 +9,9 @@ import {
   recipeDeskRow,
   recipeResult,
   strategyMark,
+  recipeBookName,
+  bookDisplayName,
+  isHoleOnlyMark,
   chartWindow,
   dailyDomain,
   dailyTicks,
@@ -99,6 +102,27 @@ test("strategy mark is country · window · market · axis", () => {
   assert.equal(strategyMark("ZA|morning|WIN"), "South Africa · morning · winner");
   assert.ok(!strategyMark("H-fast-gb-nearoff-win-83959Z").includes("H-"));
   assert.ok(!strategyMark("GB near-off WIN").includes("WIN"));
+});
+
+test("recipe book name adds hunter and run — never hole title alone", () => {
+  assert.equal(
+    recipeBookName({
+      id: "H-ehole-nz-latepre-place-00206Z",
+      title: "ehole_nz_late_pre_place_00206Z",
+      hunterName: "Geo",
+    }),
+    "New Zealand · late-pre · place · Geo · 00206Z",
+  );
+  assert.equal(
+    bookDisplayName({
+      id: "H-ehole-gb-morning-place-73339Z",
+      title: "ehole_gb_morning_place_73339Z",
+      hunterName: "Card",
+    }),
+    "Britain · morning · place · Card · 73339Z",
+  );
+  assert.ok(isHoleOnlyMark("Australia · morning · winner"));
+  assert.ok(!isHoleOnlyMark("Australia · morning · winner · one-pick 2.5–4.49"));
 });
 
 test("recipe board row uses the same columns; missing facts are Empty", () => {

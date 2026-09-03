@@ -130,6 +130,8 @@ function recipesFromCells(cells: Record<string, unknown>[]): Recipe[] {
         : status === "HUNTING"
           ? "Looking for the next book."
           : "Still proving. Not the score.";
+    const hunterName =
+      typeof c.hunter_name === "string" && c.hunter_name.trim() ? c.hunter_name.trim() : null;
     const recipe: Recipe = {
       id,
       title,
@@ -141,6 +143,7 @@ function recipesFromCells(cells: Record<string, unknown>[]): Recipe[] {
       roi,
       freezePnl: pnl,
       why,
+      hunterName,
     };
     measuring.push(recipe);
   }

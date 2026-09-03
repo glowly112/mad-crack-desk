@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { recipeDeskRow } from "./desk.ts";
 import {
   bookBadge,
   bookedClock,
@@ -252,6 +253,7 @@ test("tradesWaitChips lists post-epoch ehole recipes and hides legacy KEEP steam
     roi: 0,
     freezePnl: 0,
     why: "Still proving.",
+    hunterName: "Geo",
   };
   const eholeGb = {
     id: "H-ehole-gb-latepre-win-34829Z",
@@ -290,6 +292,23 @@ test("tradesWaitChips lists post-epoch ehole recipes and hides legacy KEEP steam
   assert.ok(rows.every((r) => r.odds === "Waiting" && r.stake === "Waiting" && r.time === "Waiting"));
   assert.ok(rows.every((r) => r.side === "WIN" || r.side === "PLACE"));
   assert.match(rows.find((r) => r.id === eholeAu.id)?.name ?? "", /Australia · morning · winner/);
+});
+
+test("measuring recipe desk row names hunter and run, not hole alone", () => {
+  const row = recipeDeskRow({
+    id: "H-ehole-nz-latepre-place-01741Z",
+    title: "ehole_nz_late_pre_place_01741Z",
+    region: "NZ",
+    status: "MEASURING",
+    badge: "Research",
+    chip: null,
+    n: 0,
+    roi: 0,
+    freezePnl: 0,
+    why: "Still proving",
+    hunterName: "Geo",
+  });
+  assert.match(row.name, /New Zealand · late-pre · place · Geo · 01741Z/);
 });
 
 test("open ticket shows real side/odds/stake; unsettled P&L stays Empty", () => {

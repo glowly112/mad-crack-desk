@@ -319,6 +319,76 @@ export function strategyMark(...parts: string[]): string {
   return fallback && fallback !== EMPTY ? fallback : EMPTY;
 }
 
+/** Run tag on post-epoch ehole ids — not a horse, not invented. */
+export function eholeRunSuffix(id: string): string | null {
+  const m = /^H-ehole-[a-z]{2}-[a-z]+-(?:win|place|lay)-([A-Za-z0-9]+)$/i.exec(id.trim());
+  return m?.[1] ?? null;
+}
+
+/** Hole title only: country · window · place|winner — no recipe bits. */
+export function isHoleOnlyMark(mark: string): boolean {
+  if (!mark || mark === EMPTY) return false;
+  const segs = mark.split(" · ");
+  if (segs.length !== 3) return false;
+  const m = segs[2].toLowerCase();
+  return m === "place" || m === "winner" || m === "lay";
+}
+
+export type BookNameParts = {
+  title?: string;
+  id?: string;
+  horse?: string | null;
+  odds?: number | null;
+  side?: string | null;
+  hunterName?: string | null;
+  /** Open ticket waiting for result — append odds + side when no horse. */
+  openTicket?: boolean;
+};
+
+/** Book / trade / tape name: recipe bits + horse, else hunter + run + odds + side. Never hole alone. */
+export function bookDisplayName(parts: BookNameParts): string {
+  const mark = strategyMark(parts.title ?? "", parts.id ?? "");
+  if (parts.horse && parts.horse !== EMPTY) return `${mark} · ${parts.horse}`;
+
+  const tail: string[] = [];
+  const hunter = parts.hunterName?.trim();
+  if (hunter && !mark.toLowerCase().includes(hunter.toLowerCase())) tail.push(hunter);
+
+  const id = parts.id ?? "";
+  if (/^H-ehole-/i.test(id)) {
+    const run = eholeRunSuffix(id);
+    if (run && !mark.includes(run)) tail.push(run);
+  } else if (isHoleOnlyMark(mark) && id && !mark.includes(id)) {
+    const short = /H-[A-Za-z0-9-]+/.exec(id)?.[0];
+    if (short && short !== id) {
+      const run = eholeRunSuffix(short) ?? short.replace(/^H-/, "");
+      if (run && !mark.includes(run)) tail.push(run);
+    }
+  }
+
+  const ticket: string[] = [];
+  if (parts.openTicket) {
+    if (parts.odds != null && Number.isFinite(parts.odds)) {
+      ticket.push(Number.isInteger(parts.odds) ? String(parts.odds) : String(parts.odds));
+    }
+    if (parts.side && parts.side !== EMPTY) ticket.push(parts.side);
+  }
+
+  const bits: string[] = [];
+  if (tail.length) bits.push(tail.join(" · "));
+  if (ticket.length) bits.push(ticket.join(" "));
+  if (bits.length) return `${mark} · ${bits.join(" · ")}`;
+  return mark;
+}
+
+export function recipeBookName(recipe: Pick<Recipe, "id" | "title" | "hunterName">): string {
+  return bookDisplayName({
+    title: recipe.title,
+    id: recipe.id,
+    hunterName: recipe.hunterName,
+  });
+}
+
 /** @deprecated use cellName — kept for existing imports */
 export function prettyTitle(title: string): string {
   return cellName(title);
@@ -369,7 +439,7 @@ export function recipeDeskRow(recipe: Recipe): DeskRow {
   return {
     id: recipe.id,
     time: open ? WAITING : EMPTY,
-    name: strategyMark(recipe.title, recipe.id),
+    name: recipeBookName(recipe),
     side: market ?? (open ? WAITING : EMPTY),
     odds: open ? WAITING : EMPTY,
     stake: open ? WAITING : EMPTY,

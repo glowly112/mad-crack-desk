@@ -16,6 +16,8 @@ export type Recipe = {
   roi: number;
   freezePnl: number;
   why: string;
+  /** Oracle cell hunter_name — distinguishes books in the same hole. */
+  hunterName?: string | null;
 };
 
 export type Move = {

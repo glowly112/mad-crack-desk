@@ -15,7 +15,6 @@ import {
   isEmptyHoleHuntBoard,
   pipeBoard,
   SQUARE_HOLE_COUNT,
-  dedupeRecipesByHole,
   waffleCols,
 } from "@/lib/lab/boards";
 import { EMPTY, recipeDeskRow, recipePack } from "@/lib/lab/desk";
@@ -189,8 +188,8 @@ export function RecipesNotEarning() {
     <div className="space-y-8">
       <CountryPack />
 
-      <RecipeGroup title="Parked" hint="Not income" rows={dedupeRecipesByHole(pack.keeps)} />
-      <RecipeGroup title="Still being tested" hint="Not the score" rows={dedupeRecipesByHole(pack.proving)} />
+      <RecipeGroup title="Parked" hint="Not income" rows={pack.keeps} />
+      <RecipeGroup title="Still being tested" hint="Not the score" rows={pack.proving} />
 
       <section>
         <header className="mb-2 flex items-baseline justify-between gap-3 border-b border-border pb-2">

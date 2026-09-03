@@ -1,6 +1,6 @@
 /** Display English for Office, Pipe, Health, Issues. Never invents counts. */
 
-import { EMPTY, cellName, recipePack, strategyMark } from "./desk.ts";
+import { EMPTY, cellName, recipePack, recipeBookName, bookDisplayName, strategyMark } from "./desk.ts";
 import type { Move, Recipe, Seat } from "./stamp.ts";
 
 export const REGIONS = ["AU", "GB", "IE", "US", "NZ", "ZA", "HK", "FR"] as const;
@@ -1250,14 +1250,13 @@ export function bookLabel(raw: string, recipes: readonly Recipe[] = []): string 
   const id = /H-[A-Za-z0-9-]+/.exec(raw)?.[0];
   if (id) {
     const hit = recipes.find((r) => r.id === id);
-    if (hit) return strategyMark(hit.title, hit.id);
-    const named = strategyMark(id);
-    if (named && named !== EMPTY && named.length > 2) return named;
+    if (hit) return recipeBookName(hit);
+    return bookDisplayName({ id, title: id });
   }
   const slug = raw.replace(/_/g, " ");
   const titled = recipes.find((r) => r.title === raw || r.id === raw || r.title === slug);
-  if (titled) return strategyMark(titled.title, titled.id);
-  const mark = strategyMark(slug);
+  if (titled) return recipeBookName(titled);
+  const mark = bookDisplayName({ title: slug, id: slug });
   if (mark && mark !== EMPTY && mark.length > 2) return mark;
   const hole = holeName(slug);
   return hole !== EMPTY && hole.length > 2 ? hole : "";
@@ -1309,7 +1308,7 @@ export function staffBookFacts(seatNow: string, stamp: StaffWatchStamp) {
     /\bdensify\b/i.test(inventWhy) && !/empty-hole hunt|invent_empty/i.test(inventWhy);
   const holdId = firstRecipeId(seatNow);
   const holdBook = holdId ? bookLabel(holdId, recipes) : "";
-  const tapeName = tape ? strategyMark(tape.title, tape.id) : "";
+  const tapeName = tape ? recipeBookName(tape) : "";
   return { recipes, tape, tapeName, parked, trial, hydeTrials, fillAdjKills, inventCell, densify, holdBook };
 }
 
@@ -1325,7 +1324,7 @@ export function seatWatching(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchSt
   switch (seat.id) {
     case "bauron": {
       const cell = f.inventCell !== EMPTY ? f.inventCell : "";
-      if (!cell && !f.densify && !stamp.office?.invent) return now ? staffLine(now) : EMPTY;
+      if (!cell && !f.densify && !stamp.office?.invent) return now ? staffLine(now, stamp.recipes ?? []) : EMPTY;
       return sentences(
         cell ? `Inventing ${cell} — this cell’s bets.` : stamp.office?.invent ? "Invent is on." : "",
         f.densify
@@ -1397,17 +1396,17 @@ export function seatWatching(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchSt
       return `Freeze fuel for ${f.tapeName}.`;
     }
     default:
-      return now ? staffLine(now) : EMPTY;
+      return now ? staffLine(now, stamp.recipes ?? []) : EMPTY;
   }
 }
 
 /** Staff watching line in English. Layout stays; plant tokens do not. */
-export function staffLine(now: string): string {
+export function staffLine(now: string, recipes: readonly Recipe[] = []): string {
   if (!now?.trim()) return EMPTY;
   let s = now;
   s = s.replace(/next hole:\s*([^\s·,]+)/gi, (_, hole) => `Next gap: ${holeName(hole)}`);
-  s = s.replace(/first:\s*(H-[A-Za-z0-9-]+)/gi, (_, id) => holeName(id));
-  s = s.replace(/H-[A-Za-z0-9-]+/g, (id) => holeName(id));
+  s = s.replace(/first:\s*(H-[A-Za-z0-9-]+)/gi, (_, id) => bookLabel(id, recipes) || holeName(id));
+  s = s.replace(/H-[A-Za-z0-9-]+/g, (id) => bookLabel(id, recipes) || holeName(id));
   s = s.replace(/Measuring n=(\d+)/gi, "Watching $1 still being tested");
   s = s.replace(/proving=(\d+)/gi, "$1 still being tested");
   s = s.replace(/pitched=(\d+)/gi, "$1 new ideas");

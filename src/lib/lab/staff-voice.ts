@@ -1,8 +1,8 @@
 /** Ordinary-English staff bubbles. Stamp facts only. Never invents P&L. */
 
-import { EMPTY, hopMoves, strategyMark } from "./desk.ts";
+import { EMPTY, hopMoves, recipeBookName, bookDisplayName } from "./desk.ts";
 import { isBoardResetView } from "./board-reset.ts";
-import { bookStages, staffBookFacts, type StaffWatchStamp } from "./boards.ts";
+import { bookStages, bookLabel, holeName, staffBookFacts, type StaffWatchStamp } from "./boards.ts";
 import type { Move, Recipe, Seat } from "./stamp.ts";
 
 export type SeatBubble = {
@@ -19,13 +19,14 @@ export function hasJargon(text: string): boolean {
 }
 
 /** Same short mark Staff, Office and Floor use. Never a paragraph, never H-fast-…. */
-export function speakBook(raw: string): string {
-  return strategyMark(raw);
+export function speakBook(raw: string, recipe?: { id: string; title: string; hunterName?: string | null }): string {
+  if (recipe) return recipeBookName(recipe);
+  return bookDisplayName({ title: raw, id: raw });
 }
 
 /** Same mark — a look, not a hole. */
 export function speakLook(raw: string): string {
-  return strategyMark(raw);
+  return holeName(raw);
 }
 
 function cap(s: string): string {
@@ -35,7 +36,7 @@ function cap(s: string): string {
 
 function paperLine(recipe: Recipe | null): string {
   if (!recipe || !Number.isFinite(recipe.freezePnl)) return "";
-  const book = speakBook(recipe.title);
+  const book = speakBook(recipe.title, recipe);
   if (recipe.freezePnl > 0) return `${cap(book)} made money on old races.`;
   if (recipe.freezePnl < 0) return `${cap(book)} lost money on old races.`;
   return "";
@@ -101,7 +102,7 @@ function resetNowBubbles(seatId: string): string[] {
 function nowBubbles(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchStamp): string[] {
   if (isBoardResetView(stamp)) return resetNowBubbles(seat.id);
   const f = staffBookFacts(seat.now ?? "", stamp);
-  const britain = f.tape ? speakBook(f.tape.title) : "";
+  const britain = f.tape ? speakBook(f.tape.title, f.tape) : "";
   switch (seat.id) {
     case "bauron": {
       const inventWhy = stamp.office?.inventWhy ?? "";
@@ -150,7 +151,7 @@ function nowBubbles(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchStamp): str
       const stages = f.tape ? bookStages(f.tape) : [];
       const same = stages.length > 0 && stages.filter((s) => s.key !== "live").every((s) => s.kind !== "split");
       const fill = f.fillAdjKills[0];
-      const fillBook = fill ? speakBook(fill.recipe) : "";
+      const fillBook = fill ? bookLabel(fill.recipe, f.recipes) : "";
       const lines = [
         paperLine(f.tape),
         britain && same
@@ -167,8 +168,8 @@ function nowBubbles(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchStamp): str
       return lines.filter(Boolean);
     }
     case "foreman": {
-      const trial = f.trial ? speakBook(f.trial.title) : "";
-      const parked = f.parked[0] ? speakBook(f.parked[0].title) : "";
+      const trial = f.trial ? speakBook(f.trial.title, f.trial) : "";
+      const parked = f.parked[0] ? speakBook(f.parked[0].title, f.parked[0]) : "";
       if (!britain && !trial && !parked) return [];
       return [
         britain
@@ -183,7 +184,7 @@ function nowBubbles(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchStamp): str
       const kill = f.fillAdjKills[0] ?? (stamp.moves ?? []).find((m) => /dead/i.test(m.to));
       if (!kill) return [];
       return [
-        `${cap(speakBook(kill.recipe))} died because later races of those same bets lost money after costs.`,
+        `${cap(bookLabel(kill.recipe, f.recipes))} died because later races of those same bets lost money after costs.`,
         "Don't copy it.",
       ];
     }

@@ -2,7 +2,16 @@
 
 import { isPostEpochEholeMeasuring, isPostEpochEholeRecipe } from "./board-reset.ts";
 import { parseHole, parseMarket, parseWindow } from "./boards.ts";
-import { EMPTY, cellName, hopMoves, strategyMark, WAITING, type DeskRow } from "./desk.ts";
+import {
+  bookDisplayName,
+  EMPTY,
+  cellName,
+  hopMoves,
+  recipeBookName,
+  strategyMark,
+  WAITING,
+  type DeskRow,
+} from "./desk.ts";
 import { hopVoice } from "./staff-voice.ts";
 import type { Move, Recipe } from "./stamp.ts";
 
@@ -166,19 +175,17 @@ export function fillFromRow(raw: unknown): Fill | null {
   };
 }
 
-/** Name on the board. Open tickets: horse, else hole + odds + side. Settled: horse else mark. */
-export function tradeName(fill: Fill): string {
-  const mark = strategyMark(fill.recipe, fill.recipeId);
-  if (fill.horse && fill.horse !== EMPTY) return `${mark} · ${fill.horse}`;
-  if (fill.result === "waiting") {
-    const tail: string[] = [];
-    if (fill.odds != null && Number.isFinite(fill.odds)) {
-      tail.push(Number.isInteger(fill.odds) ? String(fill.odds) : String(fill.odds));
-    }
-    if (fill.side && fill.side !== EMPTY) tail.push(fill.side);
-    if (tail.length) return `${mark} · ${tail.join(" ")}`;
-  }
-  return mark;
+/** Name on the board. Open tickets: horse, else recipe bits + odds + side. */
+export function tradeName(fill: Fill, recipe?: Pick<Recipe, "id" | "title" | "hunterName"> | null): string {
+  return bookDisplayName({
+    title: fill.recipe,
+    id: fill.recipeId,
+    horse: fill.horse,
+    odds: fill.odds,
+    side: fill.side,
+    hunterName: recipe?.hunterName,
+    openTicket: fill.result === "waiting",
+  });
 }
 
 /** @deprecated odds live in the Odds column — use tradeName */
@@ -397,7 +404,7 @@ export function millTapeRows(stamp: {
   if (hops.length) {
     return hops.map((m) => ({
       at: m.at,
-      text: hopVoice(m) || strategyMark(m.recipe),
+      text: hopVoice(m) || bookDisplayName({ id: m.recipe, title: m.recipe }),
     }));
   }
   const open = openFills(stamp.trades ?? []);
