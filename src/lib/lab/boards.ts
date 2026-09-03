@@ -418,11 +418,31 @@ export function floorRacingSquare(input: {
   recipes?: readonly Recipe[];
   openFills?: readonly SquareOpenFill[];
 }): HoleCell[] {
-  return racingSquare({
-    recipes: input.recipes ?? [],
-    namedHoles: input.namedHoles ?? [],
-    openFills: input.openFills ?? [],
-    floorOnly: true,
+  return stripFloorWholeCellKills(
+    racingSquare({
+      recipes: input.recipes ?? [],
+      namedHoles: input.namedHoles ?? [],
+      openFills: input.openFills ?? [],
+      floorOnly: true,
+    }),
+  );
+}
+
+/** Floor morning board: no red whole-cell kills — voids and one-day drops stay Empty. */
+export function stripFloorWholeCellKills(cells: readonly HoleCell[]): HoleCell[] {
+  const strip = (tone: MarketTone | undefined): MarketTone => (tone === "loss" ? "empty" : tone ?? "empty");
+  return cells.map((cell) => {
+    const backTone = strip(cell.backTone);
+    const layTone = strip(cell.layTone);
+    const tone =
+      TONE_RANK[backTone] >= TONE_RANK[layTone]
+        ? backTone !== "empty"
+          ? backTone
+          : layTone
+        : layTone !== "empty"
+          ? layTone
+          : "empty";
+    return { ...cell, backTone, layTone, tone };
   });
 }
 

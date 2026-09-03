@@ -29,7 +29,18 @@ test("office book rows include hole, strategy, side, market, state", () => {
   assert.match(rows[0]!.hole, /New Zealand/);
   assert.match(rows[0]!.hole, /WIN/);
   assert.equal(rows[0]!.state, "measuring");
-  assert.equal(rows[0]!.pnl, "Empty");
+  assert.equal(rows[0]!.paperPnl, "Empty");
+  assert.equal(rows[0]!.productionPnl, "Empty");
+  assert.equal(rows[0]!.laterRacePnl, "Empty");
+});
+
+test("measuring is not KEEP — all P&L columns Empty", () => {
+  const rows = officeBookRows([
+    ehole("H-ehole-nz-morning-win-73508Z", { freezePnl: 12.5 }),
+  ]);
+  assert.equal(rows[0]?.paperPnlTone, "empty");
+  assert.equal(rows[0]?.productionPnlTone, "empty");
+  assert.equal(rows[0]?.laterRacePnlTone, "empty");
 });
 
 test("KEEP shows later-race P&L as neutral not a win", () => {
@@ -48,16 +59,39 @@ test("KEEP shows later-race P&L as neutral not a win", () => {
   };
   const rows = officeBookRows([keep]);
   assert.equal(rows[0]?.state, "KEEP");
-  assert.equal(rows[0]?.pnlTone, "neutral");
-  assert.match(rows[0]?.pnl ?? "", /44\.02u/);
+  assert.equal(rows[0]?.laterRacePnlTone, "neutral");
+  assert.match(rows[0]?.laterRacePnl ?? "", /44\.02u/);
+  assert.equal(rows[0]?.paperPnl, "Empty");
+  assert.equal(rows[0]?.productionPnl, "Empty");
 });
 
-test("production book uses same-bets P&L with score tone", () => {
+test("KEEP 0 stays honest on later-race column", () => {
+  const keep: Recipe = {
+    id: "H-keep-zero",
+    title: "GB morning WIN",
+    region: "GB",
+    status: "KEEP",
+    badge: "Parked",
+    chip: null,
+    n: 0,
+    roi: 0,
+    freezePnl: 0,
+    why: "KEEP gate",
+    hunterName: "Geo",
+  };
+  const rows = officeBookRows([keep]);
+  assert.equal(rows[0]?.laterRacePnl, "0.00u");
+  assert.equal(rows[0]?.laterRacePnlTone, "neutral");
+});
+
+test("production book uses paper and production P&L columns", () => {
   const solid = STAMP.recipes.find((r) => r.badge === "Solid");
   assert.ok(solid);
   const rows = officeBookRows([solid!]);
   assert.equal(rows[0]?.state, "production");
-  assert.ok(rows[0]?.pnlTone === "up" || rows[0]?.pnlTone === "down");
+  assert.ok(rows[0]?.productionPnlTone === "up" || rows[0]?.productionPnlTone === "down");
+  assert.notEqual(rows[0]?.productionPnl, "Empty");
+  assert.equal(rows[0]?.laterRacePnl, "Empty");
 });
 
 test("office counts strategies, KEEP, production; live Empty when fuse off", () => {

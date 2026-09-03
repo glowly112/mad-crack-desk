@@ -1,6 +1,7 @@
 /** Office books — strategies, KEEP, production score. Never duplicates Floor, Trades, or Staff. */
 
 import {
+  bookPeriods,
   countryName,
   isSplitBook,
   squareHoleKeyAndSide,
@@ -16,6 +17,8 @@ import type { Recipe } from "./stamp.ts";
 
 export type OfficeBookState = "measuring" | "KEEP" | "production" | "killed";
 
+export type OfficePnlTone = "empty" | "neutral" | "up" | "down";
+
 export type OfficeBookRow = {
   id: string;
   hole: string;
@@ -23,8 +26,12 @@ export type OfficeBookRow = {
   side: string;
   market: string;
   state: OfficeBookState;
-  pnl: string;
-  pnlTone: "empty" | "neutral" | "up" | "down";
+  paperPnl: string;
+  paperPnlTone: OfficePnlTone;
+  productionPnl: string;
+  productionPnlTone: OfficePnlTone;
+  laterRacePnl: string;
+  laterRacePnlTone: OfficePnlTone;
   holdingId: string;
 };
 
@@ -43,11 +50,6 @@ function officeBookState(recipe: Recipe): OfficeBookState | null {
     return "measuring";
   }
   return null;
-}
-
-function isLeftoverKeep(recipe: Recipe): boolean {
-  if (recipe.status !== "KEEP" || recipe.badge === "Solid") return false;
-  return /^H-hyde-/i.test(recipe.id) || isSplitBook(recipe);
 }
 
 function officeHoleLabel(recipe: Recipe): string {
@@ -75,17 +77,62 @@ function fmtPnlU(v: number): string {
   return `${sign}${Math.abs(v).toFixed(2)}u`;
 }
 
-function officePnlCell(recipe: Recipe, state: OfficeBookState): { pnl: string; pnlTone: OfficeBookRow["pnlTone"] } {
-  if (state === "measuring") return { pnl: EMPTY, pnlTone: "empty" };
-  if (!Number.isFinite(recipe.freezePnl)) return { pnl: EMPTY, pnlTone: "empty" };
-  const text = fmtPnlU(recipe.freezePnl);
-  if (isLeftoverKeep(recipe)) return { pnl: text, pnlTone: "neutral" };
-  if (state === "KEEP") return { pnl: text, pnlTone: "neutral" };
-  if (state === "production") {
-    return { pnl: text, pnlTone: recipe.freezePnl >= 0 ? "up" : "down" };
+function emptyPnl(): Pick<
+  OfficeBookRow,
+  "paperPnl" | "paperPnlTone" | "productionPnl" | "productionPnlTone" | "laterRacePnl" | "laterRacePnlTone"
+> {
+  return {
+    paperPnl: EMPTY,
+    paperPnlTone: "empty",
+    productionPnl: EMPTY,
+    productionPnlTone: "empty",
+    laterRacePnl: EMPTY,
+    laterRacePnlTone: "empty",
+  };
+}
+
+function scoreTone(v: number): OfficePnlTone {
+  return v >= 0 ? "up" : "down";
+}
+
+function officePnlCells(recipe: Recipe, state: OfficeBookState): Pick<
+  OfficeBookRow,
+  "paperPnl" | "paperPnlTone" | "productionPnl" | "productionPnlTone" | "laterRacePnl" | "laterRacePnlTone"
+> {
+  if (state === "measuring" || state === "killed") return emptyPnl();
+
+  const periods = bookPeriods(recipe);
+  const freeze = Number.isFinite(recipe.freezePnl) ? recipe.freezePnl : null;
+
+  if (state === "KEEP") {
+    if (freeze == null) return emptyPnl();
+    return {
+      paperPnl: EMPTY,
+      paperPnlTone: "empty",
+      productionPnl: EMPTY,
+      productionPnlTone: "empty",
+      laterRacePnl: fmtPnlU(freeze),
+      laterRacePnlTone: "neutral",
+    };
   }
-  if (state === "killed") return { pnl: text, pnlTone: "down" };
-  return { pnl: EMPTY, pnlTone: "empty" };
+
+  if (state === "production") {
+    const paperU = periods.paperU;
+    const paperPnl =
+      paperU != null && Number.isFinite(paperU) ? fmtPnlU(paperU) : EMPTY;
+    const productionPnl = freeze != null ? fmtPnlU(freeze) : EMPTY;
+    return {
+      paperPnl,
+      paperPnlTone: paperPnl === EMPTY ? "empty" : scoreTone(paperU ?? 0),
+      productionPnl,
+      productionPnlTone:
+        productionPnl === EMPTY ? "empty" : scoreTone(freeze ?? 0),
+      laterRacePnl: EMPTY,
+      laterRacePnlTone: "empty",
+    };
+  }
+
+  return emptyPnl();
 }
 
 /** Recipes that belong on Office — one row per first-book skin, not every ticket. */
@@ -123,7 +170,7 @@ export function officeBookRecipes(recipes: readonly Recipe[]): Recipe[] {
 export function officeBookRows(recipes: readonly Recipe[]): OfficeBookRow[] {
   return officeBookRecipes(recipes).map((recipe) => {
     const state = officeBookState(recipe)!;
-    const { pnl, pnlTone } = officePnlCell(recipe, state);
+    const pnl = officePnlCells(recipe, state);
     return {
       id: recipe.id,
       hole: officeHoleLabel(recipe),
@@ -131,8 +178,7 @@ export function officeBookRows(recipes: readonly Recipe[]): OfficeBookRow[] {
       side: officeSide(recipe),
       market: officeMarket(recipe),
       state,
-      pnl,
-      pnlTone,
+      ...pnl,
       holdingId: recipe.id,
     };
   });

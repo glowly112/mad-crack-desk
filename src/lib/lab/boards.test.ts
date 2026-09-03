@@ -178,6 +178,34 @@ test("square cells show BACK and LAY on the same WIN/PLACE hole", () => {
   assert.ok(holeSideOccupied(gbWin!));
 });
 
+test("floor morning board strips whole-cell kills — voids stay Empty", () => {
+  const holes = floorRacingSquare({
+    namedHoles: [
+      { region: "ZA", window: "morning", market: "WIN", tone: "loss" },
+      { region: "GB", window: "late_pre", market: "WIN", tone: "kill" },
+    ],
+    recipes: [
+      {
+        id: "H-killed-book",
+        title: "GB morning WIN",
+        region: "GB",
+        status: "KILL",
+        badge: "Dead",
+        chip: null,
+        n: 0,
+        roi: 0,
+        freezePnl: -5,
+        why: "killed",
+      },
+    ],
+  });
+  const za = holes.find((h) => h.id === "ZA|morning|WIN");
+  const gb = holes.find((h) => h.id === "GB|morning|WIN");
+  assert.equal(za?.tone, "empty");
+  assert.equal(gb?.tone, "empty");
+  assert.equal(holes.filter((h) => h.tone === "loss").length, 0);
+});
+
 test("the racing square is the finite mill grid; Empty holes are real area", () => {
   const holes = racingSquare({
     recipes: STAMP.recipes,

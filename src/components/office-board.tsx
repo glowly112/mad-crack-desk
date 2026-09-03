@@ -3,7 +3,11 @@ import { DeskScroll } from "@/components/desk-scroll";
 import { EmptyState } from "@/components/empty-state";
 import { useStamp } from "@/components/plant-context";
 import { EMPTY } from "@/lib/lab/desk";
-import { officeBookCounts, officeBookRows } from "@/lib/lab/office-display";
+import {
+  officeBookCounts,
+  officeBookRows,
+  type OfficePnlTone,
+} from "@/lib/lab/office-display";
 import { cn } from "@/lib/utils";
 
 /** Top strip — strategies, KEEP, production, live (Empty while fuse off). */
@@ -32,9 +36,28 @@ export function OfficeCounts() {
   );
 }
 
-const HEADERS = ["Hole", "Strategy", "Side", "Market", "State", "Later-race P&L"] as const;
+const HEADERS = [
+  "Hole",
+  "Strategy",
+  "Side",
+  "Market",
+  "State",
+  "Paper P&L",
+  "Production P&L",
+  "Later-race P&L",
+] as const;
 
-/** One row per strategy/book — hole, name, side, market, state, same-bets P&L. */
+function pnlClass(tone: OfficePnlTone): string {
+  return cn(
+    "px-2 py-2.5 text-right font-mono text-xs tabular-nums",
+    tone === "empty" && "text-muted",
+    tone === "neutral" && "text-muted",
+    tone === "up" && "text-up",
+    tone === "down" && "text-bad",
+  );
+}
+
+/** One row per strategy/book — hole, name, side, market, state, paper / production / later-race P&L. */
 export function OfficeBooksTable() {
   const stamp = useStamp();
   const rows = officeBookRows(stamp.recipes);
@@ -49,14 +72,16 @@ export function OfficeBooksTable() {
         <EmptyState copy={EMPTY} />
       ) : (
         <DeskScroll className="min-w-0">
-          <table className="w-full min-w-[40rem] table-fixed border-collapse text-left">
+          <table className="w-full min-w-[52rem] table-fixed border-collapse text-left">
             <colgroup>
-              <col className="w-[28%]" />
+              <col className="w-[22%]" />
               <col />
+              <col className="w-12" />
               <col className="w-14" />
-              <col className="w-16" />
-              <col className="w-24" />
-              <col className="w-24" />
+              <col className="w-20" />
+              <col className="w-[4.5rem]" />
+              <col className="w-[4.5rem]" />
+              <col className="w-[4.5rem]" />
             </colgroup>
             <thead>
               <tr className="border-b border-border">
@@ -66,7 +91,7 @@ export function OfficeBooksTable() {
                     scope="col"
                     className={cn(
                       "px-2 py-2 text-[10px] font-normal tracking-wide text-subtle",
-                      h === "Later-race P&L" && "text-right",
+                      h.endsWith("P&L") && "text-right",
                     )}
                   >
                     {h}
@@ -90,17 +115,9 @@ export function OfficeBooksTable() {
                   <td className="px-2 py-2.5 font-mono text-xs text-subtle">{row.side}</td>
                   <td className="px-2 py-2.5 font-mono text-xs text-subtle">{row.market}</td>
                   <td className="px-2 py-2.5 text-xs text-muted">{row.state}</td>
-                  <td
-                    className={cn(
-                      "px-2 py-2.5 text-right font-mono text-xs tabular-nums",
-                      row.pnlTone === "empty" && "text-muted",
-                      row.pnlTone === "neutral" && "text-muted",
-                      row.pnlTone === "up" && "text-up",
-                      row.pnlTone === "down" && "text-bad",
-                    )}
-                  >
-                    {row.pnl}
-                  </td>
+                  <td className={pnlClass(row.paperPnlTone)}>{row.paperPnl}</td>
+                  <td className={pnlClass(row.productionPnlTone)}>{row.productionPnl}</td>
+                  <td className={pnlClass(row.laterRacePnlTone)}>{row.laterRacePnl}</td>
                 </tr>
               ))}
             </tbody>

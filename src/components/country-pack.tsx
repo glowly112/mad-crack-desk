@@ -73,7 +73,6 @@ export function FloorSquare() {
           <LegendSide label="LAY" split="right" />
           <LegendDot tone="win" label="solid" />
           <LegendDot tone="parked" label="parked" />
-          <LegendDot tone="loss" label="killed" />
         </p>
       </header>
       {holes.length === 0 ? (
