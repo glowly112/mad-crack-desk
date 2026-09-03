@@ -6,13 +6,16 @@ import {
   SQUARE_WINDOWS,
   countryMarket,
   floorRacingSquare,
+  holeSideOccupied,
   inventHole,
   millHuntCaption,
   officeCountries,
   plantMarkets,
   racingSquare,
   squareGlanceLine,
+  squareGridMarkets,
 } from "@/lib/lab/boards";
+import { honestOpenFills } from "@/lib/lab/trades";
 import { EMPTY } from "@/lib/lab/desk";
 import type { CountryRow, HoleCell, MarketSquare, SquareMarket } from "@/lib/lab/boards";
 import { cn } from "@/lib/utils";
@@ -35,13 +38,23 @@ const TONE_LABEL: Record<MarketSquare["tone"], string> = {
   parked: "parked",
 };
 
-/** Morning board square: empty holes visible. No mill roll-up or invent lines. */
+/** Morning board square: empty holes visible. BACK/LAY split on each WIN/PLACE cell. */
 export function FloorSquare() {
   const stamp = useStamp();
-  const holes = floorRacingSquare({ namedHoles: stamp.holes });
-  const markets = plantMarkets(holes.map((h) => h.market));
+  const open = honestOpenFills(stamp.trades);
+  const holes = floorRacingSquare({
+    namedHoles: stamp.holes,
+    recipes: millDisplayRecipes(stamp.recipes),
+    openFills: open.map((f) => ({
+      id: f.id,
+      recipeId: f.recipeId,
+      recipe: f.recipe,
+      side: f.side,
+    })),
+  });
+  const markets = squareGridMarkets();
   const authOccupied = (stamp as { square_occupied_n?: number }).square_occupied_n;
-  const paintedOccupied = holes.filter((h) => h.tone !== "empty").length;
+  const paintedOccupied = holes.filter((h) => holeSideOccupied(h)).length;
   const occupiedN =
     authOccupied != null && authOccupied > paintedOccupied ? authOccupied : paintedOccupied;
   const emptyN = holes.length - occupiedN;
@@ -53,6 +66,8 @@ export function FloorSquare() {
         <h2 className="text-sm font-medium text-muted">The square</h2>
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-subtle">
           <LegendDot tone="empty" label="Empty" />
+          <LegendSide label="BACK" />
+          <LegendSide label="LAY" split="right" />
           <LegendDot tone="win" label="solid" />
           <LegendDot tone="parked" label="parked" />
           <LegendDot tone="loss" label="killed" />
@@ -82,10 +97,10 @@ export function CountryPack() {
     huntNotes,
     namedHoles: stamp.holes,
   });
-  const markets = plantMarkets(holes.map((h) => h.market));
+  const markets = squareGridMarkets();
   const countries = countryMarket(officeCountries(stamp.coverage, millDisplayRecipes(stamp.recipes)));
   const authOccupied = (stamp as { square_occupied_n?: number }).square_occupied_n;
-  const paintedOccupied = holes.filter((h) => h.tone !== "empty").length;
+  const paintedOccupied = holes.filter((h) => holeSideOccupied(h)).length;
   const occupiedN =
     authOccupied != null && authOccupied > paintedOccupied ? authOccupied : paintedOccupied;
   const cap = squareGlanceLine({
@@ -148,6 +163,9 @@ function SquareGrid({ holes, markets }: { holes: readonly HoleCell[]; markets: r
         {SQUARE_WINDOWS.map((w) => (
           <p key={w} className="text-center font-mono text-[9px] leading-tight text-subtle sm:text-[10px]">
             {SQUARE_WINDOW_LABEL[w]}
+            {w === "in_play" ? (
+              <span className="block text-[8px] font-normal normal-case text-subtle/80">sparse OK</span>
+            ) : null}
           </p>
         ))}
       </div>
@@ -157,7 +175,7 @@ function SquareGrid({ holes, markets }: { holes: readonly HoleCell[]; markets: r
           <div key={`${w}-mkt`} className="flex justify-center gap-1">
             {markets.map((m) => (
               <span key={m} className="w-4 text-center font-mono text-[9px] text-subtle">
-                {m === "PLACE" ? "P" : m === "LAY" ? "L" : "W"}
+                {m === "PLACE" ? "P" : "W"}
               </span>
             ))}
           </div>
@@ -177,14 +195,7 @@ function SquareGrid({ holes, markets }: { holes: readonly HoleCell[]; markets: r
               <div key={`${region}-${window}`} className="flex justify-center gap-1">
                 {markets.map((market) => {
                   const cell = byId.get(`${region}|${window}|${market}`);
-                  const tone = cell?.tone ?? "empty";
-                  return (
-                    <span
-                      key={market}
-                      title={`${name} ${SQUARE_WINDOW_LABEL[window]} ${market} · ${TONE_LABEL[tone]}`}
-                      className={cn("size-4 rounded-[2px]", TONE[tone])}
-                    />
-                  );
+                  return <HoleSquare key={market} cell={cell} regionName={name} window={window} market={market} />;
                 })}
               </div>
             ))}
@@ -192,6 +203,71 @@ function SquareGrid({ holes, markets }: { holes: readonly HoleCell[]; markets: r
         );
       })}
     </div>
+  );
+}
+
+function HoleSquare({
+  cell,
+  regionName,
+  window,
+  market,
+}: {
+  cell: HoleCell | undefined;
+  regionName: string;
+  window: (typeof SQUARE_WINDOWS)[number];
+  market: SquareMarket;
+}) {
+  const back = cell?.backTone ?? (cell?.tone !== "empty" ? cell?.tone : "empty") ?? "empty";
+  const lay = cell?.layTone ?? "empty";
+  const bothEmpty = back === "empty" && lay === "empty";
+  const titleParts = [
+    `${regionName} ${SQUARE_WINDOW_LABEL[window]} ${market}`,
+    back !== "empty" ? `BACK · ${TONE_LABEL[back]}` : "BACK · Empty",
+    lay !== "empty" ? `LAY · ${TONE_LABEL[lay]}` : "LAY · Empty",
+  ];
+  return (
+    <span
+      title={titleParts.join(" · ")}
+      className={cn("relative inline-block size-4 rounded-[2px]", bothEmpty && TONE.empty)}
+      aria-label={titleParts.join(" · ")}
+    >
+      {!bothEmpty ? (
+        <>
+          <span
+            className={cn(
+              "absolute inset-y-0 left-0 w-1/2 rounded-l-[2px] ring-1 ring-inset ring-border/40",
+              back !== "empty" ? TONE[back] : "bg-elev",
+            )}
+            aria-hidden
+          />
+          <span
+            className={cn(
+              "absolute inset-y-0 right-0 w-1/2 rounded-r-[2px] ring-1 ring-inset ring-border/40",
+              lay !== "empty" ? TONE[lay] : "bg-elev",
+            )}
+            aria-hidden
+          />
+        </>
+      ) : null}
+    </span>
+  );
+}
+
+const markets = squareGridMarkets();
+
+function LegendSide({ label, split }: { label: string; split?: "left" | "right" }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="relative inline-block size-2 rounded-[1px] ring-1 ring-inset ring-border-strong" aria-hidden>
+        <span
+          className={cn(
+            "absolute inset-y-0 w-1/2 bg-subtle",
+            split === "right" ? "right-0" : "left-0",
+          )}
+        />
+      </span>
+      {label}
+    </span>
   );
 }
 

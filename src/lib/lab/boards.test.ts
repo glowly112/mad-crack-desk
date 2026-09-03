@@ -15,6 +15,8 @@ import {
   officeCountries,
   officeWorkers,
   factorySquares,
+  floorRacingSquare,
+  holeSideOccupied,
   inventHole,
   inventWhatHappened,
   bookPeriods,
@@ -131,6 +133,49 @@ test("the plant waffle is stamp cells: unused leftover, hunting, kill, then the 
   assert.equal(leftover.empty, 180 - leftover.used);
   assert.equal(inventHole(STAMP.office.inventWhy), "South Africa · morning · winner");
   assert.equal(inventHole("invent off"), EMPTY);
+});
+
+test("square cells show BACK and LAY on the same WIN/PLACE hole", () => {
+  const holes = floorRacingSquare({
+    namedHoles: [
+      { region: "GB", window: "near_off", market: "WIN", tone: "hunt" },
+      { region: "AU", window: "morning", market: "WIN", tone: "idea", side: "LAY" },
+    ],
+    recipes: [
+      {
+        id: "H-ehole-nz-latepre-place-01741Z",
+        title: "ehole_nz_late_pre_place",
+        region: "NZ",
+        status: "MEASURING",
+        badge: "Research",
+        chip: null,
+        n: 0,
+        roi: 0,
+        freezePnl: 0,
+        why: "",
+      },
+    ],
+    openFills: [
+      {
+        id: "open-1",
+        recipeId: "H-ehole-gb-nearoff-win-83959Z",
+        recipe: "GB near-off WIN",
+        side: "BACK",
+      },
+    ],
+  });
+  assert.equal(holes.length, 64);
+  const gbWin = holes.find((h) => h.id === "GB|near_off|WIN");
+  assert.ok(gbWin);
+  assert.equal(gbWin!.backTone, "idea");
+  assert.equal(gbWin!.layTone, "empty");
+  const auWin = holes.find((h) => h.id === "AU|morning|WIN");
+  assert.ok(auWin);
+  assert.equal(auWin!.layTone, "idea");
+  const nzPlace = holes.find((h) => h.id === "NZ|late_pre|PLACE");
+  assert.ok(nzPlace);
+  assert.equal(nzPlace!.backTone, "idea");
+  assert.ok(holeSideOccupied(gbWin!));
 });
 
 test("the racing square is the finite mill grid; Empty holes are real area", () => {

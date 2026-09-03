@@ -1,7 +1,7 @@
 /** Display English for Office, Pipe, Health, Issues. Never invents counts. */
 
 import { EMPTY, cellName, recipePack, recipeBookName, bookDisplayName, strategyMark } from "./desk.ts";
-import { millDisplayRecipes } from "./mill-display.ts";
+import { isSprayClassInPlayEholeFirstBook, millDisplayRecipes } from "./mill-display.ts";
 import type { Move, Recipe, Seat } from "./stamp.ts";
 
 export const REGIONS = ["AU", "GB", "IE", "US", "NZ", "ZA", "HK", "FR"] as const;
@@ -176,7 +176,11 @@ export const SQUARE_WINDOW_LABEL: Record<SquareWindow, string> = {
   in_play: "in-play",
 };
 
-export type SquareMarket = "WIN" | "PLACE" | "LAY";
+export type SquareMarket = "WIN" | "PLACE";
+export type SquareSide = "BACK" | "LAY";
+
+/** Floor grid is always WIN beside PLACE — never a third LAY column. */
+export const SQUARE_GRID_MARKETS: SquareMarket[] = ["WIN", "PLACE"];
 
 export type HoleCell = {
   id: string;
@@ -185,6 +189,10 @@ export type HoleCell = {
   window: SquareWindow;
   market: SquareMarket;
   tone: MarketTone;
+  /** BACK side of this WIN/PLACE hole. */
+  backTone?: MarketTone;
+  /** LAY side of the same hole — not a separate square. */
+  layTone?: MarketTone;
 };
 
 const TONE_RANK: Record<MarketTone, number> = {
@@ -203,13 +211,74 @@ const WINDOW_PARSE: [RegExp, SquareWindow][] = [
   [/morning/, "morning"],
 ];
 
-/** WIN beside PLACE. LAY only when the plant already names it. */
+/** WIN beside PLACE on the square. LAY is a side mark inside the cell, not a column. */
 export function plantMarkets(texts: readonly string[]): SquareMarket[] {
-  const blob = texts.join(" ");
-  if (/(?:^|[^A-Za-z])LAY(?:[^A-Za-z]|$)/.test(blob) && !/display/i.test(blob)) {
-    return ["WIN", "PLACE", "LAY"];
+  return [...SQUARE_GRID_MARKETS];
+}
+
+export function squareGridMarkets(): SquareMarket[] {
+  return [...SQUARE_GRID_MARKETS];
+}
+
+/** Whether either side of a WIN/PLACE cell is occupied. */
+export function holeSideOccupied(cell: HoleCell): boolean {
+  const back = cell.backTone ?? (cell.tone !== "empty" ? cell.tone : "empty");
+  const lay = cell.layTone ?? "empty";
+  return back !== "empty" || lay !== "empty";
+}
+
+/** LAY keys and lay ehole ids map to the same WIN/PLACE hole with a side. */
+export function normalizeSquareHoleKey(
+  region: string,
+  window: SquareWindow,
+  market: string,
+): { id: string; market: SquareMarket; side?: SquareSide } | null {
+  const m = market.toUpperCase();
+  if (m === "LAY") return { id: `${region}|${window}|WIN`, market: "WIN", side: "LAY" };
+  if (m === "WIN" || m === "PLACE") return { id: `${region}|${window}|${m}`, market: m };
+  return null;
+}
+
+/** Country × window × WIN/PLACE and which side (BACK from win/place arms, LAY from lay arms). */
+export function squareHoleKeyAndSide(
+  id: string,
+  title: string,
+  region?: string,
+): { id: string; market: SquareMarket; side: SquareSide } | null {
+  const ehole = /^H-ehole-([a-z]{2})-([a-z]+)-(win|place|lay)/i.exec(id.trim());
+  if (ehole) {
+    const regionCode = ehole[1].toUpperCase();
+    const window = parseWindow(ehole[2]);
+    if (!window) return null;
+    const seg = ehole[3].toLowerCase();
+    if (seg === "lay") {
+      return { id: `${regionCode}|${window}|WIN`, market: "WIN", side: "LAY" };
+    }
+    const market: SquareMarket = seg === "place" ? "PLACE" : "WIN";
+    return { id: `${regionCode}|${window}|${market}`, market, side: "BACK" };
   }
-  return ["WIN", "PLACE"];
+  const hole = parseHole(`${region ?? ""} ${title} ${id}`);
+  if (!hole) return null;
+  if (hole.market === "LAY") {
+    return { id: `${hole.region}|${hole.window}|WIN`, market: "WIN", side: "LAY" };
+  }
+  const market: SquareMarket = hole.market === "PLACE" ? "PLACE" : "WIN";
+  return { id: `${hole.region}|${hole.window}|${market}`, market, side: "BACK" };
+}
+
+export type SquareOpenFill = {
+  id: string;
+  recipeId: string;
+  recipe: string;
+  side: string | null;
+};
+
+export function squareHoleFromOpenFill(fill: SquareOpenFill): { id: string; side: SquareSide } | null {
+  const parsed = squareHoleKeyAndSide(fill.recipeId, fill.recipe);
+  if (!parsed) return null;
+  const ticketSide = (fill.side ?? "").toUpperCase();
+  const side: SquareSide = ticketSide === "LAY" ? "LAY" : ticketSide === "BACK" ? "BACK" : parsed.side;
+  return { id: parsed.id, side };
 }
 
 export function parseWindow(text: string): SquareWindow | null {
@@ -220,7 +289,9 @@ export function parseWindow(text: string): SquareWindow | null {
   return null;
 }
 
-export function parseMarket(text: string): SquareMarket | null {
+export type ParsedSquareMarket = SquareMarket | "LAY";
+
+export function parseMarket(text: string): ParsedSquareMarket | null {
   const t = text.toUpperCase().replace(/_/g, " ");
   if (/(?:^|[^A-Z])LAY(?:[^A-Z]|$)/.test(t)) return "LAY";
   if (/\bPLACE\b/.test(t)) return "PLACE";
@@ -229,7 +300,7 @@ export function parseMarket(text: string): SquareMarket | null {
 }
 
 /** Country × window × market. All three or nothing — never invent a missing axis. */
-export function parseHole(text: string): { region: string; window: SquareWindow; market: SquareMarket } | null {
+export function parseHole(text: string): { region: string; window: SquareWindow; market: ParsedSquareMarket } | null {
   const region = regionFromText(text);
   const window = parseWindow(text);
   const market = parseMarket(text);
@@ -251,8 +322,79 @@ function occupy(
   const id = `${hole.region}|${hole.window}|${hole.market}`;
   const cur = map.get(id);
   if (!cur || TONE_RANK[tone] >= TONE_RANK[cur.tone]) {
-    map.set(id, { id, region: hole.region, name: countryName(hole.region), window: hole.window, market: hole.market, tone });
+    map.set(id, {
+      id,
+      region: hole.region,
+      name: countryName(hole.region),
+      window: hole.window,
+      market: hole.market,
+      tone,
+      backTone: tone,
+    });
   }
+}
+
+function occupySide(
+  map: Map<string, HoleCell>,
+  holeId: string,
+  side: SquareSide,
+  tone: MarketTone,
+) {
+  const parts = holeId.split("|");
+  if (parts.length !== 3) return;
+  const region = parts[0];
+  const window =
+    parseWindow(parts[1]) ??
+    (SQUARE_WINDOWS.includes(parts[1] as SquareWindow) ? (parts[1] as SquareWindow) : null);
+  if (!window) return;
+  const norm = normalizeSquareHoleKey(region, window, parts[2]);
+  if (!norm) return;
+  const id = norm.id;
+  let cell = map.get(id);
+  if (!cell) {
+    cell = {
+      id,
+      region,
+      name: countryName(region),
+      window,
+      market: norm.market,
+      tone: "empty",
+      backTone: "empty",
+      layTone: "empty",
+    };
+    map.set(id, cell);
+  }
+  const slot = side === "LAY" ? "layTone" : "backTone";
+  const cur = cell[slot] ?? "empty";
+  if (TONE_RANK[tone] >= TONE_RANK[cur]) {
+    cell[slot] = tone;
+  }
+  const back = cell.backTone ?? "empty";
+  const lay = cell.layTone ?? "empty";
+  cell.tone =
+    TONE_RANK[back] >= TONE_RANK[lay]
+      ? back !== "empty"
+        ? back
+        : lay
+      : lay !== "empty"
+        ? lay
+        : "empty";
+}
+
+function syncHoleSideTones(cell: HoleCell): void {
+  if (cell.backTone == null && cell.tone !== "empty") cell.backTone = cell.tone;
+  if (cell.layTone == null) cell.layTone = "empty";
+  if (cell.backTone == null) cell.backTone = "empty";
+  const back = cell.backTone ?? "empty";
+  const lay = cell.layTone ?? "empty";
+  cell.tone =
+    TONE_RANK[back] >= TONE_RANK[lay]
+      ? back !== "empty"
+        ? back
+        : lay
+      : lay !== "empty"
+        ? lay
+        : "empty";
 }
 
 type RacingSquareInput = {
@@ -261,7 +403,8 @@ type RacingSquareInput = {
   moves?: readonly { recipe: string; to: string }[];
   floorLog?: readonly { kind?: string; line: string }[];
   huntNotes?: readonly string[];
-  namedHoles?: readonly { region: string; window: string; market: string; tone?: string }[];
+  namedHoles?: readonly { region: string; window: string; market: string; tone?: string; side?: string }[];
+  openFills?: readonly SquareOpenFill[];
   /** Floor morning board: hunt queue + named holes only — no legacy recipe roll-up. */
   floorOnly?: boolean;
 };
@@ -271,11 +414,14 @@ type RacingSquareInput = {
  * Legacy KEEP / measuring / certified books never paint the Floor grid.
  */
 export function floorRacingSquare(input: {
-  namedHoles?: readonly { region: string; window: string; market: string; tone?: string }[];
+  namedHoles?: readonly { region: string; window: string; market: string; tone?: string; side?: string }[];
+  recipes?: readonly Recipe[];
+  openFills?: readonly SquareOpenFill[];
 }): HoleCell[] {
   return racingSquare({
-    recipes: [],
+    recipes: input.recipes ?? [],
     namedHoles: input.namedHoles ?? [],
+    openFills: input.openFills ?? [],
     floorOnly: true,
   });
 }
@@ -285,22 +431,23 @@ export function floorRacingSquare(input: {
  * mill names that country × window × market. Never paints 126 kills across countries.
  */
 export function racingSquare(input: RacingSquareInput): HoleCell[] {
-  const texts = [
-    ...input.recipes.map((r) => `${r.id} ${r.title} ${r.why}`),
-    ...(input.moves ?? []).map((m) => m.recipe),
-    ...(input.floorLog ?? []).map((r) => r.line),
-    ...(input.huntNotes ?? []),
-    ...(input.coverage ?? []).map((c) => c.note ?? ""),
-    ...(input.namedHoles ?? []).map((h) => h.market),
-  ];
-  const markets = plantMarkets(texts);
+  const markets = squareGridMarkets();
   const occ = new Map<string, HoleCell>();
   const grid: HoleCell[] = [];
   for (const region of REGIONS) {
     for (const window of SQUARE_WINDOWS) {
       for (const market of markets) {
         const id = `${region}|${window}|${market}`;
-        const cell: HoleCell = { id, region, name: countryName(region), window, market, tone: "empty" };
+        const cell: HoleCell = {
+          id,
+          region,
+          name: countryName(region),
+          window,
+          market,
+          tone: "empty",
+          backTone: "empty",
+          layTone: "empty",
+        };
         grid.push(cell);
         occ.set(id, cell);
       }
@@ -310,44 +457,84 @@ export function racingSquare(input: RacingSquareInput): HoleCell[] {
   const named = input.namedHoles ?? [];
   if (input.floorOnly || named.length) {
     for (const h of named) {
-      const window = parseWindow(h.window) ?? (SQUARE_WINDOWS.includes(h.window as SquareWindow) ? (h.window as SquareWindow) : null);
-      const market = parseMarket(h.market);
+      const window =
+        parseWindow(h.window) ??
+        (SQUARE_WINDOWS.includes(h.window as SquareWindow) ? (h.window as SquareWindow) : null);
       const region = REGIONS.includes(h.region as (typeof REGIONS)[number]) ? h.region : regionFromText(h.region);
-      if (!region || !window || !market || !markets.includes(market)) continue;
-      occupy(occ, { region, window, market }, asHoleTone(h.tone) ?? "idea");
+      if (!region || !window) continue;
+      const norm = normalizeSquareHoleKey(region, window, h.market);
+      if (!norm) continue;
+      const tone = asHoleTone(h.tone) ?? "idea";
+      const side = (h.side ?? "").toUpperCase() === "LAY" ? "LAY" : "BACK";
+      occupySide(occ, norm.id, side, tone);
+    }
+    const displayRecipes = millDisplayRecipes(input.recipes ?? []);
+    for (const r of displayRecipes) {
+      if (isSprayClassInPlayEholeFirstBook(r)) continue;
+      const parsed = squareHoleKeyAndSide(r.id, r.title, r.region);
+      if (!parsed) continue;
+      occupySide(occ, parsed.id, parsed.side, recipeTone(r));
+    }
+    for (const f of input.openFills ?? []) {
+      const hit = squareHoleFromOpenFill(f);
+      if (!hit) continue;
+      occupySide(occ, hit.id, hit.side, "idea");
     }
   } else {
-    const regionsWithBook = new Set<string>();
-    for (const r of input.recipes) {
+    const displayRecipes = millDisplayRecipes(input.recipes);
+    for (const r of displayRecipes) {
+      if (isSprayClassInPlayEholeFirstBook(r)) continue;
+      const parsed = squareHoleKeyAndSide(r.id, r.title, r.region);
+      if (parsed) {
+        occupySide(occ, parsed.id, parsed.side, recipeTone(r));
+        continue;
+      }
       const hole = parseHole(`${r.region} ${r.title} ${r.id}`);
-      if (!hole) continue;
-      regionsWithBook.add(r.region);
-      occupy(occ, hole, recipeTone(r));
+      if (!hole || hole.market === "LAY") continue;
+      const market: SquareMarket = hole.market === "PLACE" ? "PLACE" : "WIN";
+      occupySide(occ, `${hole.region}|${hole.window}|${market}`, "BACK", recipeTone(r));
     }
     for (const m of input.moves ?? []) {
       if (m.to !== "Dead") continue;
       const hole = parseHole(m.recipe);
-      if (hole) occupy(occ, hole, "loss");
+      if (!hole || hole.market === "LAY") continue;
+      const market: SquareMarket = hole.market === "PLACE" ? "PLACE" : "WIN";
+      occupySide(occ, `${hole.region}|${hole.window}|${market}`, "BACK", "loss");
     }
     for (const row of input.floorLog ?? []) {
       if (row.kind !== "kill" && !/→\s*Dead/i.test(row.line)) continue;
       const hole = parseHole(row.line);
-      if (hole) occupy(occ, hole, "loss");
+      if (!hole || hole.market === "LAY") continue;
+      const market: SquareMarket = hole.market === "PLACE" ? "PLACE" : "WIN";
+      occupySide(occ, `${hole.region}|${hole.window}|${market}`, "BACK", "loss");
     }
     for (const note of input.huntNotes ?? []) {
       const hole = parseHole(note);
-      if (hole) occupy(occ, hole, "hunt");
+      if (!hole || hole.market === "LAY") continue;
+      const market: SquareMarket = hole.market === "PLACE" ? "PLACE" : "WIN";
+      occupySide(occ, `${hole.region}|${hole.window}|${market}`, "BACK", "hunt");
     }
+    const regionsWithBook = new Set(displayRecipes.map((r) => r.region));
     for (const c of input.coverage ?? []) {
-      if (regionsWithBook.has(c.region)) continue;
+      if (regionsWithBook.has(c.region as Recipe["region"])) continue;
       if (c.keep + c.measuring === 0) continue;
       const hole = parseHole(`${c.region} ${c.note ?? ""}`);
-      if (!hole) continue;
-      occupy(occ, hole, c.keep > 0 ? "parked" : "idea");
+      if (!hole || hole.market === "LAY") continue;
+      const market: SquareMarket = hole.market === "PLACE" ? "PLACE" : "WIN";
+      occupySide(occ, `${hole.region}|${hole.window}|${market}`, "BACK", c.keep > 0 ? "parked" : "idea");
+    }
+    for (const f of input.openFills ?? []) {
+      const hit = squareHoleFromOpenFill(f);
+      if (!hit) continue;
+      occupySide(occ, hit.id, hit.side, "idea");
     }
   }
 
-  return grid.map((cell) => occ.get(cell.id) ?? cell);
+  return grid.map((cell) => {
+    const painted = occ.get(cell.id) ?? cell;
+    syncHoleSideTones(painted);
+    return painted;
+  });
 }
 
 /** Stamp fields needed to paint the racing square for empty-hole hunt. */
@@ -356,7 +543,7 @@ export type SquareStampSlice = {
   coverage?: readonly { region: string; keep: number; measuring: number; note?: string }[];
   moves?: readonly Move[];
   floorLog?: readonly { kind?: string; line: string }[];
-  holes?: readonly { region: string; window: string; market: string; tone?: string }[];
+  holes?: readonly { region: string; window: string; market: string; tone?: string; side?: string }[];
   office?: { invent?: boolean; inventWhy?: string };
   hunters?: readonly { id: string; note: string }[];
 };

@@ -3,7 +3,8 @@ import { mergeMillPathRuns } from "./mill-paths.ts";
 import { cellName } from "./desk.ts";
 import type { Badge, Chip, Recipe } from "./stamp.ts";
 import { parseFills, parseWaitOpen } from "./trades.ts";
-import { parseHole, parseWindow, parseMarket, regionFromText, millHuntCaption, type SquareWindow } from "./boards.ts";
+import { parseHole, parseWindow, parseMarket, regionFromText, millHuntCaption, squareHoleKeyAndSide, normalizeSquareHoleKey, type ParsedSquareMarket, type SquareWindow } from "./boards.ts";
+import { isSprayClassInPlayEholeFirstBook } from "./mill-display.ts";
 import { cellIsPostEpochEhole, cellIsPostEpochParkedKeep } from "./board-reset.ts";
 import { matrixKeyFromScoreboardCell } from "./hollow-occupancy.ts";
 
@@ -160,7 +161,7 @@ function plantRegion(c: Record<string, unknown>): string | null {
   return null;
 }
 
-function plantMarket(c: Record<string, unknown>): ReturnType<typeof parseMarket> {
+function plantMarket(c: Record<string, unknown>): ParsedSquareMarket | null {
   const mt = c.market_type;
   if (typeof mt === "string") {
     const m = parseMarket(mt);
@@ -205,12 +206,40 @@ function cellBlob(c: Record<string, unknown>): string {
 function holePlacementsFromCell(c: Record<string, unknown>): LiveStamp["holes"] {
   const status = statusOf(c);
   if (status !== "MEASURING" && status !== "HUNTING" && status !== "KILL" && status !== "KEEP") return [];
+  const id = String(c.id || "");
+  const title = String(c.title || "");
+  const regionCode = plantRegion(c) ?? regionFromText(cellBlob(c));
+  if (
+    cellIsPostEpochEhole(c) &&
+    isSprayClassInPlayEholeFirstBook({
+      id,
+      title,
+      status,
+      region: regionCode as Recipe["region"],
+    })
+  ) {
+    return [];
+  }
+  const sideHit = squareHoleKeyAndSide(id, title, regionCode ?? undefined);
+  const tone = holeToneFromStatus(status);
+  if (sideHit) {
+    const parts = sideHit.id.split("|");
+    const window = parseWindow(parts[1]) ?? (parts[1] as SquareWindow);
+    return [
+      {
+        region: parts[0],
+        window,
+        market: sideHit.market,
+        tone,
+        side: sideHit.side,
+      },
+    ];
+  }
   const blob = cellBlob(c);
   const parsed = parseHole(blob);
-  const region = plantRegion(c) ?? parsed?.region ?? regionFromText(blob);
+  const region = regionCode ?? parsed?.region ?? regionFromText(blob);
   const market = plantMarket(c) ?? parsed?.market;
   if (!region || !market) return [];
-  const tone = holeToneFromStatus(status);
   const plantW = plantWindow(c);
   const parsedW = parsed?.window;
   const windows: SquareWindow[] = [];
@@ -218,7 +247,19 @@ function holePlacementsFromCell(c: Record<string, unknown>): LiveStamp["holes"] 
   if (parsedW && !windows.includes(parsedW)) windows.push(parsedW);
   if (!windows.length && parsedW) windows.push(parsedW);
   if (!windows.length) return [];
-  return windows.map((window) => ({ region, window, market, tone }));
+  const out: LiveStamp["holes"] = [];
+  for (const window of windows) {
+    const norm = normalizeSquareHoleKey(region, window, market);
+    if (!norm) continue;
+    out.push({
+      region,
+      window,
+      market: norm.market,
+      tone,
+      side: norm.side ?? "BACK",
+    });
+  }
+  return out;
 }
 
 function holeFromCell(c: Record<string, unknown>): LiveStamp["holes"][number] | null {
@@ -317,16 +358,17 @@ function holesFromOccupancyPostEpoch(
     const region = parts[0].toUpperCase();
     if (!(REGIONS as readonly string[]).includes(region)) continue;
     const window = parseWindow(parts[1]) ?? parseWindow(parts[1].replace(/_/g, " "));
-    const market = parseMarket(parts[2]);
-    if (!window || !market) continue;
-    const holeKey = `${region}|${window}|${market}`;
+    const norm = normalizeSquareHoleKey(region, window ?? "morning", parts[2]);
+    if (!window || !norm) continue;
+    const holeKey = norm.id;
     const cell = cellByHole.get(String(key)) ?? cellByHole.get(holeKey);
     const status = cell ? statusOf(cell) : "MEASURING";
     map.set(holeKey, {
       region,
       window,
-      market,
+      market: norm.market,
       tone: holeToneFromStatus(status),
+      side: norm.side ?? "BACK",
     });
   }
 

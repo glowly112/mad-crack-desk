@@ -4,7 +4,6 @@ import { useDayScope } from "@/components/day-scope";
 import { LiveDot } from "@/components/live-dot";
 import { usePlantSource, useStamp } from "@/components/plant-context";
 import { EmptyState } from "@/components/empty-state";
-import { floorRacingSquare } from "@/lib/lab/boards";
 import {
   axisDay,
   dailyDomain,
@@ -17,6 +16,9 @@ import {
   type FloorFact,
   type FloorFactId,
 } from "@/lib/lab/desk";
+import { floorRacingSquare, holeSideOccupied } from "@/lib/lab/boards";
+import { honestOpenFills } from "@/lib/lab/trades";
+import { millDisplayRecipes } from "@/lib/lab/mill-display.ts";
 import { cn, fmtScore } from "@/lib/utils";
 
 export function PlantPane() {
@@ -24,9 +26,19 @@ export function PlantPane() {
   const plant = usePlantSource();
   const scope = useDayScope();
   const [fact, setFact] = useState<FloorFactId>("paper");
-  const holes = floorRacingSquare({ namedHoles: stamp.holes });
+  const open = honestOpenFills(stamp.trades);
+  const holes = floorRacingSquare({
+    namedHoles: stamp.holes,
+    recipes: millDisplayRecipes(stamp.recipes),
+    openFills: open.map((f) => ({
+      id: f.id,
+      recipeId: f.recipeId,
+      recipe: f.recipe,
+      side: f.side,
+    })),
+  });
   const authOccupied = (stamp as { square_occupied_n?: number }).square_occupied_n;
-  const paintedOccupied = holes.filter((h) => h.tone !== "empty").length;
+  const paintedOccupied = holes.filter((h) => holeSideOccupied(h)).length;
   const occupiedN =
     authOccupied != null && authOccupied > paintedOccupied ? authOccupied : paintedOccupied;
   const emptyHoles = holes.length - occupiedN;
