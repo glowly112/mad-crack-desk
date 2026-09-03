@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { recipeDeskRow } from "./desk.ts";
+import { recipeDeskRow, EMPTY } from "./desk.ts";
 import {
   bookBadge,
   bookedClock,
@@ -232,7 +232,7 @@ test("trade name is the mark plus horse; odds live in Odds", () => {
     why: "no size_ok candidates",
   });
   assert.equal(wait.name, "New Zealand · morning · winner · one-pick 2.5–4.49");
-  assert.equal(wait.side, "WIN");
+  assert.equal(wait.side, EMPTY);
   assert.equal(wait.time, "Waiting");
   assert.equal(wait.odds, "Waiting");
   assert.equal(wait.stake, "Waiting");
@@ -295,7 +295,8 @@ test("tradesWaitChips lists post-epoch ehole recipes and hides legacy KEEP steam
   assert.ok(rows.every((r) => r.book === "paper"));
   assert.ok(rows.every((r) => r.pnl == null));
   assert.ok(rows.every((r) => r.odds === "Waiting" && r.stake === "Waiting" && r.time === "Waiting"));
-  assert.ok(rows.every((r) => r.side === "WIN" || r.side === "PLACE"));
+  assert.ok(rows.every((r) => r.side === EMPTY));
+  assert.ok(rows.every((r) => !/^(WIN|PLACE|LAY)$/.test(r.side)));
   assert.match(rows.find((r) => r.id === eholeAu.id)?.name ?? "", /Australia · morning · winner/);
 });
 

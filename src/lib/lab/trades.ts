@@ -246,22 +246,13 @@ export function fillDeskRow(fill: Fill, fuseOn: boolean): DeskRow {
   };
 }
 
-function chipMarketSide(chip: WaitOpen): string {
-  const hole = parseHole(chip.title) ?? parseHole(chip.id);
-  if (hole) return hole.market;
-  const ehole = /^H-ehole-[a-z]{2}-[a-z]+-(win|place|lay)/i.exec(chip.id);
-  if (ehole) return ehole[3].toUpperCase();
-  return WAITING;
-}
-
-/** Recipe armed with no fill. Not a ticket. */
+/** Recipe armed with no fill. Not a ticket — Side is Empty; market lives in the name. */
 export function waitDeskRow(chip: WaitOpen): DeskRow {
-  const side = chipMarketSide(chip);
   return {
     id: chip.id,
     time: WAITING,
     name: strategyMark(chip.title, chip.id),
-    side: side === WAITING ? WAITING : side,
+    side: EMPTY,
     odds: WAITING,
     stake: WAITING,
     book: "paper",
