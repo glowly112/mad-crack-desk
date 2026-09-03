@@ -24,8 +24,14 @@ fi
 
 tar czf /tmp/mcl-desk-out.tar.gz .output
 scp "${SSH_OPTS[@]}" /tmp/mcl-desk-out.tar.gz "$HOST:~/mcl-desk/mcl-desk-out.tar.gz"
+scp "${SSH_OPTS[@]}" scripts/nginx/mcl-desk.conf "$HOST:~/mcl-desk/mcl-desk.conf"
 
 ssh "${SSH_OPTS[@]}" "$HOST" 'set -eu
+# Nitro baseURL=/desk/ — nginx must proxy /desk/assets/ → node /desk/assets/ (not /assets/).
+if [ -f /etc/nginx/snippets/mcl-desk.conf ]; then
+  sudo cp "$HOME/mcl-desk/mcl-desk.conf" /etc/nginx/snippets/mcl-desk.conf
+  sudo nginx -t && sudo systemctl reload nginx
+fi
 APP="$HOME/mcl-desk"
 ROOT="${BBB_ROOT:-$HOME/bbb}"
 mkdir -p "$APP" "$ROOT/logs"
@@ -65,6 +71,11 @@ set +a
 nohup "$HOME/opt/node/bin/node" .output/server/index.mjs >>"$ROOT/logs/mcl_desk.log" 2>&1 &
 echo $! >"$APP/desk.pid"
 sleep 8
+CSS=$(ls .output/public/assets/styles-*.css 2>/dev/null | head -1)
+JS=$(ls .output/public/assets/index-*.js 2>/dev/null | head -1)
+curl -sS -m 25 -o /dev/null -w "desk:%{http_code}\n" http://127.0.0.1:8791/desk/
+curl -sS -m 25 -o /dev/null -w "css:%{http_code}\n" "http://127.0.0.1:8791/desk/assets/$(basename "$CSS")"
+curl -sS -m 25 -o /dev/null -w "js:%{http_code}\n" "http://127.0.0.1:8791/desk/assets/$(basename "$JS")"
 curl -sS -m 25 -L http://127.0.0.1:8791/desk/ | python3 -c "
 import sys,re
 t=sys.stdin.read()
