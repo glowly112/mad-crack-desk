@@ -5,8 +5,10 @@ import { fillFromRow } from "./trades.ts";
 import {
   fillHasRawIdTicketName,
   junkFillIds,
+  isMillVoidLeftover,
   isRawIdRunSuffix,
   twinSkinJunkFillIds,
+  voidedJunkSquareHoles,
 } from "./junk-fills.ts";
 import { honestOpenFills, honestSettledFills, settledPaperDayU } from "./trades.ts";
 
@@ -142,4 +144,44 @@ test("only junk on tape yields Empty paper", () => {
     t: "09:00:00",
   })!;
   assert.equal(settledPaperDayU([junkOnly], "2026-09-03"), null);
+});
+
+test("mill-voided spray leftovers do not count as paper lost", () => {
+  const voidSpray = fillFromRow({
+    pick_id: "za-void",
+    date: "2026-09-03",
+    cell_id: "H-ehole-za-nearoff-win-73506Z",
+    mode: "auto_dry",
+    status: "VOID",
+    odds: 4,
+    side: "BACK",
+    stake_gbp: 2,
+    paper_pnl_gbp: -2,
+    placed_result: false,
+    ts: "2026-09-03T10:00:00Z",
+    t: "10:00:00",
+  })!;
+  assert.equal(isMillVoidLeftover(voidSpray), true);
+  assert.equal(honestSettledFills([voidSpray]).length, 0);
+  assert.equal(settledPaperDayU([voidSpray], "2026-09-03"), null);
+});
+
+test("voided junk paints killed on square, not fake empty", () => {
+  const voidGb = fillFromRow({
+    pick_id: "gb-void",
+    date: "2026-09-03",
+    cell_id: "H-ehole-gb-latepre-win-34829Z",
+    mode: "auto_dry",
+    status: "VOID",
+    odds: 5,
+    side: "BACK",
+    stake_gbp: 2,
+    ts: "2026-09-03T11:00:00Z",
+    t: "11:00:00",
+  })!;
+  const holes = voidedJunkSquareHoles([voidGb]);
+  assert.equal(holes.length, 1);
+  assert.equal(holes[0]?.region, "GB");
+  assert.equal(holes[0]?.tone, "loss");
+  assert.equal(holes[0]?.window, "late_pre");
 });

@@ -15,7 +15,8 @@ import {
   squareGlanceLine,
   squareGridMarkets,
 } from "@/lib/lab/boards";
-import { honestOpenFills } from "@/lib/lab/trades";
+import { openFills } from "@/lib/lab/trades";
+import { voidedJunkSquareHoles } from "@/lib/lab/junk-fills.ts";
 import { EMPTY } from "@/lib/lab/desk";
 import type { CountryRow, HoleCell, MarketSquare, SquareMarket } from "@/lib/lab/boards";
 import { cn } from "@/lib/utils";
@@ -41,9 +42,9 @@ const TONE_LABEL: Record<MarketSquare["tone"], string> = {
 /** Morning board square: empty holes visible. BACK/LAY split on each WIN/PLACE cell. */
 export function FloorSquare() {
   const stamp = useStamp();
-  const open = honestOpenFills(stamp.trades, stamp.recipes);
+  const open = openFills(stamp.trades);
   const holes = floorRacingSquare({
-    namedHoles: stamp.holes,
+    namedHoles: [...stamp.holes, ...voidedJunkSquareHoles(stamp.trades, stamp.recipes)],
     recipes: millDisplayRecipes(stamp.recipes),
     openFills: open.map((f) => ({
       id: f.id,

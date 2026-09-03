@@ -1,6 +1,6 @@
-/** Junk tickets — same rules as mill void / Office hide. Never honest one-picks with a horse. */
+/** Junk on the tape vs occupancy on the square — mill voids leftovers; never fake-empty the board. */
 
-import { parseHole, parseWindow } from "./boards.ts";
+import { parseHole, parseWindow, squareHoleKeyAndSide } from "./boards.ts";
 import {
   isPostEpochEholeRecipe,
 } from "./board-reset.ts";
@@ -77,6 +77,10 @@ function groupPickCap(group: readonly Fill[]): number | null {
   return cap;
 }
 
+function countsForTape(fill: Fill): boolean {
+  return fill.result === "void" || fill.result === "waiting" || fill.result === "won" || fill.result === "lost";
+}
+
 function isFieldSprayGroup(group: readonly Fill[]): boolean {
   if (group.length < FIELD_SPRAY_MIN_RUNNERS) return false;
   const odds = new Set(group.map((f) => f.odds).filter((o) => o != null));
@@ -93,8 +97,7 @@ function isFieldSprayGroup(group: readonly Fill[]): boolean {
 export function fieldSprayFillIds(fills: readonly Fill[]): Set<string> {
   const groups = new Map<string, Fill[]>();
   for (const f of fills) {
-    if (f.result === "void") continue;
-    if (f.result !== "waiting" && f.result !== "won" && f.result !== "lost") continue;
+    if (!countsForTape(f)) continue;
     if ((f.side ?? "").toUpperCase() !== "BACK") continue;
     const key = fieldSprayGroupKey(f);
     const list = groups.get(key) ?? [];
@@ -140,8 +143,7 @@ function isEholeFirstBookFill(fill: Fill): boolean {
 export function eholeFirstBookSprayFillIds(fills: readonly Fill[]): Set<string> {
   const groups = new Map<string, Fill[]>();
   for (const f of fills) {
-    if (f.result === "void") continue;
-    if (f.result !== "waiting" && f.result !== "won" && f.result !== "lost") continue;
+    if (!countsForTape(f)) continue;
     if ((f.side ?? "").toUpperCase() !== "BACK") continue;
     if (!isEholeFirstBookFill(f)) continue;
     const key = fieldSprayGroupKey(f);
@@ -216,7 +218,53 @@ function recipeForFill(recipes: readonly Recipe[], fill: Fill): Recipe | undefin
   return recipes.find((r) => r.id === fill.recipeId);
 }
 
-/** All junk fill ids — Trades, Floor paper, mill tape share this filter. */
+/** Mill-voided ehole leftovers — ZA 73506Z, GB 34829Z, FR 73339Z spray packs. */
+export function isMillVoidLeftover(fill: Fill, recipe?: Pick<Recipe, "id" | "title" | "hunterName"> | null): boolean {
+  if (fill.result !== "void") return false;
+  if (fillIsInPlayEholeFirstBook(fill)) return true;
+  if (fillHasRawIdTicketName(fill, recipe)) return true;
+  if (!isPostEpochEholeRecipe({ id: fill.recipeId, title: fill.recipe })) return false;
+  const run = eholeRunSuffix(fill.recipeId);
+  return run != null && isRawIdRunSuffix(run);
+}
+
+export type VoidGoneHole = {
+  region: string;
+  window: string;
+  market: string;
+  tone: string;
+  side?: string;
+};
+
+/** Voided junk paints killed on the square — not a fake empty hole after mill stamp. */
+export function voidedJunkSquareHoles(
+  fills: readonly Fill[],
+  recipes: readonly Recipe[] = [],
+): VoidGoneHole[] {
+  const junk = junkFillIds(fills, recipes);
+  const out: VoidGoneHole[] = [];
+  const seen = new Set<string>();
+  for (const f of fills) {
+    if (f.result !== "void") continue;
+    if (!junk.has(f.id) && !isMillVoidLeftover(f, recipeForFill(recipes, f))) continue;
+    const parsed = squareHoleKeyAndSide(f.recipeId, f.recipe);
+    if (!parsed) continue;
+    if (seen.has(parsed.id)) continue;
+    seen.add(parsed.id);
+    const parts = parsed.id.split("|");
+    const window = parseWindow(parts[1]) ?? parts[1];
+    out.push({
+      region: parts[0],
+      window,
+      market: parsed.market,
+      tone: "loss",
+      side: parsed.side,
+    });
+  }
+  return out;
+}
+
+/** All junk fill ids — Trades lists and paper P&L; not for hiding square occupancy. */
 export function junkFillIds(fills: readonly Fill[], recipes: readonly Recipe[] = []): Set<string> {
   const out = new Set<string>();
   for (const id of fieldSprayFillIds(fills)) out.add(id);
