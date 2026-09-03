@@ -113,8 +113,7 @@ async function readRecentFills(focalDay: string): Promise<Record<string, unknown
     const text = await readFile(bookPath(), "utf8");
     const lines = text.split("\n");
     const byDay = new Map<string, Record<string, unknown>[]>();
-    const tail = lines.length > 20000 ? lines.slice(-20000) : lines;
-    for (const line of tail) {
+    for (const line of lines) {
       if (!line.trim()) continue;
       try {
         const row = JSON.parse(line) as Record<string, unknown>;

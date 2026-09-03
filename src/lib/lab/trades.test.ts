@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { recipeDeskRow, EMPTY } from "./desk.ts";
 import { officePaperTotals } from "./office-display.ts";
+import { applyBoardResetView } from "./board-reset.ts";
+import { STAMP } from "./stamp.ts";
+import type { Fill } from "./trades.ts";
 import {
   bookBadge,
   bookedClock,
@@ -19,6 +22,9 @@ import {
   tradesSettledTapeFills,
   tradesSettledCandidateFills,
   deskSettledTapeRollup,
+  mergeMillTradesTape,
+  reconcileTodayTradesWithBook,
+  assertMillSettledSignedPresent,
   paperSettledFills,
   fieldSprayFillIds,
   settledPaperDayU,
@@ -784,6 +790,122 @@ test("SETTLED mill rows on void-pack runs stay on Trades settled tape", () => {
   const rollup = deskSettledTapeRollup([harb, spl], "2026-09-03");
   assert.equal(rollup.counts?.wins, 2);
   assert.equal(rollup.u, 1.862 + 0.735);
+});
+
+test("assertMillSettledSignedPresent fails closed when Harb missing", () => {
+  const day = "2026-09-03";
+  const harb = fillFromRow({
+    pick_id: "harb-34829",
+    date: day,
+    cell_id: "H-ehole-gb-latepre-win-34829Z",
+    mode: "auto_dry",
+    status: "SETTLED",
+    horse_name: "Harb",
+    paper_pnl_gbp: 3.724,
+    stake_gbp: 2,
+    placed_result: true,
+    side: "BACK",
+    ts: "2026-09-03T14:00:00Z",
+  })!;
+  assertMillSettledSignedPresent([harb!], day, [{ horse: "Harb" }]);
+  assert.throws(
+    () => assertMillSettledSignedPresent([], day, [{ horse: "Harb" }]),
+    /Missing mill SETTLED/,
+  );
+});
+
+test("poll merge keeps SETTLED signed rows when stamp tick drops them", () => {
+  const day = "2026-09-03";
+  const harb = fillFromRow({
+    pick_id: "harb-34829",
+    date: day,
+    cell_id: "H-ehole-gb-latepre-win-34829Z",
+    mode: "auto_dry",
+    status: "SETTLED",
+    horse_name: "Harb",
+    paper_pnl_gbp: 3.724,
+    stake_gbp: 2,
+    placed_result: true,
+    side: "BACK",
+    ts: "2026-09-03T14:00:00Z",
+  })!;
+  const loss = fillFromRow({
+    pick_id: "loss-only",
+    date: day,
+    cell_id: "H-ehole-gb-nearoff-win-83959Z",
+    mode: "auto_dry",
+    status: "SETTLED",
+    paper_pnl_gbp: -2,
+    stake_gbp: 2,
+    placed_result: false,
+    side: "BACK",
+    ts: "2026-09-03T16:00:00Z",
+  })!;
+  const prev = [harb!, loss!];
+  const next = [loss!];
+  const merged = mergeMillTradesTape(prev, next, day);
+  assertMillSettledSignedPresent(merged, day, [{ horse: "Harb" }]);
+});
+
+test("book reconcile restores today SETTLED rows missing from stamp", () => {
+  const day = "2026-09-03";
+  const harb = fillFromRow({
+    pick_id: "harb-34829",
+    date: day,
+    cell_id: "H-ehole-gb-latepre-win-34829Z",
+    mode: "auto_dry",
+    status: "SETTLED",
+    horse_name: "Harb",
+    paper_pnl_gbp: 3.724,
+    stake_gbp: 2,
+    placed_result: true,
+    side: "BACK",
+    ts: "2026-09-03T14:00:00Z",
+  })!;
+  const stampTrades: Fill[] = [];
+  const bookFills = [harb!];
+  const merged = reconcileTodayTradesWithBook(stampTrades, bookFills, day);
+  assertMillSettledSignedPresent(merged, day, [{ horse: "Harb" }]);
+});
+
+test("board reset view keeps Harb and Splendid on settled tape", () => {
+  const day = "2026-09-03";
+  const harb = fillFromRow({
+    pick_id: "harb-34829",
+    date: day,
+    cell_id: "H-ehole-gb-latepre-win-34829Z",
+    mode: "auto_dry",
+    status: "SETTLED",
+    horse_name: "Harb",
+    paper_pnl_gbp: 3.724,
+    stake_gbp: 2,
+    placed_result: true,
+    side: "BACK",
+    ts: "2026-09-03T14:00:00Z",
+  })!;
+  const spl = fillFromRow({
+    pick_id: "spl-73339",
+    date: day,
+    cell_id: "H-ehole-ie-nearoff-win-73339Z",
+    mode: "auto_dry",
+    status: "SETTLED",
+    horse_name: "Splendid Fellow",
+    paper_pnl_gbp: 1.47,
+    stake_gbp: 2,
+    placed_result: true,
+    side: "BACK",
+    ts: "2026-09-03T15:00:00Z",
+  })!;
+  const view = applyBoardResetView({
+    ...STAMP,
+    day,
+    source: "oracle",
+    trades: [harb!, spl!],
+  } as unknown as import("./from-digest.ts").LiveStamp);
+  assertMillSettledSignedPresent(view.trades, day, [
+    { horse: "Harb" },
+    { horse: "Splendid Fellow" },
+  ]);
 });
 
 test("wait chips dedupe by country window market", () => {

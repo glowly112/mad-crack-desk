@@ -7,6 +7,7 @@ import liveSnap from "./live-snapshot.json" with { type: "json" };
 import { applyBoardResetView, isBoardResetView, hasLivePlantArms } from "./board-reset.ts";
 import { applySnapshot } from "./from-snapshot.ts";
 import { readLocalOraclePlant, oracleScoreboardExists } from "./oracle-local-plant.ts";
+import { parseFills, reconcileTodayTradesWithBook } from "./trades.ts";
 import { bootStamp, digestStamp, plantFromTape, type PlantPayload } from "./plant-boot.ts";
 import type { LiveStamp } from "./from-digest.ts";
 
@@ -38,9 +39,7 @@ except Exception:
     want = set()
 by = defaultdict(list)
 if book.exists() and want:
-    lines = book.read_text().splitlines()
-    tail = lines[-20000:] if len(lines) > 20000 else lines
-    for line in tail:
+    for line in book.read_text().splitlines():
         if not line.strip():
             continue
         try:
@@ -238,8 +237,18 @@ function fromLiveFile(base: LiveStamp): PlantPayload {
   };
 }
 
-function finishOraclePayload(hit: PlantPayload): PlantPayload {
-  const stamp = applyBoardResetView(hit.stamp);
+async function finishOraclePayload(hit: PlantPayload): Promise<PlantPayload> {
+  let stamp = applyBoardResetView(hit.stamp);
+  if (stamp.source === "oracle" && (await oracleScoreboardExists())) {
+    const local = await readLocalOraclePlant();
+    if (local && Array.isArray(local.fills) && local.fills.length) {
+      const bookFills = parseFills(local.fills);
+      stamp = applyBoardResetView({
+        ...stamp,
+        trades: reconcileTodayTradesWithBook(stamp.trades, bookFills, stamp.day),
+      });
+    }
+  }
   const detail = hasLivePlantArms(stamp)
     ? `live oracle · ${stamp.recipes.length} on board · ${stamp.holes?.length ?? 0} holes · stamp ${stamp.generated}`
     : isBoardResetView(stamp)

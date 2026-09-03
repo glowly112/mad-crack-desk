@@ -4,7 +4,7 @@ import {
   isPostEpochEholeMeasuring,
   isPostEpochEholeRecipe,
   recipeIsPostEpoch,
-  fillIsPostEpoch,
+  BOARD_RESET_DAY,
 } from "./board-reset.ts";
 import {
   eholeChipRunOrder,
@@ -519,18 +519,33 @@ export function honestSettledFills(fills: readonly Fill[], _recipes: readonly Re
   return settledFills(fills).filter((f) => !junk.has(f.id));
 }
 
-/** Today's mill tape row — post-reset, Hyde/fast legacy off; no first-book archaeology. */
-export function isMillTapeFill(fill: Fill): boolean {
-  if (/^H-hyde-/i.test(fill.recipeId) || /^H-fast-/i.test(fill.recipeId)) return false;
-  return fillIsPostEpoch(fill);
+/** Today's mill tape row — Hyde/fast legacy and pre-reset days only. No epoch archaeology. */
+export function isHydeFastLegacyFill(fill: Fill): boolean {
+  return /^H-hyde-/i.test(fill.recipeId) || /^H-fast-/i.test(fill.recipeId);
 }
 
-/** Trades › Settled / Void candidates — mirror mill status for today, not stamp archaeology. */
+export function isPreResetDayFill(fill: Fill): boolean {
+  return fill.day < BOARD_RESET_DAY;
+}
+
+/** Mill book row eligible for Trades groups (Open / Settled / Void). */
+export function isMillDeskTradeFill(fill: Fill): boolean {
+  if (isHydeFastLegacyFill(fill)) return false;
+  if (isPreResetDayFill(fill)) return false;
+  return true;
+}
+
+/** @deprecated use isMillDeskTradeFill */
+export function isMillTapeFill(fill: Fill): boolean {
+  return isMillDeskTradeFill(fill);
+}
+
+/** Trades › Settled / Void candidates — mill book mirror; SETTLED signed rows never peeled. */
 export function tradesSettledCandidateFills(
   fills: readonly Fill[],
   _recipes: readonly Recipe[] = [],
 ): Fill[] {
-  return settledFills(fills).filter(isMillTapeFill);
+  return settledFills(fills).filter(isMillDeskTradeFill);
 }
 
 /** Trades › Open — mill OPEN rows on today's tape. */
@@ -539,7 +554,7 @@ export function tradesMillOpenFills(
   day: string,
   recipes: readonly Recipe[] = [],
 ): Fill[] {
-  return honestOpenFills(fillsOnDay(fills, day), recipes).filter(isMillTapeFill);
+  return honestOpenFills(fillsOnDay(fills, day), recipes).filter(isMillDeskTradeFill);
 }
 
 /** Trades settled — Hyde / fast / legacy morning tape hidden. */
@@ -595,7 +610,7 @@ export function honestFirstBookOpenFills(
   fills: readonly Fill[],
   recipes: readonly Recipe[] = [],
 ): Fill[] {
-  return honestOpenFills(fills, recipes).filter(isMillTapeFill);
+  return honestOpenFills(fills, recipes).filter(isMillDeskTradeFill);
 }
 
 /** Paper settles that contribute to the day u total. */
@@ -692,6 +707,71 @@ export function assertDeskTapeFloorAligns(
     throw new Error(
       `Floor ${floorCounts?.wins} win · ${floorCounts?.losses} lose !== tape ${rollup.counts?.wins} win · ${rollup.counts?.losses} lose (${wonOnTape} Won rows)`,
     );
+  }
+}
+
+/** Today’s mill book wins on stamp/digest — never drop SETTLED signed rows on poll. */
+export function reconcileTodayTradesWithBook(
+  stampTrades: readonly Fill[],
+  bookFills: readonly Fill[],
+  day: string,
+): Fill[] {
+  const otherDays = stampTrades.filter((f) => f.day !== day);
+  const byId = new Map<string, Fill>();
+  for (const f of stampTrades) {
+    if (f.day === day) byId.set(f.id, f);
+  }
+  for (const f of bookFills) {
+    if (f.day !== day || !isMillDeskTradeFill(f)) continue;
+    byId.set(f.id, f);
+  }
+  return [...otherDays, ...byId.values()];
+}
+
+/** Client poll merge — keep SETTLED signed rows if a stamp tick drops them. */
+export function mergeMillTradesTape(
+  prev: readonly Fill[],
+  next: readonly Fill[],
+  day: string,
+): Fill[] {
+  const byId = new Map<string, Fill>();
+  for (const f of next) byId.set(f.id, f);
+  for (const f of prev) {
+    if (f.day !== day || !isCountableSettledFill(f)) continue;
+    const n = byId.get(f.id);
+    if (!n) {
+      byId.set(f.id, f);
+      continue;
+    }
+    if (!isCountableSettledFill(n)) byId.set(f.id, f);
+  }
+  return [...byId.values()].sort((a, b) => b.ts.localeCompare(a.ts));
+}
+
+export type MillSettledNeedle = {
+  horse?: string;
+  cellId?: string;
+  pickId?: string;
+};
+
+/** Fail closed — missing mill SETTLED signed row throws (not Empty). */
+export function assertMillSettledSignedPresent(
+  trades: readonly Fill[],
+  day: string,
+  needles: readonly MillSettledNeedle[],
+  recipes: readonly Recipe[] = [],
+): void {
+  const tape = tradesSettledTapeFills(fillsOnDay(trades, day), recipes);
+  for (const needle of needles) {
+    const hit = tape.some((f) => {
+      if (needle.horse && f.horse?.toLowerCase().includes(needle.horse.toLowerCase())) return true;
+      if (needle.cellId && f.recipeId.includes(needle.cellId)) return true;
+      if (needle.pickId && f.id.includes(needle.pickId)) return true;
+      return false;
+    });
+    if (!hit) {
+      throw new Error(`Missing mill SETTLED signed row on tape: ${JSON.stringify(needle)}`);
+    }
   }
 }
 
