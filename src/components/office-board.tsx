@@ -17,6 +17,7 @@ import {
   SQUARE_HOLE_COUNT,
   waffleCols,
 } from "@/lib/lab/boards";
+import { millDisplayRecipes } from "@/lib/lab/mill-display.ts";
 import { EMPTY, recipeDeskRow, recipePack } from "@/lib/lab/desk";
 import type { Recipe } from "@/lib/lab/stamp";
 import { cn } from "@/lib/utils";
@@ -181,7 +182,7 @@ export function InventHappened() {
 /** Parked vs still being tested, by country, then who’s working. */
 export function RecipesNotEarning() {
   const stamp = useStamp();
-  const pack = recipePack(stamp.recipes);
+  const pack = recipePack(millDisplayRecipes(stamp.recipes));
   const workers = officeWorkers(stamp.hunters, stamp.office.activeHunter, stamp.office.inventWhy);
 
   return (

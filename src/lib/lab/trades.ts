@@ -1,6 +1,15 @@
 /** Display mapping for the clerk book. Never invents tickets or sums P&L. */
 
-import { isPostEpochEholeMeasuring, isPostEpochEholeRecipe } from "./board-reset.ts";
+import {
+  isPostEpochEholeMeasuring,
+  isPostEpochEholeRecipe,
+} from "./board-reset.ts";
+import {
+  eholeChipRunOrder,
+  isSprayClassInPlayEholeFirstBook,
+  millDisplayRecipes,
+  recipeDisplayHoleKey,
+} from "./mill-display.ts";
 import { parseHole, parseMarket, parseWindow } from "./boards.ts";
 import {
   bookDisplayName,
@@ -359,42 +368,40 @@ export function measuringEholeWaitChips(
   return out;
 }
 
-/** Trades wait rows: every post-epoch ehole recipe on the mill, no pre-reset tape leftovers. */
+/** Trades wait rows: post-epoch ehole on the mill — no spray-class in-play first books or twin skins. */
 export function tradesWaitChips(
   recipes: readonly Recipe[],
   waitOpen: readonly WaitOpen[],
   open: readonly Fill[],
 ): WaitOpen[] {
-  const postEholeWait = waitOpen.filter((w) => isPostEpochEholeRecipe({ id: w.id, title: w.title }));
+  const display = millDisplayRecipes(recipes);
+  const postEholeWait = waitOpen.filter(
+    (w) =>
+      isPostEpochEholeRecipe({ id: w.id, title: w.title }) &&
+      !isSprayClassInPlayEholeFirstBook({ id: w.id, title: w.title }),
+  );
   const fromWait = waitOpenChips(postEholeWait, open);
-  const fromRecipes = measuringEholeWaitChips(recipes, open, fromWait);
+  const fromRecipes = measuringEholeWaitChips(display, open, fromWait);
   return dedupeWaitChipsByHole([...fromWait, ...fromRecipes]);
 }
 
 function waitChipHoleKey(chip: WaitOpen): string {
-  const hole = parseHole(chip.title) ?? parseHole(chip.id);
-  if (hole) return `${hole.region}|${hole.window}|${hole.market}`;
-  const ehole = /^H-ehole-([a-z]{2})-([a-z]+)-(win|place|lay)/i.exec(chip.id);
-  if (ehole) {
-    const region = ehole[1].toUpperCase();
-    const window = parseWindow(ehole[2]);
-    const market = ehole[3].toUpperCase();
-    if (window) return `${region}|${window}|${market}`;
-  }
-  return chip.id;
+  return recipeDisplayHoleKey(chip) ?? chip.id;
 }
 
-/** One Trades row per country × window × WIN/PLACE. */
+/** One Trades row per hole — earliest ehole skin when Geo/Card twins share a hole. */
 export function dedupeWaitChipsByHole(chips: readonly WaitOpen[]): WaitOpen[] {
-  const seen = new Set<string>();
-  const out: WaitOpen[] = [];
+  const byHole = new Map<string, WaitOpen>();
   for (const c of chips) {
     const key = waitChipHoleKey(c);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(c);
+    const prev = byHole.get(key);
+    if (!prev) {
+      byHole.set(key, c);
+      continue;
+    }
+    if (eholeChipRunOrder(c.id) < eholeChipRunOrder(prev.id)) byHole.set(key, c);
   }
-  return out;
+  return [...byHole.values()];
 }
 
 export type MillTapeRow = { at: string; text: string };

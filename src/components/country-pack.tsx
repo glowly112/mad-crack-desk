@@ -1,5 +1,6 @@
 import { EmptyState } from "@/components/empty-state";
 import { useStamp } from "@/components/plant-context";
+import { millDisplayRecipes } from "@/lib/lab/mill-display.ts";
 import {
   SQUARE_WINDOW_LABEL,
   SQUARE_WINDOWS,
@@ -81,7 +82,7 @@ export function CountryPack() {
     namedHoles: stamp.holes,
   });
   const markets = plantMarkets(holes.map((h) => h.market));
-  const countries = countryMarket(officeCountries(stamp.coverage, stamp.recipes));
+  const countries = countryMarket(officeCountries(stamp.coverage, millDisplayRecipes(stamp.recipes)));
   const authOccupied = (stamp as { square_occupied_n?: number }).square_occupied_n;
   const paintedOccupied = holes.filter((h) => h.tone !== "empty").length;
   const occupiedN =

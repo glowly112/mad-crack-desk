@@ -1,6 +1,7 @@
 /** Display English for Office, Pipe, Health, Issues. Never invents counts. */
 
 import { EMPTY, cellName, recipePack, recipeBookName, bookDisplayName, strategyMark } from "./desk.ts";
+import { millDisplayRecipes } from "./mill-display.ts";
 import type { Move, Recipe, Seat } from "./stamp.ts";
 
 export const REGIONS = ["AU", "GB", "IE", "US", "NZ", "ZA", "HK", "FR"] as const;
@@ -1270,7 +1271,7 @@ function firstRecipeId(text: string): string {
 
 export function staffBookFacts(seatNow: string, stamp: StaffWatchStamp) {
   const blob = [seatNow, stamp.office?.inventWhy ?? "", ...(stamp.hunters ?? []).map((h) => h.note)].join(" ");
-  const recipes = stamp.recipes ?? [];
+  const recipes = millDisplayRecipes(stamp.recipes ?? []);
   const inventWhy = stamp.office?.inventWhy ?? "";
   const onHunt = isEmptyHoleHuntBoard(inventWhy);
   const nextEmpty = onHunt ? nextEmptySquareHole(stamp) : EMPTY;
