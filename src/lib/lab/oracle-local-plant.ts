@@ -175,7 +175,7 @@ async function readRecentFills(
   if (tape) return tape;
   const book = await readBookDayRows(focalDay);
   const focal = book.filter((r) => r.date === focalDay);
-  return focal.length ? focal.slice(-120) : book;
+  return focal.slice(-120);
 }
 
 async function readWaitOpen(): Promise<Record<string, unknown>[]> {

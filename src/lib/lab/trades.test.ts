@@ -24,6 +24,7 @@ import {
   deskSettledTapeRollup,
   mergeMillTradesTape,
   patchTapeWithBookSettledSigned,
+  refreshTapeFromBook,
   reconcileTodayTradesWithBook,
   assertMillSettledSignedPresent,
   paperSettledFills,
@@ -462,9 +463,9 @@ test("field spray packs do not count as paper or appear in settled", () => {
   const ids = fieldSprayFillIds(fills);
   assert.equal(ids.size, 7);
   assert.equal(honestSettledFills(fills).length, 8);
-  assert.equal(tradesSettledTapeFills(fills).length, 8);
-  assert.equal(settledPaperDayU(fills, "2026-09-03"), -6);
-  assert.equal(settledPaperDayU(spray, "2026-09-03"), -7);
+  assert.equal(tradesSettledTapeFills(fills).length, 1);
+  assert.equal(settledPaperDayU(fills, "2026-09-03"), 1);
+  assert.equal(settledPaperDayU(spray, "2026-09-03"), null);
 });
 
 test("two-odds same-tick pair is not field spray", () => {
@@ -848,7 +849,7 @@ test("poll merge keeps SETTLED signed rows when stamp tick drops them", () => {
   assertMillSettledSignedPresent(merged, day, [{ horse: "Harb" }]);
 });
 
-test("book patch restores SETTLED signed on tape cell scope", () => {
+test("book refresh updates SETTLED rows already on tape", () => {
   const day = "2026-09-03";
   const harb = fillFromRow({
     pick_id: "harb-34829",
@@ -863,22 +864,24 @@ test("book patch restores SETTLED signed on tape cell scope", () => {
     side: "BACK",
     ts: "2026-09-03T14:00:00Z",
   })!;
-  const openOnCell = fillFromRow({
-    pick_id: "open-34829",
+  const bookHarb = fillFromRow({
+    pick_id: "harb-34829",
     date: day,
     cell_id: "H-ehole-gb-latepre-win-34829Z",
     mode: "auto_dry",
-    status: "OPEN",
+    status: "SETTLED",
+    horse_name: "Harb",
+    paper_pnl_gbp: 4,
     stake_gbp: 2,
-    placed_result: null,
+    placed_result: true,
     side: "BACK",
-    ts: "2026-09-03T13:00:00Z",
+    ts: "2026-09-03T14:00:00Z",
   })!;
-  const merged = patchTapeWithBookSettledSigned([openOnCell!], [harb!], day);
-  assertMillSettledSignedPresent(merged, day, [{ horse: "Harb" }]);
+  const merged = refreshTapeFromBook([harb!], [bookHarb!], day);
+  assert.equal(merged[0]?.pnl, 2);
 });
 
-test("book patch does not dump full-day book.jsonl into trades tape", () => {
+test("book refresh does not dump full-day book.jsonl into trades tape", () => {
   const day = "2026-09-03";
   const tapeRow = fillFromRow({
     pick_id: "tape-1",

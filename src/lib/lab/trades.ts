@@ -25,7 +25,7 @@ import {
   WAITING,
   type DeskRow,
 } from "./desk.ts";
-import { junkFillIds } from "./junk-fills.ts";
+import { fieldSprayFillIds, junkFillIds } from "./junk-fills.ts";
 import { hopVoice } from "./staff-voice.ts";
 import { ukClock, ukHopAt } from "./uk-time.ts";
 import type { Move, Recipe } from "./stamp.ts";
@@ -570,7 +570,11 @@ export function tradesSettledTapeFills(
   fills: readonly Fill[],
   recipes: readonly Recipe[] = [],
 ): Fill[] {
-  return tradesSettledCandidateFills(fills, recipes).filter(isCountableSettledFill);
+  const spray = fieldSprayFillIds(fills);
+  const junk = junkFillIds(fills);
+  return tradesSettledCandidateFills(fills, recipes)
+    .filter(isCountableSettledFill)
+    .filter((f) => !spray.has(f.id) && !junk.has(f.id));
 }
 
 /** VOID / 0u on Trades — not wins, losses, or Floor paper. */
@@ -738,36 +742,30 @@ function tapeScopeHit(
 }
 
 /**
- * Patch today's tape from book — refresh rows already on tape; add missing mill SETTLED
- * signed for tape pick/cell scope only. Never dump full-day book.jsonl into trades.
+ * Patch today's tape from book — refresh rows already on tape only.
+ * Never grow today's settled set from full-day book.jsonl.
  */
-export function patchTapeWithBookSettledSigned(
+export function refreshTapeFromBook(
   tapeTrades: readonly Fill[],
   bookFills: readonly Fill[],
   day: string,
 ): Fill[] {
   const byId = new Map<string, Fill>();
   for (const f of tapeTrades) byId.set(f.id, f);
-  const scope = tapeScopeForDay(tapeTrades, day);
-
   for (const f of bookFills) {
     if (f.day !== day || !isMillDeskTradeFill(f)) continue;
-    const onTape = byId.has(f.id) || tapeScopeHit(f, scope);
-    if (!onTape) continue;
-    if (byId.has(f.id)) {
-      byId.set(f.id, f);
-      continue;
-    }
-    if (f.result === "waiting" || f.result === "void" || !isCountableSettledFill(f)) {
-      byId.set(f.id, f);
-      continue;
-    }
-    byId.set(f.id, f);
-    scope.pickIds.add(f.id);
-    scope.cells.add(fillTapeCell(f));
+    if (byId.has(f.id)) byId.set(f.id, f);
   }
-
   return [...byId.values()].sort((a, b) => b.ts.localeCompare(a.ts));
+}
+
+/** @deprecated use refreshTapeFromBook */
+export function patchTapeWithBookSettledSigned(
+  tapeTrades: readonly Fill[],
+  bookFills: readonly Fill[],
+  day: string,
+): Fill[] {
+  return refreshTapeFromBook(tapeTrades, bookFills, day);
 }
 
 /** @deprecated use patchTapeWithBookSettledSigned */
