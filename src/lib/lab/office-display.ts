@@ -3,7 +3,6 @@
 import {
   bookPeriods,
   countryName,
-  isSplitBook,
   squareHoleKeyAndSide,
   SQUARE_WINDOW_LABEL,
   type SquareWindow,
@@ -12,7 +11,10 @@ import { EMPTY, deskMarketFromParts, deskStampedSide, recipeBookName } from "./d
 import {
   isSprayClassInPlayEholeFirstBook,
   millDisplayRecipes,
+  millPaperRecipeIds,
 } from "./mill-display.ts";
+import { settledPaperUForRecipeIds } from "./trades.ts";
+import type { Fill } from "./trades.ts";
 import type { Recipe } from "./stamp.ts";
 
 export type OfficeBookState = "measuring" | "KEEP" | "production" | "killed";
@@ -40,6 +42,13 @@ export type OfficeBookCounts = {
   keep: number;
   production: number;
   live: string;
+};
+
+export type OfficeBookInput = {
+  recipes: readonly Recipe[];
+  day: string;
+  trades?: readonly Fill[];
+  n_keep?: number;
 };
 
 function officeBookState(recipe: Recipe): OfficeBookState | null {
@@ -95,44 +104,52 @@ function scoreTone(v: number): OfficePnlTone {
   return v >= 0 ? "up" : "down";
 }
 
-function officePnlCells(recipe: Recipe, state: OfficeBookState): Pick<
+function paperPnlCell(
+  recipe: Recipe,
+  input: OfficeBookInput,
+): Pick<OfficeBookRow, "paperPnl" | "paperPnlTone"> {
+  const trades = input.trades ?? [];
+  const ids = millPaperRecipeIds(recipe, input.recipes);
+  const u = settledPaperUForRecipeIds(trades, input.day, ids, input.recipes);
+  if (u == null) return { paperPnl: EMPTY, paperPnlTone: "empty" };
+  return { paperPnl: fmtPnlU(u), paperPnlTone: scoreTone(u) };
+}
+
+function officePnlCells(
+  recipe: Recipe,
+  state: OfficeBookState,
+  input: OfficeBookInput,
+): Pick<
   OfficeBookRow,
   "paperPnl" | "paperPnlTone" | "productionPnl" | "productionPnlTone" | "laterRacePnl" | "laterRacePnlTone"
 > {
-  if (state === "measuring" || state === "killed") return emptyPnl();
-
+  const paper = paperPnlCell(recipe, input);
+  const nKeep = input.n_keep ?? 0;
   const periods = bookPeriods(recipe);
   const freeze = Number.isFinite(recipe.freezePnl) ? recipe.freezePnl : null;
+  const hasLaterRace = state === "KEEP" && periods.sameBook && periods.holdoutN != null;
 
-  if (state === "KEEP") {
-    if (freeze == null) return emptyPnl();
-    return {
-      paperPnl: EMPTY,
-      paperPnlTone: "empty",
-      productionPnl: EMPTY,
-      productionPnlTone: "empty",
-      laterRacePnl: fmtPnlU(freeze),
-      laterRacePnlTone: "neutral",
-    };
+  let productionPnl = EMPTY;
+  let productionPnlTone: OfficePnlTone = "empty";
+  if (state === "production" && nKeep > 0 && freeze != null) {
+    productionPnl = fmtPnlU(freeze);
+    productionPnlTone = scoreTone(freeze);
   }
 
-  if (state === "production") {
-    const paperU = periods.paperU;
-    const paperPnl =
-      paperU != null && Number.isFinite(paperU) ? fmtPnlU(paperU) : EMPTY;
-    const productionPnl = freeze != null ? fmtPnlU(freeze) : EMPTY;
-    return {
-      paperPnl,
-      paperPnlTone: paperPnl === EMPTY ? "empty" : scoreTone(paperU ?? 0),
-      productionPnl,
-      productionPnlTone:
-        productionPnl === EMPTY ? "empty" : scoreTone(freeze ?? 0),
-      laterRacePnl: EMPTY,
-      laterRacePnlTone: "empty",
-    };
+  let laterRacePnl = EMPTY;
+  let laterRacePnlTone: OfficePnlTone = "empty";
+  if (hasLaterRace && freeze != null) {
+    laterRacePnl = fmtPnlU(freeze);
+    laterRacePnlTone = "neutral";
   }
 
-  return emptyPnl();
+  return {
+    ...paper,
+    productionPnl,
+    productionPnlTone,
+    laterRacePnl,
+    laterRacePnlTone,
+  };
 }
 
 /** Recipes that belong on Office — one row per first-book skin, not every ticket. */
@@ -167,10 +184,11 @@ export function officeBookRecipes(recipes: readonly Recipe[]): Recipe[] {
   });
 }
 
-export function officeBookRows(recipes: readonly Recipe[]): OfficeBookRow[] {
+export function officeBookRows(input: OfficeBookInput): OfficeBookRow[] {
+  const recipes = input.recipes;
   return officeBookRecipes(recipes).map((recipe) => {
     const state = officeBookState(recipe)!;
-    const pnl = officePnlCells(recipe, state);
+    const pnl = officePnlCells(recipe, state, input);
     return {
       id: recipe.id,
       hole: officeHoleLabel(recipe),

@@ -560,6 +560,21 @@ export function settledPaperDayU(
   return paper.reduce((acc, f) => acc + (f.pnl ?? 0), 0);
 }
 
+/** Today's settled paper u for one strategy/book — null when no settles (Empty). */
+export function settledPaperUForRecipeIds(
+  trades: readonly Fill[],
+  day: string,
+  recipeIds: ReadonlySet<string>,
+  recipes: readonly Recipe[] = [],
+): number | null {
+  if (!recipeIds.size) return null;
+  const paper = paperSettledFills(fillsOnDay(trades, day), recipes).filter((f) =>
+    recipeIds.has(f.recipeId),
+  );
+  if (!paper.length) return null;
+  return paper.reduce((acc, f) => acc + (f.pnl ?? 0), 0);
+}
+
 export function recipeForFill(recipes: readonly Recipe[], fill: Fill): Recipe | undefined {
   return recipes.find((r) => r.id === fill.recipeId);
 }

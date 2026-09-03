@@ -81,6 +81,27 @@ export function millDisplayRecipes(recipes: readonly Recipe[]): Recipe[] {
   return collapseEholeTwinSkins(sansSpray);
 }
 
+/** Recipe ids whose paper settles roll onto this Office / mill-display row (twin skins). */
+export function millPaperRecipeIds(recipe: Recipe, recipes: readonly Recipe[]): Set<string> {
+  const ids = new Set<string>([recipe.id]);
+  if (!isPostEpochEholeRecipe(recipe)) return ids;
+  const hunter = (recipe.hunterName ?? "").trim().toLowerCase();
+  if (!TWIN_HUNTER_SKINS.has(hunter)) return ids;
+  const holeKey = recipeDisplayHoleKey(recipe);
+  if (!holeKey) return ids;
+  const twins = recipes.filter(
+    (r) =>
+      isPostEpochEholeRecipe(r) &&
+      (r.hunterName ?? "").trim().toLowerCase() === hunter &&
+      recipeDisplayHoleKey(r) === holeKey,
+  );
+  if (twins.length <= 1) return ids;
+  const sorted = [...twins].sort((a, b) => eholeRunOrder(a.id).localeCompare(eholeRunOrder(b.id)));
+  if (sorted[0]?.id !== recipe.id) return ids;
+  for (const r of twins) ids.add(r.id);
+  return ids;
+}
+
 export function eholeChipRunOrder(id: string): string {
   return eholeRunOrder(id);
 }

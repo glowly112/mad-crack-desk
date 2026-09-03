@@ -11,9 +11,19 @@ import {
 import { cn } from "@/lib/utils";
 
 /** Top strip — strategies, KEEP, production, live (Empty while fuse off). */
+function officeInput(stamp: ReturnType<typeof useStamp>) {
+  const trend = stamp.trends.find((t) => t.day === stamp.day);
+  return {
+    recipes: stamp.recipes,
+    day: stamp.day,
+    trades: stamp.trades,
+    n_keep: trend?.n_keep,
+  };
+}
+
 export function OfficeCounts() {
   const stamp = useStamp();
-  const rows = officeBookRows(stamp.recipes);
+  const rows = officeBookRows(officeInput(stamp));
   const counts = officeBookCounts(rows, stamp.fuse_on, stamp.pipe.scaling);
 
   const tiles = [
@@ -60,7 +70,7 @@ function pnlClass(tone: OfficePnlTone): string {
 /** One row per strategy/book — hole, name, side, market, state, paper / production / later-race P&L. */
 export function OfficeBooksTable() {
   const stamp = useStamp();
-  const rows = officeBookRows(stamp.recipes);
+  const rows = officeBookRows(officeInput(stamp));
 
   return (
     <section>
