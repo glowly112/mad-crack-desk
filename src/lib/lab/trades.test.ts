@@ -18,6 +18,8 @@ import {
   fillResultWord,
   tradeName,
   waitDeskRow,
+  measuringEholeWaitChips,
+  tradesWaitChips,
   waitOpenChips,
 } from "./trades.ts";
 
@@ -214,8 +216,64 @@ test("trade name is the mark plus horse; odds live in Odds", () => {
   });
   assert.equal(wait.name, "New Zealand · morning · winner · one-pick 2.5–4.49");
   assert.equal(wait.odds, "Empty");
-  assert.equal(wait.book, "Empty");
+  assert.equal(wait.book, "paper");
   assert.equal(wait.result, "Waiting for races");
+});
+
+test("tradesWaitChips lists post-epoch ehole recipes and hides legacy KEEP steam-fade", () => {
+  const open = openFills(parseFills([gbOpen]));
+  const legacySteam = {
+    id: "Britain_near_off_WIN_steam_fade_residual_one_pick",
+    title: "GB near-off WIN steam fade",
+    why: null,
+  };
+  const eholeAu = {
+    id: "H-ehole-au-morning-win-73508Z",
+    title: "AU morning WIN",
+    region: "AU" as const,
+    status: "MEASURING" as const,
+    badge: "Research" as const,
+    chip: null,
+    n: 0,
+    roi: 0,
+    freezePnl: 0,
+    why: "Still proving.",
+  };
+  const eholeGb = {
+    id: "H-ehole-gb-latepre-win-34829Z",
+    title: "GB late-pre WIN",
+    region: "GB" as const,
+    status: "HUNTING" as const,
+    badge: "Research" as const,
+    chip: null,
+    n: 0,
+    roi: 0,
+    freezePnl: 0,
+    why: "Looking.",
+  };
+  const legacyFast = {
+    id: "H-fast-gb-nearoff-win-83959Z",
+    title: "GB near-off WIN",
+    region: "GB" as const,
+    status: "KEEP" as const,
+    badge: "Solid" as const,
+    chip: "Waiting for races" as const,
+    n: 76,
+    roi: 8.9,
+    freezePnl: 119.97,
+    why: "Certified keep",
+  };
+  const chips = tradesWaitChips([eholeAu, eholeGb, legacyFast], [legacySteam], open);
+  assert.equal(chips.length, 2);
+  assert.ok(chips.every((c) => /^H-ehole-/i.test(c.id)));
+  assert.ok(chips.some((c) => c.id === eholeAu.id));
+  assert.ok(chips.some((c) => c.id === eholeGb.id));
+  assert.ok(!chips.some((c) => /steam|fade|H-fast/i.test(`${c.id} ${c.title}`)));
+  const rows = chips.map((c) => waitDeskRow(c));
+  assert.ok(rows.every((r) => r.result === "Waiting for races"));
+  assert.ok(rows.every((r) => r.book === "paper"));
+  assert.ok(rows.every((r) => r.pnl == null));
+  assert.match(rows.find((r) => r.id === eholeAu.id)?.name ?? "", /Australia · morning · winner/);
 });
 
 test("booked clock is a real time, never Empty", () => {

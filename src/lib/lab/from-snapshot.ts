@@ -4,6 +4,7 @@ import type { Badge, Chip, Recipe } from "./stamp.ts";
 import { parseFills, parseWaitOpen } from "./trades.ts";
 import { parseHole, parseWindow, parseMarket, regionFromText, type SquareWindow } from "./boards.ts";
 import { cellIsPostEpochEhole, cellIsPostEpochParkedKeep } from "./board-reset.ts";
+import { matrixKeyFromScoreboardCell } from "./hollow-occupancy.ts";
 
 const REGIONS = ["AU", "GB", "IE", "US", "NZ", "ZA", "HK", "FR"] as const;
 const BADGES: Badge[] = ["Solid", "Research", "Parked", "Dead"];
@@ -256,6 +257,25 @@ function countEholeArms(cells: Record<string, unknown>[]): number {
 }
 
 /** Post-epoch occupancy from factory empty-hole hunt — not every MEASURING cell on the board. */
+function supplementOccupiedKeys(
+  keys: Set<string>,
+  cells: Record<string, unknown>[],
+  targetN: number,
+): void {
+  if (targetN <= 0 || keys.size >= targetN) return;
+  for (const c of cells) {
+    if (!cellIsPostEpochEhole(c)) continue;
+    const st = statusOf(c);
+    if (st !== "MEASURING" && st !== "HUNTING" && st !== "KEEP") continue;
+    const fromCell = matrixKeyFromScoreboardCell(c);
+    if (fromCell) keys.add(fromCell);
+    for (const h of holePlacementsFromCell(c)) {
+      keys.add(`${h.region}|${h.window}|${h.market}`);
+    }
+    if (keys.size >= targetN) return;
+  }
+}
+
 function holesFromOccupancyPostEpoch(
   snap: Record<string, unknown>,
   cells: Record<string, unknown>[],
@@ -267,11 +287,16 @@ function holesFromOccupancyPostEpoch(
   const list = occRec?.occupied_cells;
   const nOccupied = int(occRec?.n_occupied_cells);
   if (!Array.isArray(list) || !list.length) return null;
-  // bbb hunt stamp truncates occupied_cells[:24]; full list is rebuilt on oracle poll.
-  const keysToPaint =
-    nOccupied != null && nOccupied > 0 && list.length >= nOccupied
-      ? list.slice(0, nOccupied)
-      : list;
+
+  const keySet = new Set<string>();
+  for (const key of list) keySet.add(String(key));
+  if (nOccupied != null && nOccupied > 0 && keySet.size < nOccupied) {
+    supplementOccupiedKeys(keySet, cells, nOccupied);
+  }
+  let keysToPaint = [...keySet];
+  if (nOccupied != null && nOccupied > 0 && keysToPaint.length > nOccupied) {
+    keysToPaint = keysToPaint.slice(0, nOccupied);
+  }
 
   const map = new Map<string, LiveStamp["holes"][number]>();
   const cellByHole = new Map<string, Record<string, unknown>>();
@@ -420,6 +445,11 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
   const inventOn = inventCaption ? inventIsOn(inventCaption) : base.office.invent;
   const millParked = plantOracle && isMillParked(snap, inventCaption);
   const armed = armedFromSnap(snap, plantOracle, millParked, eholeArms);
+  const occRec =
+    rec(snap.occupancy_post_epoch) ??
+    rec(rec(snap.empty_hole_hunt)?.occupancy_post_epoch) ??
+    rec(rec(snap.factory_empty_hole_hunt)?.occupancy_post_epoch);
+  const square_occupied_n = int(occRec?.n_occupied_cells);
 
   const trends = base.trends.map((t) => {
     if (t.day !== date) return t;
@@ -440,6 +470,7 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
     source: "oracle",
     mill_n_armed: armed.mill_n_armed,
     n_armed: armed.n_armed,
+    square_occupied_n: square_occupied_n != null && square_occupied_n > 0 ? square_occupied_n : undefined,
     n_solid,
     fuse_on,
     fuse: fuse_on ? "Real betting: ON" : "Real betting: OFF",

@@ -45,6 +45,7 @@ export function matrixKeyFromArmedYamlName(name: string): string | null {
 export async function computeHollowOccupiedKeys(
   root: string,
   cells: unknown[],
+  stampOccupied?: readonly string[],
 ): Promise<string[]> {
   let resetUnix = 0;
   try {
@@ -65,18 +66,24 @@ export async function computeHollowOccupiedKeys(
     if (!c) continue;
     const st = String(c.status ?? "").toUpperCase();
     if (st !== "KEEP" && st !== "MEASURING" && st !== "HUNTING") continue;
+    const id = String(c.id ?? "");
     const pathRaw = c.path;
-    if (typeof pathRaw !== "string" || !pathRaw.trim()) continue;
-    const p = pathRaw.startsWith("/") ? pathRaw : join(root, pathRaw);
-    try {
-      const { mtimeMs } = await stat(p);
-      if (mtimeMs / 1000 < resetUnix - 0.001) continue;
-      countedPaths.add(p);
-    } catch {
-      continue;
+    if (typeof pathRaw === "string" && pathRaw.trim()) {
+      const p = pathRaw.startsWith("/") ? pathRaw : join(root, pathRaw);
+      try {
+        const { mtimeMs } = await stat(p);
+        if (mtimeMs / 1000 < resetUnix - 0.001) continue;
+        countedPaths.add(p);
+      } catch {
+        /* path missing — fall through to scope / id key */
+      }
     }
     const key = matrixKeyFromScoreboardCell(c);
     if (key) keys.add(key);
+    else if (/^H-ehole-/i.test(id)) {
+      const fromId = matrixKeyFromArmedYamlName(id.replace(/^H-ehole-/i, "").replace(/\.yaml$/i, "") + ".yaml");
+      if (fromId) keys.add(fromId);
+    }
   }
 
   const armedDir = join(root, "config/recipes_paper_armed");
@@ -97,6 +104,13 @@ export async function computeHollowOccupiedKeys(
     }
   } catch {
     /* armed dir missing */
+  }
+
+  if (stampOccupied?.length) {
+    for (const raw of stampOccupied) {
+      const k = String(raw).trim();
+      if (k) keys.add(k);
+    }
   }
 
   return [...keys].sort();

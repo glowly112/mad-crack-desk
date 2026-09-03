@@ -24,7 +24,11 @@ export function PlantPane() {
   const scope = useDayScope();
   const [fact, setFact] = useState<FloorFactId>("paper");
   const holes = floorRacingSquare({ namedHoles: stamp.holes });
-  const emptyHoles = holes.filter((h) => h.tone === "empty").length;
+  const authOccupied = (stamp as { square_occupied_n?: number }).square_occupied_n;
+  const paintedOccupied = holes.filter((h) => h.tone !== "empty").length;
+  const occupiedN =
+    authOccupied != null && authOccupied > paintedOccupied ? authOccupied : paintedOccupied;
+  const emptyHoles = holes.length - occupiedN;
   const facts = floorFacts(stamp, scope, emptyHoles);
   const selected = facts.find((f) => f.id === fact) ?? facts[0];
   const live = plant.source === "oracle";

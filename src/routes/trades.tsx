@@ -13,7 +13,7 @@ import {
   openFills,
   settledFills,
   waitDeskRow,
-  waitOpenChips,
+  tradesWaitChips,
 } from "@/lib/lab/trades";
 import { fmtU } from "@/lib/utils";
 
@@ -26,7 +26,7 @@ export function Trades() {
   const dayFills = fillsOnDay(stamp.trades, scope.day);
   const open = openFills(dayFills);
   const settled = settledFills(dayFills);
-  const chips = scope.lookingBack ? [] : waitOpenChips(stamp.wait_open ?? [], open);
+  const chips = scope.lookingBack ? [] : tradesWaitChips(stamp.recipes, stamp.wait_open ?? [], open);
   const tape = dayTapePnl(settled, stamp.fuse_on);
   const live = plant.source === "oracle";
   const days = stamp.trends.map((t) => t.day);

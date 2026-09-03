@@ -1,6 +1,8 @@
 /** Display mapping for the clerk book. Never invents tickets or sums P&L. */
 
+import { isPostEpochEholeMeasuring, isPostEpochEholeRecipe } from "./board-reset.ts";
 import { EMPTY, cellName, strategyMark, type DeskRow } from "./desk.ts";
+import type { Recipe } from "./stamp.ts";
 
 export type FillBook = "paper" | "production" | "live";
 export type FillResult = "won" | "lost" | "void" | "waiting";
@@ -212,7 +214,7 @@ export function waitDeskRow(chip: WaitOpen): DeskRow {
     side: EMPTY,
     odds: EMPTY,
     stake: EMPTY,
-    book: EMPTY,
+    book: "paper",
     result: "Waiting for races",
     pnl: null,
   };
@@ -290,6 +292,42 @@ export function parseWaitOpen(raw: unknown): WaitOpen[] {
 export function waitOpenChips(waitOpen: readonly WaitOpen[], open: readonly Fill[]): WaitOpen[] {
   const ids = new Set(open.map((f) => f.recipeId));
   return waitOpen.filter((w) => !ids.has(w.id));
+}
+
+function coveredRecipeIds(open: readonly Fill[], chips: readonly WaitOpen[]): Set<string> {
+  const ids = new Set<string>();
+  for (const f of open) ids.add(f.recipeId);
+  for (const w of chips) ids.add(w.id);
+  return ids;
+}
+
+/** Post-epoch H-ehole measuring/hunting — not legacy KEEP / Hyde / steam-fade wait_open. */
+export function measuringEholeWaitChips(
+  recipes: readonly Recipe[],
+  open: readonly Fill[],
+  existing: readonly WaitOpen[],
+): WaitOpen[] {
+  const covered = coveredRecipeIds(open, existing);
+  const out: WaitOpen[] = [];
+  for (const r of recipes) {
+    if (!isPostEpochEholeMeasuring(r)) continue;
+    if (covered.has(r.id)) continue;
+    covered.add(r.id);
+    out.push({ id: r.id, title: r.title, why: null });
+  }
+  return out;
+}
+
+/** Trades wait rows: every post-epoch ehole recipe on the mill, no pre-reset tape leftovers. */
+export function tradesWaitChips(
+  recipes: readonly Recipe[],
+  waitOpen: readonly WaitOpen[],
+  open: readonly Fill[],
+): WaitOpen[] {
+  const postEholeWait = waitOpen.filter((w) => isPostEpochEholeRecipe({ id: w.id, title: w.title }));
+  const fromWait = waitOpenChips(postEholeWait, open);
+  const fromRecipes = measuringEholeWaitChips(recipes, open, fromWait);
+  return [...fromWait, ...fromRecipes];
 }
 
 export function fillsOnDay(fills: readonly Fill[], day: string): Fill[] {

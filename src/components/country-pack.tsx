@@ -38,7 +38,11 @@ export function FloorSquare() {
   const stamp = useStamp();
   const holes = floorRacingSquare({ namedHoles: stamp.holes });
   const markets = plantMarkets(holes.map((h) => h.market));
-  const emptyN = holes.filter((h) => h.tone === "empty").length;
+  const authOccupied = (stamp as { square_occupied_n?: number }).square_occupied_n;
+  const paintedOccupied = holes.filter((h) => h.tone !== "empty").length;
+  const occupiedN =
+    authOccupied != null && authOccupied > paintedOccupied ? authOccupied : paintedOccupied;
+  const emptyN = holes.length - occupiedN;
   const glance = `${emptyN} empty of ${holes.length} holes on the square`;
 
   return (

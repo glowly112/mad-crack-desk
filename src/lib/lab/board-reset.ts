@@ -52,6 +52,19 @@ export function hasPostEpochEholeRecipes(recipes: readonly Recipe[]): boolean {
   );
 }
 
+/** Post-epoch invent ehole — never legacy H-fast KEEP or Hyde cousins. */
+export function isPostEpochEholeRecipe(recipe: Pick<Recipe, "id" | "title">): boolean {
+  if (/^H-hyde-/i.test(recipe.id) || /^H-fast-/i.test(recipe.id)) return false;
+  if (!/^H-ehole-/i.test(recipe.id) && !/^ehole_/i.test(recipe.title)) return false;
+  return recipeIsPostEpoch(recipe as Recipe);
+}
+
+export function isPostEpochEholeMeasuring(recipe: Pick<Recipe, "id" | "title" | "status">): boolean {
+  const st = String(recipe.status ?? "").toUpperCase();
+  if (st !== "MEASURING" && st !== "HUNTING") return false;
+  return isPostEpochEholeRecipe(recipe);
+}
+
 export function fillIsPostEpoch(fill: Fill): boolean {
   if (fill.day && fill.day < BOARD_RESET_DAY) return false;
   const fromTs = compactEpoch(fill.ts);

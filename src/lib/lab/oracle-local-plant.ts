@@ -225,11 +225,18 @@ export async function readLocalOraclePlant(): Promise<Record<string, unknown> | 
 
     const bbbRoot = process.env.BBB_ROOT?.trim() || join(homedir(), "bbb");
     const cells = Array.isArray(sb.cells) ? sb.cells : [];
-    const hollowKeys = await computeHollowOccupiedKeys(bbbRoot, cells);
     const stampOcc = rec(huntStamp?.occupancy_post_epoch);
+    const stampList = Array.isArray(stampOcc?.occupied_cells)
+      ? stampOcc.occupied_cells.map((x) => String(x))
+      : [];
+    const stampN = int(stampOcc?.n_occupied_cells);
+    const hollowKeys = await computeHollowOccupiedKeys(bbbRoot, cells, stampList);
+    const occupied_cells = hollowKeys.length > 0 ? hollowKeys : stampList;
+    const n_occupied_cells =
+      stampN > 0 ? Math.max(stampN, occupied_cells.length) : occupied_cells.length;
     const occupancy_post_epoch =
-      hollowKeys.length > 0
-        ? { n_occupied_cells: hollowKeys.length, occupied_cells: hollowKeys }
+      occupied_cells.length > 0 || stampN > 0
+        ? { n_occupied_cells, occupied_cells }
         : stampOcc ?? snapInner.occupancy_post_epoch;
 
     return {
