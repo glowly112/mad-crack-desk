@@ -589,7 +589,7 @@ export type BookStage = {
 
 const SPLIT_MARK = "Hyde cousin, not the same picks";
 
-function isSplitBook(recipe: Recipe): boolean {
+export function isSplitBook(recipe: Recipe): boolean {
   return /cousin|not the same pick|different pick|\btwin\b/i.test(`${recipe.why} ${recipe.title}`);
 }
 

@@ -1,111 +1,111 @@
 import { Link } from "@tanstack/react-router";
+import { DeskScroll } from "@/components/desk-scroll";
 import { EmptyState } from "@/components/empty-state";
-import { Portrait, ownerId } from "@/components/portrait";
 import { useStamp } from "@/components/plant-context";
-import { officeIssuesForBoard } from "@/lib/lab/boards";
 import { EMPTY } from "@/lib/lab/desk";
-import {
-  officeMillCaption,
-  officeMillFixLines,
-  officeTapeSkips,
-} from "@/lib/lab/office-display";
+import { officeBookCounts, officeBookRows } from "@/lib/lab/office-display";
+import { cn } from "@/lib/utils";
 
-/** Next action first — stamp issues plus mill clutter to clear. */
-export function ThingsToFix() {
+/** Top strip — strategies, KEEP, production, live (Empty while fuse off). */
+export function OfficeCounts() {
   const stamp = useStamp();
-  const issues = officeIssuesForBoard(stamp.issues, stamp);
-  const mill = officeMillFixLines(stamp.recipes, stamp.trades, stamp.day);
-  const hasAnything = issues.length > 0 || mill.length > 0;
+  const rows = officeBookRows(stamp.recipes);
+  const counts = officeBookCounts(rows, stamp.fuse_on, stamp.pipe.scaling);
+
+  const tiles = [
+    { label: "Strategies", value: String(counts.strategies), hint: "First-book skins" },
+    { label: "KEEP", value: String(counts.keep), hint: "Later-race same-bets" },
+    { label: "Production", value: String(counts.production), hint: "On today's tape" },
+    { label: "Live", value: counts.live, hint: stamp.fuse_on ? "Real betting" : "fuse off" },
+  ];
 
   return (
-    <section>
-      <header className="mb-2 flex items-baseline justify-between gap-3 border-b border-border pb-2">
-        <h2 className="text-sm font-medium">Things to fix</h2>
-        <p className="text-xs text-subtle">Problem · who · next</p>
-      </header>
-      {!hasAnything ? (
-        <EmptyState copy={EMPTY} />
-      ) : (
-        <ol>
-          {issues.map((iss) => {
-            const id = ownerId(iss.owner);
-            return (
-              <li key={iss.id} className="border-b border-border">
-                <Link
-                  to="/issues/$id"
-                  params={{ id: iss.id }}
-                  className="flex gap-3 py-3 transition-transform duration-150 ease-out active:scale-[0.96]"
-                >
-                  {id ? <Portrait id={id} name={iss.owner} size="sm" /> : null}
-                  <div className="min-w-0">
-                    <p className="text-sm">{iss.problem}</p>
-                    <p className="mt-1 text-xs text-subtle">
-                      {iss.owner} · {iss.next}
-                    </p>
-                  </div>
-                </Link>
-              </li>
-            );
-          })}
-          {mill.map((row) => (
-            <li key={row.id} className="border-b border-border py-3">
-              <p className="text-sm">{row.problem}</p>
-              <p className="mt-1 text-xs text-subtle">{row.hint}</p>
-            </li>
-          ))}
-        </ol>
-      )}
+    <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {tiles.map((t) => (
+        <div key={t.label} className="rounded-sm border border-border bg-surface px-3 py-2.5">
+          <p className="text-xs text-subtle">{t.label}</p>
+          <p className="mt-1 font-mono text-lg tabular-nums">{t.value}</p>
+          <p className="mt-0.5 text-[10px] text-muted">{t.hint}</p>
+        </div>
+      ))}
     </section>
   );
 }
 
-/** One invent/mill line — not a second square. */
-export function MillCaption() {
+const HEADERS = ["Hole", "Strategy", "Side", "Market", "State", "Later-race P&L"] as const;
+
+/** One row per strategy/book — hole, name, side, market, state, same-bets P&L. */
+export function OfficeBooksTable() {
   const stamp = useStamp();
-  const line = officeMillCaption({
-    fuse_on: stamp.fuse_on,
-    office: stamp.office,
-    pipe: stamp.pipe,
-    hunters: stamp.hunters,
-    mill_mode: (stamp as { mill_mode?: string }).mill_mode,
-    mill_n_armed: (stamp as { mill_n_armed?: number }).mill_n_armed,
-    n_armed: (stamp as { n_armed?: number }).n_armed,
-  });
+  const rows = officeBookRows(stamp.recipes);
 
   return (
     <section>
       <header className="mb-2 flex items-baseline justify-between gap-3 border-b border-border pb-2">
-        <h2 className="text-sm font-medium">Mill</h2>
-        <p className="text-xs text-subtle">Invent caption</p>
+        <h2 className="text-sm font-medium">Books</h2>
+        <p className="text-xs text-subtle">One row per strategy · measuring is not income</p>
       </header>
-      {line === EMPTY ? (
+      {rows.length === 0 ? (
         <EmptyState copy={EMPTY} />
       ) : (
-        <p className="text-sm text-muted">{line}</p>
-      )}
-    </section>
-  );
-}
-
-/** Off Trades tape — sparse in-play by design, not a first-book window. */
-export function SkippedOffTape() {
-  const stamp = useStamp();
-  const lines = officeTapeSkips(stamp.recipes, stamp.trades, stamp.day);
-
-  return (
-    <section>
-      <header className="mb-2 flex items-baseline justify-between gap-3 border-b border-border pb-2">
-        <h2 className="text-sm font-medium">Skipped / off tape</h2>
-        <p className="text-xs text-subtle">Not on Trades Waiting</p>
-      </header>
-      {lines.length === 0 ? (
-        <EmptyState copy={EMPTY} />
-      ) : (
-        <ul className="space-y-2">
-          {lines.map((line) => (
-            <li key={line} className="text-sm text-muted">{line}</li>
-          ))}
-        </ul>
+        <DeskScroll className="min-w-0">
+          <table className="w-full min-w-[40rem] table-fixed border-collapse text-left">
+            <colgroup>
+              <col className="w-[28%]" />
+              <col />
+              <col className="w-14" />
+              <col className="w-16" />
+              <col className="w-24" />
+              <col className="w-24" />
+            </colgroup>
+            <thead>
+              <tr className="border-b border-border">
+                {HEADERS.map((h) => (
+                  <th
+                    key={h}
+                    scope="col"
+                    className={cn(
+                      "px-2 py-2 text-[10px] font-normal tracking-wide text-subtle",
+                      h === "Later-race P&L" && "text-right",
+                    )}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.id} className="border-b border-border">
+                  <td className="px-2 py-2.5 text-sm text-muted">{row.hole}</td>
+                  <td className="px-2 py-2.5 text-sm">
+                    <Link
+                      to="/holdings/$id"
+                      params={{ id: row.holdingId }}
+                      className="transition-colors hover:text-fg"
+                    >
+                      {row.strategy}
+                    </Link>
+                  </td>
+                  <td className="px-2 py-2.5 font-mono text-xs text-subtle">{row.side}</td>
+                  <td className="px-2 py-2.5 font-mono text-xs text-subtle">{row.market}</td>
+                  <td className="px-2 py-2.5 text-xs text-muted">{row.state}</td>
+                  <td
+                    className={cn(
+                      "px-2 py-2.5 text-right font-mono text-xs tabular-nums",
+                      row.pnlTone === "empty" && "text-muted",
+                      row.pnlTone === "neutral" && "text-muted",
+                      row.pnlTone === "up" && "text-up",
+                      row.pnlTone === "down" && "text-bad",
+                    )}
+                  >
+                    {row.pnl}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </DeskScroll>
       )}
     </section>
   );
