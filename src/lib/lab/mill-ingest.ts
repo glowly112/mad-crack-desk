@@ -4,7 +4,12 @@ import { BOARD_RESET_DAY } from "./board-reset.ts";
 import { EMPTY, scrubPostResetTrendPaper } from "./desk.ts";
 import type { LiveStamp } from "./from-digest.ts";
 import type { Recipe } from "./stamp.ts";
-import { archiveTradesTape, deskSettledTapeRollup, ingestMillFills } from "./trades.ts";
+import {
+  archiveTradesTape,
+  assertDeskTapeFloorAligns,
+  deskSettledTapeRollup,
+  ingestMillFills,
+} from "./trades.ts";
 
 /** Mill-history / Hyde / quota strings that must not paint on the desk. */
 export const MILL_ARCHIVE_POISON =
@@ -52,6 +57,33 @@ function keepCountOnBoard(recipes: readonly Recipe[]): number {
   return recipes.filter((r) => r.status === "KEEP").length;
 }
 
+/**
+ * Floor Paper = Trades › Settled first-book sum. Mill stamp paper_live_day_u and
+ * factory_day_pnl_u never override the tape roll-up.
+ */
+export function sealFloorPaperFromTape(stamp: LiveStamp): LiveStamp {
+  const day = stamp.day;
+  const recipes = stamp.recipes ?? [];
+  const trades = ingestMillFills(stamp.trades ?? [], day, recipes);
+  const rollup = deskSettledTapeRollup(trades, day, recipes);
+  const trends = scrubPostResetTrendPaper(stamp.trends, trades, recipes);
+  const sealed: LiveStamp = {
+    ...stamp,
+    trades,
+    trends,
+    hero: {
+      ...stamp.hero,
+      day_u: day >= BOARD_RESET_DAY ? rollup.u : stamp.hero.day_u,
+    },
+    fuse_on: false,
+    fuse: "Real betting: OFF",
+  };
+  if (day >= BOARD_RESET_DAY) {
+    assertDeskTapeFloorAligns(trades, day, recipes, rollup.u, rollup.counts);
+  }
+  return sealed;
+}
+
 /** Oracle stamp — first-book tape, no mill freeze £, no factory history, no occupancy dumps. */
 export function scrubDeskStampArchive(stamp: LiveStamp): LiveStamp {
   const day = stamp.day;
@@ -89,25 +121,9 @@ export function scrubDeskStampArchive(stamp: LiveStamp): LiveStamp {
     status: isMillArchivePoison(k.detail) && k.id === "factory" ? ("AMBER" as const) : k.status,
   }));
 
-  const tapeU = deskSettledTapeRollup(trades, day, recipes).u;
-
-  return {
+  const sealed = sealFloorPaperFromTape({
     ...stamp,
     trades,
-    researchKeepGbp: 0,
-    fuse_on: false,
-    fuse: "Real betting: OFF",
-    hero: {
-      ...stamp.hero,
-      day_u: tapeU ?? null,
-      aim_u: 0 as typeof stamp.hero.aim_u,
-      aim_vs: "behind" as const,
-    },
-    counts: {
-      ...stamp.counts,
-      keep: nKeep,
-      certified: stamp.n_solid,
-    },
     trends,
     seats,
     kpis: kpis as unknown as LiveStamp["kpis"],
@@ -117,7 +133,19 @@ export function scrubDeskStampArchive(stamp: LiveStamp): LiveStamp {
       inventWhy: scrubMillWatchingLine(stamp.office.inventWhy ?? ""),
     },
     square_occupied_n: undefined,
-  } as LiveStamp;
+    researchKeepGbp: 0,
+    hero: {
+      ...stamp.hero,
+      aim_u: 0 as typeof stamp.hero.aim_u,
+      aim_vs: "behind" as const,
+    },
+    counts: {
+      ...stamp.counts,
+      keep: nKeep,
+      certified: stamp.n_solid,
+    },
+  } as LiveStamp);
+  return sealed;
 }
 
 function boardResetSeatHint(seatId: string): string {

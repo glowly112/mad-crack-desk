@@ -700,6 +700,21 @@ export function ingestMillFills(
   return archiveTradesTape(trades, day, recipes);
 }
 
+/**
+ * Oracle ingest — when today's desk tape already exists, poll-merge blocks mill stamp
+ * settled bloat; otherwise first-book archive only.
+ */
+export function mergeOracleTape(
+  prev: readonly Fill[],
+  incoming: readonly Fill[],
+  day: string,
+  recipes: readonly Recipe[] = [],
+): Fill[] {
+  const hasToday = prev.some((f) => f.day === day);
+  const merged = hasToday ? mergeMillTradesTape(prev, incoming, day) : incoming;
+  return ingestMillFills(merged, day, recipes);
+}
+
 /** One roll-up for Trades › Settled, Floor paper tile, Trades header, and Office. */
 export type DeskSettledTapeRollup = {
   fills: Fill[];

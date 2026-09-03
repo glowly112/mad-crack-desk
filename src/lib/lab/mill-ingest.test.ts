@@ -6,10 +6,12 @@ import {
   scrubDigestStampArchive,
   scrubMillWatchingLine,
   filterIngestMillFillRows,
+  sealFloorPaperFromTape,
 } from "./mill-ingest.ts";
 import type { LiveStamp } from "./from-digest.ts";
 import { STAMP } from "./stamp.ts";
-import { fillFromRow } from "./trades.ts";
+import { fillFromRow, deskSettledTapeRollup, mergeMillTradesTape, assertDeskTapeFloorAligns } from "./trades.ts";
+import { floorFacts } from "./desk.ts";
 
 test("mill archive poison detects aim and hyde history", () => {
   assert.ok(isMillArchivePoison("aim £100/day: -9.49u"));
@@ -137,4 +139,108 @@ test("scrub keeps first-book ehole settles on tape", () => {
     ],
   } as unknown as LiveStamp);
   assert.ok(stamp.trades.some((f) => f.horse === "Harb"));
+});
+
+test("sealFloorPaperFromTape ignores mill stamp paper_live and factory_day_pnl", () => {
+  const day = "2026-09-03";
+  const wins = Array.from({ length: 16 }, (_, i) =>
+    fillFromRow({
+      pick_id: `w-${i}`,
+      date: day,
+      cell_id: `H-ehole-gb-morning-win-${String(10000 + i)}Z`,
+      mode: "auto_dry",
+      status: "SETTLED",
+      paper_pnl_gbp: 1,
+      stake_gbp: 2,
+      placed_result: true,
+      side: "BACK",
+      ts: `2026-09-03T10:${String(i).padStart(2, "0")}:00Z`,
+    })!,
+  );
+  const losses = Array.from({ length: 46 }, (_, i) =>
+    fillFromRow({
+      pick_id: `l-${i}`,
+      date: day,
+      cell_id: `H-ehole-ie-nearoff-win-${String(20000 + i)}Z`,
+      mode: "auto_dry",
+      status: "SETTLED",
+      paper_pnl_gbp: -0.5,
+      stake_gbp: 2,
+      placed_result: false,
+      side: "BACK",
+      ts: `2026-09-03T11:${String(i).padStart(2, "0")}:00Z`,
+    })!,
+  );
+  const tape = [...wins, ...losses].filter(Boolean) as NonNullable<ReturnType<typeof fillFromRow>>[];
+  const rollup = deskSettledTapeRollup(tape, day, []);
+  assert.equal(rollup.counts?.wins, 16);
+  assert.equal(rollup.counts?.losses, 46);
+  const millBloat = Array.from({ length: 20 }, (_, i) =>
+    fillFromRow({
+      pick_id: `bloat-${i}`,
+      date: day,
+      cell_id: `H-ehole-fr-inplay-win-${String(30000 + i)}Z`,
+      mode: "auto_dry",
+      status: "SETTLED",
+      paper_pnl_gbp: -0.5,
+      stake_gbp: 2,
+      placed_result: false,
+      side: "BACK",
+      ts: `2026-09-03T09:${String(i).padStart(2, "0")}:00Z`,
+    })!,
+  ).filter(Boolean) as NonNullable<ReturnType<typeof fillFromRow>>[];
+
+  const sealed = sealFloorPaperFromTape({
+    ...STAMP,
+    day,
+    source: "oracle",
+    trades: tape,
+    trends: [
+      ...STAMP.trends.filter((t) => t.day !== day),
+      {
+        day,
+        paper_live_day_u: -18.76,
+        factory_day_pnl_u: -18.76,
+        n_solid: 0,
+        n_keep: 0,
+        n_measuring: 0,
+        n_dropped: 0,
+      },
+    ],
+    hero: { ...STAMP.hero, day_u: -18.76 },
+  } as unknown as LiveStamp);
+
+  assert.equal(sealed.hero.day_u, rollup.u);
+  assert.equal(sealed.trends.find((t) => t.day === day)?.paper_live_day_u, rollup.u);
+  assert.equal(sealed.trends.find((t) => t.day === day)?.factory_day_pnl_u, null);
+
+  const facts = floorFacts(sealed, { day, lookingBack: false }, 24);
+  const paper = facts.find((f) => f.id === "paper");
+  assert.equal(paper?.value, rollup.u);
+  assert.equal(paper?.countsLine, rollup.countsLine);
+  assertDeskTapeFloorAligns(sealed.trades, day, [], paper?.value ?? null, rollup.counts);
+
+  const afterChurn = scrubDeskStampArchive({
+    ...sealed,
+    trades: mergeMillTradesTape(tape, [...tape, ...millBloat], day),
+    trends: [
+      ...STAMP.trends.filter((t) => t.day !== day),
+      {
+        day,
+        paper_live_day_u: -18.76,
+        factory_day_pnl_u: -18.76,
+        n_solid: 0,
+        n_keep: 0,
+        n_measuring: 0,
+        n_dropped: 0,
+      },
+    ],
+    hero: { ...STAMP.hero, day_u: -18.76 },
+  } as unknown as LiveStamp);
+  const churnRollup = deskSettledTapeRollup(afterChurn.trades, day, []);
+  assert.equal(churnRollup.u, rollup.u);
+  assert.equal(churnRollup.counts?.wins, 16);
+  assert.equal(churnRollup.counts?.losses, 46);
+  const churnPaper = floorFacts(afterChurn, { day, lookingBack: false }, 24).find((f) => f.id === "paper");
+  assert.equal(churnPaper?.value, rollup.u);
 });

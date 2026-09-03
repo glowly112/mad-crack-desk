@@ -159,7 +159,7 @@ export function floorFactDayValue(
   return floorDayValue(fact, point);
 }
 
-/** Post-reset trend rows — paper_live_day_u from tape roll-up, not mill stamp. */
+/** Post-reset trend rows — paper from tape roll-up; mill factory_day_pnl never paints Floor. */
 export function scrubPostResetTrendPaper(
   trends: readonly TrendPoint[],
   trades: readonly import("./trades.ts").Fill[],
@@ -167,7 +167,11 @@ export function scrubPostResetTrendPaper(
 ): TrendPoint[] {
   return trends.map((t) => {
     if (t.day < BOARD_RESET_DAY) return t;
-    return { ...t, paper_live_day_u: deskSettledTapeRollup(trades, t.day, recipes).u };
+    return {
+      ...t,
+      paper_live_day_u: deskSettledTapeRollup(trades, t.day, recipes).u,
+      factory_day_pnl_u: null,
+    };
   });
 }
 

@@ -4,7 +4,7 @@ import { filterIngestMillFillRows, scrubMillWatchingLine } from "./mill-ingest.t
 import { cellName } from "./desk.ts";
 import { scrubPostResetTrendPaper } from "./desk.ts";
 import type { Badge, Chip, Recipe } from "./stamp.ts";
-import { parseFills, parseWaitOpen, settledPaperDayU } from "./trades.ts";
+import { mergeOracleTape, parseFills, parseWaitOpen, settledPaperDayU } from "./trades.ts";
 import { parseHole, parseWindow, parseMarket, regionFromText, millHuntCaption, squareHoleKeyAndSide, normalizeSquareHoleKey, type ParsedSquareMarket, type SquareWindow } from "./boards.ts";
 import { isSprayClassInPlayEholeFirstBook } from "./mill-display.ts";
 import { cellIsPostEpochEhole, cellIsPostEpochParkedKeep, recipeIsPostEpoch } from "./board-reset.ts";
@@ -464,7 +464,6 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
     int(scaling?.n_certified_keep);
 
   const rawFillRows = Array.isArray(snap.fills) ? filterIngestMillFillRows(snap.fills) : null;
-  const tradesParsed = rawFillRows != null ? parseFills(rawFillRows) : base.trades;
 
   let fuse_on = false;
 
@@ -484,6 +483,10 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
       : typeof snap.day === "string" && snap.day
         ? snap.day
         : base.day;
+  const tradesParsed =
+    rawFillRows != null
+      ? mergeOracleTape(base.trades, parseFills(rawFillRows), date, recipes)
+      : base.trades;
   const firstBookPaper = settledPaperDayU(tradesParsed, date, recipes);
   const generated =
     (typeof snap.generatedAt === "string" && snap.generatedAt) ||
