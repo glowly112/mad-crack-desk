@@ -82,7 +82,7 @@ test("auto_dry SETTLED maps to paper, not production or live", () => {
   assert.equal(fill.market, "WIN 3.35");
   assert.equal(fill.t, "00:07:45");
   assert.equal(fill.day, "2026-09-02");
-  assert.equal(fill.pnl, -2);
+  assert.equal(fill.pnl, -1);
   assert.equal(fill.flight, null);
 });
 
@@ -171,7 +171,7 @@ test("paper P&L is not income; live is 0 while fuse off", () => {
   const paper = fillFromRow(auWon);
   assert.ok(paper);
   const paperTape = tapePnl(paper, false);
-  assert.equal(paperTape.pnl, 2.744);
+  assert.equal(paperTape.pnl, 1.372);
   assert.equal(paperTape.caption, "not income");
   const liveFill = fillFromRow({
     pick_id: "live-2",
@@ -366,7 +366,22 @@ test("tradeCounts, stake u, and day tape Empty when no production", () => {
   assert.ok(tape.paper != null);
 });
 
-test("mill tape shows hunt arms when hops are empty", () => {
+test("mill tape shows open tickets, not recipe-only line", () => {
+  const open = fillFromRow(gbOpen)!;
+  const rows = millTapeRows({
+    day: "2026-09-02",
+    moves: [],
+    recipes: [],
+    trades: [open],
+    mill_n_armed: 56,
+    office: { inventWhy: "empty-hole hunt on · mill parked" },
+  });
+  assert.ok(rows.some((r) => /Booked/.test(r.text)));
+  assert.ok(rows.some((r) => /1 open on the mill/.test(r.text)));
+  assert.ok(!rows.some((r) => /recipe, not a ticket/i.test(r.text)));
+});
+
+test("mill tape shows hunt arms when hops are empty and no tickets", () => {
   const rows = millTapeRows({
     moves: [],
     recipes: [],
@@ -376,6 +391,7 @@ test("mill tape shows hunt arms when hops are empty", () => {
   assert.ok(rows.length >= 2);
   assert.match(rows[0].text, /empty-hole hunt/);
   assert.match(rows.at(-1)?.text ?? "", /52 armed/);
+  assert.ok(!rows.at(-1)?.text.includes("recipe, not a ticket"));
 });
 
 test("wait chips dedupe by country window market", () => {

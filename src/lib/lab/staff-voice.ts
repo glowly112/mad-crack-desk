@@ -3,7 +3,9 @@
 import { EMPTY, hopMoves, recipeBookName, bookDisplayName } from "./desk.ts";
 import { isBoardResetView } from "./board-reset.ts";
 import { bookStages, bookLabel, holeName, staffBookFacts, type StaffWatchStamp } from "./boards.ts";
+import { millActivity, fillTradeName } from "./trades.ts";
 import type { Move, Recipe, Seat } from "./stamp.ts";
+import { fmtU } from "../utils.ts";
 
 export type SeatBubble = {
   text: string;
@@ -83,7 +85,7 @@ function resetNowBubbles(seatId: string): string[] {
     case "igor":
       return ["Watching the empty square.", "Nothing on today's tape yet."];
     case "hyde":
-      return ["Nothing certified is on today's tape.", "Tweaks wait for a new hole on the square."];
+      return ["Nothing certified is on today's tape.", "Tweaks wait for the next empty cell on the square."];
     case "foreman":
       return ["Nothing certified is on today's tape.", "The board reset — we start from empty holes."];
     case "mercator":
@@ -99,8 +101,85 @@ function resetNowBubbles(seatId: string): string[] {
   }
 }
 
+function settleWord(result: string): string {
+  if (result === "won") return "won";
+  if (result === "lost") return "lost";
+  if (result === "void") return "void";
+  return "settled";
+}
+
+/** Mill tickets on the same tape as Trades — not empty-hole overlay when fills exist. */
+function millSeatLines(seatId: string, stamp: StaffWatchStamp): string[] {
+  const day = stamp.day ?? "";
+  const recipes = stamp.recipes ?? [];
+  const act = millActivity({ day, trades: stamp.trades ?? [] });
+  if (act.openCount === 0 && act.settledToday.length === 0) return [];
+
+  const lastOpenName = act.lastOpen ? fillTradeName(act.lastOpen, recipes) : "";
+  const lastSettleName = act.lastSettled ? fillTradeName(act.lastSettled, recipes) : "";
+  const openLine =
+    act.openCount > 0
+      ? `${act.openCount} open on the mill — paper only, fuse off.`
+      : "";
+  const settleLine =
+    act.lastSettled
+      ? `Last settle: ${lastSettleName} ${settleWord(act.lastSettled.result)}${act.lastSettled.pnl != null ? ` ${fmtU(act.lastSettled.pnl)}` : ""}.`
+      : "";
+  const bookLine = act.lastOpen
+    ? `Last book: ${lastOpenName} at ${act.lastOpen.t || "—"}.`
+    : "";
+  const paperLine =
+    act.paperDayU != null ? `Today's settled paper is ${fmtU(act.paperDayU)}.` : "";
+
+  switch (seatId) {
+    case "clerk":
+      return [bookLine, openLine, settleLine].filter(Boolean);
+    case "igor":
+      return [
+        act.openCount > 0 ? `Paper is booking — ${act.openCount} open tickets.` : "",
+        paperLine,
+        act.openCount > 0 ? "Scoring those runs, not inventing." : "",
+      ].filter(Boolean);
+    case "curator":
+      return act.openCount > 0 || act.settledToday.length > 0
+        ? ["Race files are in.", bookLine || settleLine || openLine].filter(Boolean)
+        : [];
+    case "virchow":
+      if (!act.lastSettled || act.lastSettled.result !== "lost") return [];
+      return [
+        `${lastSettleName} lost ${act.lastSettled.pnl != null ? fmtU(act.lastSettled.pnl) : "money"} on paper.`,
+        "That settle is that book — not a twin of an old kill.",
+      ];
+    case "hyde":
+      if (act.openCount === 0) return [];
+      return [
+        "Nothing certified is on today's tape.",
+        `Measuring books are booking — ${act.openCount} open paper tickets.`,
+      ];
+    case "foreman":
+      return [
+        act.openCount > 0
+          ? `${act.openCount} armed tickets on the mill — paper, not live.`
+          : "",
+        paperLine,
+      ].filter(Boolean);
+    case "bauron":
+    case "mercator":
+      return [];
+    default:
+      return [bookLine, openLine].filter(Boolean);
+  }
+}
+
 function nowBubbles(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchStamp): string[] {
   if (isBoardResetView(stamp)) return resetNowBubbles(seat.id);
+  const mill = millSeatLines(seat.id, stamp);
+  const tape = tapeSeatLines(seat, stamp);
+  if (mill.length) return [...mill, ...tape];
+  return tape;
+}
+
+function tapeSeatLines(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchStamp): string[] {
   const f = staffBookFacts(seat.now ?? "", stamp);
   const britain = f.tape ? speakBook(f.tape.title, f.tape) : "";
   switch (seat.id) {

@@ -1244,6 +1244,8 @@ export function issueBoard(iss: { id: string; owner: string; title: string; deta
 export type StaffWatchStamp = SquareStampSlice & {
   solids?: readonly Recipe[];
   issues?: readonly { id: string; title?: string; owner?: string }[];
+  trades?: readonly import("./trades.ts").Fill[];
+  day?: string;
 };
 
 export function bookLabel(raw: string, recipes: readonly Recipe[] = []): string {

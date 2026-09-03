@@ -2,6 +2,7 @@
 
 import type { Move, Recipe, TrendPoint } from "./stamp.ts";
 import { productionScore } from "./hero.ts";
+import { settledPaperDayU } from "./trades.ts";
 
 export const EMPTY = "Empty";
 /** Open or armed but not finished — not the same as unused. */
@@ -89,10 +90,12 @@ export type FloorFact = {
 };
 
 export type FloorStamp = {
+  day: string;
   n_solid: number;
   fuse_on: boolean;
   hero: { day_u: number | null };
   recipes: readonly Recipe[];
+  trades?: readonly import("./trades.ts").Fill[];
   wait_open?: readonly { id: string }[];
   trends: readonly TrendPoint[];
   researchKeepGbp: number;
@@ -139,13 +142,15 @@ export function floorFacts(
   emptyHoles: number,
 ): FloorFact[] {
   const trend = stamp.trends.find((t) => t.day === scope.day);
+  const tapePaper = settledPaperDayU(stamp.trades ?? [], scope.day);
   const paper = scope.lookingBack
     ? (trend?.paper_live_day_u ?? null)
-    : productionScore({
-        n_solid: stamp.n_solid,
-        day_u: stamp.hero.day_u,
-        researchKeepGbp: stamp.researchKeepGbp,
-      });
+    : (tapePaper ??
+        productionScore({
+          n_solid: stamp.n_solid,
+          day_u: stamp.hero.day_u,
+          researchKeepGbp: stamp.researchKeepGbp,
+        }));
   const production = trend?.factory_day_pnl_u ?? null;
   const dayHint = axisDay(scope.day);
   return [

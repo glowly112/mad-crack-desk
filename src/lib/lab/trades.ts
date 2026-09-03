@@ -127,6 +127,15 @@ function heroStake(row: Record<string, unknown>): number | null {
   return HERO_U;
 }
 
+/** Paper P&L in hero u — envelope stake_gbp is not the displayed unit. */
+function pnlInU(row: Record<string, unknown>): number | null {
+  const raw = num(row.paper_pnl_gbp) ?? num(row.pnl_gbp) ?? num(row.pnl);
+  if (raw == null) return null;
+  const envelope = num(row.stake_gbp) ?? num(row.paper_stake_gbp);
+  if (envelope == null || envelope <= 0) return raw;
+  return raw * (HERO_U / envelope);
+}
+
 function horseOf(row: Record<string, unknown>): string | null {
   const keys = ["horse", "runner", "horse_name", "runner_name", "selection_name", "sel_name"];
   for (const k of keys) {
@@ -151,7 +160,7 @@ export function fillFromRow(raw: unknown): Fill | null {
   if (!id && !ts && !cell) return null;
   const title = cellName(cell, String(row.title || ""), id);
   const odds = num(row.odds);
-  const pnl = num(row.paper_pnl_gbp) ?? num(row.pnl_gbp) ?? num(row.pnl);
+  const pnl = pnlInU(row);
   const day =
     (typeof row.date === "string" && row.date) ||
     (/^\d{4}-\d{2}-\d{2}/.exec(ts)?.[0] ?? "");
@@ -390,8 +399,9 @@ export function dedupeWaitChipsByHole(chips: readonly WaitOpen[]): WaitOpen[] {
 
 export type MillTapeRow = { at: string; text: string };
 
-/** State hops when present; else live hunt arms (not Empty when mill_n_armed > 0). */
+/** State hops when present; else live hunt arms or open tickets on the mill. */
 export function millTapeRows(stamp: {
+  day?: string;
   moves?: readonly Move[];
   recipes: readonly Recipe[];
   wait_open?: readonly WaitOpen[];
@@ -407,20 +417,61 @@ export function millTapeRows(stamp: {
       text: hopVoice(m) || bookDisplayName({ id: m.recipe, title: m.recipe }),
     }));
   }
-  const open = openFills(stamp.trades ?? []);
-  const chips = tradesWaitChips(stamp.recipes, stamp.wait_open ?? [], open);
-  const armed = stamp.mill_n_armed ?? stamp.n_armed ?? 0;
-  if (armed <= 0 && chips.length === 0) return [];
 
+  const day = stamp.day ?? "";
+  const act = millActivity({ day, trades: stamp.trades ?? [] });
+  const recipes = stamp.recipes ?? [];
   const rows: MillTapeRow[] = [];
   const why = stamp.office?.inventWhy?.trim() ?? "";
+
+  if (act.lastSettled) {
+    const name = fillTradeName(act.lastSettled, recipes);
+    const pnl = act.lastSettled.pnl;
+    const word =
+      act.lastSettled.result === "won"
+        ? "won"
+        : act.lastSettled.result === "lost"
+          ? "lost"
+          : "settled";
+    const pnlBit = pnl != null ? ` ${pnl >= 0 ? "+" : "−"}${Math.abs(pnl).toFixed(2)}u` : "";
+    rows.push({
+      at: act.lastSettled.t || bookedClock(act.lastSettled.ts),
+      text: `Settled ${name} · ${word}${pnlBit} · paper`,
+    });
+  }
+
+  if (act.lastOpen) {
+    rows.push({
+      at: act.lastOpen.t || bookedClock(act.lastOpen.ts),
+      text: `Booked ${fillTradeName(act.lastOpen, recipes)} · paper`,
+    });
+  }
+
+  if (act.openCount > 0) {
+    rows.push({
+      at: "",
+      text: `${act.openCount} open on the mill · paper only · fuse off`,
+    });
+    if (act.paperDayU != null) {
+      rows.push({
+        at: "",
+        text: `Today's settled paper ${act.paperDayU >= 0 ? "+" : "−"}${Math.abs(act.paperDayU).toFixed(2)}u`,
+      });
+    }
+    return rows;
+  }
+
+  const chips = tradesWaitChips(stamp.recipes, stamp.wait_open ?? [], act.open);
+  const armed = stamp.mill_n_armed ?? stamp.n_armed ?? 0;
+  if (armed <= 0 && chips.length === 0) return rows;
+
   if (/empty-hole hunt|invent_empty|mill parked/i.test(why)) {
     rows.push({ at: "", text: why });
   }
   const n = armed > 0 ? armed : chips.length;
   rows.push({
     at: "",
-    text: `${n} armed on the mill · waiting for races (recipe, not a ticket).`,
+    text: `${n} armed on the mill · waiting for races.`,
   });
   return rows;
 }
@@ -435,6 +486,49 @@ export function openFills(fills: readonly Fill[]): Fill[] {
 
 export function settledFills(fills: readonly Fill[]): Fill[] {
   return fills.filter((f) => f.result !== "waiting");
+}
+
+export type MillActivity = {
+  open: Fill[];
+  settledToday: Fill[];
+  lastOpen: Fill | null;
+  lastSettled: Fill | null;
+  paperDayU: number | null;
+  openCount: number;
+};
+
+/** Live mill tape from today's fills — same book as Trades. */
+export function millActivity(stamp: { day: string; trades?: readonly Fill[] }): MillActivity {
+  const dayFills = fillsOnDay(stamp.trades ?? [], stamp.day);
+  const open = openFills(dayFills);
+  const settled = settledFills(dayFills);
+  const paperSettled = settled.filter((f) => f.book === "paper");
+  const paperDayU = paperSettled.length
+    ? paperSettled.reduce((acc, f) => acc + (f.pnl ?? 0), 0)
+    : null;
+  return {
+    open,
+    settledToday: settled,
+    lastOpen: open[0] ?? null,
+    lastSettled: settled[0] ?? null,
+    paperDayU,
+    openCount: open.length,
+  };
+}
+
+/** Settled paper u for one day — Floor tile matches Trades headline. */
+export function settledPaperDayU(trades: readonly Fill[], day: string): number | null {
+  const paper = settledFills(fillsOnDay(trades, day)).filter((f) => f.book === "paper");
+  if (!paper.length) return null;
+  return paper.reduce((acc, f) => acc + (f.pnl ?? 0), 0);
+}
+
+export function recipeForFill(recipes: readonly Recipe[], fill: Fill): Recipe | undefined {
+  return recipes.find((r) => r.id === fill.recipeId);
+}
+
+export function fillTradeName(fill: Fill, recipes: readonly Recipe[] = []): string {
+  return tradeName(fill, recipeForFill(recipes, fill));
 }
 
 /** Day's tape totals. Paper/production Empty when that book has no fills. Live is 0 while fuse off. */

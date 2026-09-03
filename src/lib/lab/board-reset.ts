@@ -4,6 +4,7 @@ import { parseMarket, parseWindow } from "./boards.ts";
 import { EMPTY } from "./desk.ts";
 import type { LiveStamp } from "./from-digest.ts";
 import type { Fill } from "./trades.ts";
+import { openFills, settledPaperDayU } from "./trades.ts";
 import type { Recipe } from "./stamp.ts";
 
 export const BOARD_RESET_EPOCH = "20260902T101756Z";
@@ -188,20 +189,23 @@ export function isBoardResetView(stamp: {
   holes?: readonly unknown[];
   mill_n_armed?: number;
   n_armed?: number;
+  day?: string;
 }): boolean {
   if (hasLivePlantArms(stamp as LiveStamp)) return false;
   const recipes = (stamp.recipes ?? []) as Recipe[];
   const trades = (stamp.trades ?? []) as Fill[];
   const postRecipes = recipes.filter(recipeIsPostEpoch);
   const postTrades = trades.filter(fillIsPostEpoch);
+  if (postTrades.length > 0 || openFills(postTrades).length > 0) return false;
+  const day = stamp.day ?? "";
+  if (day && settledPaperDayU(postTrades, day) != null) return false;
   return (
     countArmed({
       recipes: postRecipes,
       wait_open: stamp.wait_open as { id: string }[] | undefined,
       mill_n_armed: stamp.mill_n_armed,
       n_armed: stamp.n_armed,
-    }) === 0 &&
-    postTrades.length === 0
+    }) === 0
   );
 }
 
@@ -310,21 +314,45 @@ function boardResetSeatNow(seatId: string): string {
  * Hide pre-epoch leftovers. When the plant has post-reset arms, serve live facts.
  * When n_armed is zero, paint the empty morning board.
  */
+function overlayPaperTape(stamp: LiveStamp): LiveStamp {
+  const paperU = settledPaperDayU(stamp.trades, stamp.day);
+  if (paperU == null) return stamp;
+  const trends = stamp.trends.some((t) => t.day === stamp.day)
+    ? stamp.trends.map((t) => (t.day === stamp.day ? { ...t, paper_live_day_u: paperU } : t))
+    : [
+        ...stamp.trends,
+        {
+          day: stamp.day,
+          paper_live_day_u: paperU,
+          factory_day_pnl_u: null,
+          n_solid: stamp.n_solid,
+          n_keep: stamp.counts.keep,
+          n_measuring: stamp.counts.measuring,
+          n_dropped: stamp.counts.kill,
+        },
+      ];
+  return {
+    ...stamp,
+    hero: { ...stamp.hero, day_u: paperU },
+    trends,
+  };
+}
+
 export function applyBoardResetView(stamp: LiveStamp): LiveStamp {
   const filtered = filterPreEpochLeftovers(stamp);
   if (hasLivePlantArms(filtered)) {
-    return {
+    return overlayPaperTape({
       ...filtered,
       fuse_on: false,
       fuse: "Real betting: OFF",
-    };
+    });
   }
   if (!isBoardResetView(filtered)) {
-    return {
+    return overlayPaperTape({
       ...filtered,
       fuse_on: false,
       fuse: filtered.fuse_on ? "Real betting: ON" : "Real betting: OFF",
-    };
+    });
   }
   return applyEmptyBoardOverlay(filtered);
 }
