@@ -333,6 +333,9 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
     base.generated;
 
   const plantOracle = isPlantSnap(opened);
+  const inventCaption = plantOracle ? inventCaptionFromSnap(snap) : null;
+  const inventWhy = inventCaption ?? base.office.inventWhy;
+  const inventOn = inventCaption ? inventIsOn(inventCaption) : base.office.invent;
 
   const trends = base.trends.map((t) => {
     if (t.day !== date) return t;
@@ -356,6 +359,8 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
     n_solid,
     fuse_on,
     fuse: fuse_on ? "Real betting: ON" : "Real betting: OFF",
+    plantHealth: plantOracle ? plantHealthFromSnap(snap, base) : base.plantHealth,
+    plantLine: inventCaption ? plantLineFromInvent(inventCaption) : base.plantLine,
     researchKeepGbp,
     hero: {
       ...base.hero,
@@ -390,6 +395,8 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
       : holesFromSnap(snap) ?? (namedHoles.length ? namedHoles : base.holes),
     office: {
       ...base.office,
+      invent: inventOn,
+      inventWhy,
       rejects: rejectsFromSnap(snap) ?? base.office.rejects,
     },
   } as LiveStamp;
@@ -422,7 +429,9 @@ function rejectsFromSnap(snap: Record<string, unknown>): string[] | null {
 }
 
 function overlaySeats(base: LiveStamp["seats"], snap: Record<string, unknown>): LiveStamp["seats"] {
-  const rows = Array.isArray(snap.seats) ? snap.seats : [];
+  const seatRows = Array.isArray(snap.seats) ? snap.seats : [];
+  const staffRows = Array.isArray(snap.staff) ? snap.staff : [];
+  const rows = seatRows.length ? seatRows : staffRows;
   if (!rows.length) return base;
   return base.map((seat) => {
     const row = rows.find((s) => {
@@ -441,4 +450,54 @@ function overlaySeats(base: LiveStamp["seats"], snap: Record<string, unknown>): 
       now,
     };
   });
+}
+
+/** Live oracle plant_digest / snapshot invent — never keep bundled digest.json densify caption. */
+function inventCaptionFromSnap(snap: Record<string, unknown>): string | null {
+  const inventRec = rec(snap.invent);
+  const fromString =
+    typeof snap.invent === "string" && snap.invent.trim() ? snap.invent.trim() : null;
+  const board = rec(snap.board);
+  const boardInvent =
+    typeof board?.invent === "string" && board.invent.trim() ? board.invent.trim() : null;
+  const fromRec =
+    typeof inventRec?.line === "string" && inventRec.line.trim()
+      ? inventRec.line.trim()
+      : typeof inventRec?.caption === "string" && inventRec.caption.trim()
+        ? inventRec.caption.trim()
+        : null;
+
+  if (fromString) return fromString;
+  if (boardInvent) return boardInvent;
+  if (fromRec) return fromRec;
+
+  const fromMode =
+    typeof snap.invent_mode === "string" && snap.invent_mode.trim() ? snap.invent_mode.trim() : null;
+  if (fromMode) return fromMode.replace(/_/g, " ");
+
+  const staff = Array.isArray(snap.staff) ? snap.staff : [];
+  for (const row of staff) {
+    const r = rec(row);
+    if (!r || String(r.seat).toLowerCase() !== "bauron") continue;
+    const w = typeof r.watching === "string" ? r.watching.trim() : "";
+    if (w) return w;
+  }
+  return null;
+}
+
+function inventIsOn(caption: string): boolean {
+  return /invent on|empty-hole hunt on|invent_empty/i.test(caption);
+}
+
+function plantLineFromInvent(caption: string): string {
+  return inventIsOn(caption) ? `Invent ${caption}` : caption;
+}
+
+function plantHealthFromSnap(snap: Record<string, unknown>, base: LiveStamp): LiveStamp["plantHealth"] {
+  const board = rec(snap.board);
+  const ops = board?.ops ?? snap.ops ?? snap.plant_health ?? snap.plantHealth;
+  if (typeof ops === "string" && /^(GREEN|AMBER|RED)$/i.test(ops)) {
+    return ops.toUpperCase() as LiveStamp["plantHealth"];
+  }
+  return base.plantHealth;
 }

@@ -265,3 +265,22 @@ test("plant live snapshot is oracle empty board when day_u is null", () => {
   assert.equal(live.trades.length, 0);
   assert.equal(live.wait_open?.length ?? 0, 0);
 });
+
+test("oracle snapshot invent replaces bundled digest densify plantLine", () => {
+  const live = applySnapshot(
+    {
+      truth: { keep: 1, measuring: 54, gathering: 6, dropped: 4 },
+      summary: { by_status: { KEEP: 1, MEASURING: 54, HUNTING: 6, KILL: 4 } },
+      invent: "empty-hole hunt on · invent_empty_holes · mill parked",
+      invent_mode: "invent_empty_holes",
+      ts: "20260903T013706Z",
+      cells: [],
+    },
+    base(),
+  );
+  assert.match(live.plantLine, /empty-hole hunt/);
+  assert.match(live.plantLine, /mill parked/);
+  assert.ok(!/densify/i.test(live.plantLine));
+  assert.match(live.office.inventWhy, /invent_empty_holes/);
+  assert.equal(live.office.invent, true);
+});
