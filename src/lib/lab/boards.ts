@@ -946,8 +946,10 @@ function healthKnown(k: { id: string; label: string; detail: string; status: str
       return {
         id: k.id,
         group: groupOf(k.status),
-        sentence: /on|densify/i.test(d) ? "Invent is running." : "Invent is paused.",
-        why: "New ideas are still being found.",
+        sentence: /on|empty-hole hunt|invent_empty/i.test(d) ? "Invent is running." : "Invent is paused.",
+        why: /empty-hole hunt|invent_empty/i.test(d)
+          ? "Empty-hole hunt is on the mill."
+          : "New ideas are still being found.",
       };
     case "doer":
       return {
@@ -1141,7 +1143,9 @@ export function staffBookFacts(seatNow: string, stamp: StaffWatchStamp) {
             const q = /(?:next hole|queue)\s+([A-Za-z0-9_|-]+)/i.exec(blob);
             return q ? holeName(q[1]) : EMPTY;
           })();
-  const densify = /\bdensify\b/i.test(blob);
+  const inventWhy = stamp.office?.inventWhy ?? "";
+  const densify =
+    /\bdensify\b/i.test(inventWhy) && !/empty-hole hunt|invent_empty/i.test(inventWhy);
   const holdId = firstRecipeId(seatNow);
   const holdBook = holdId ? bookLabel(holdId, recipes) : "";
   const tapeName = tape ? strategyMark(tape.title, tape.id) : "";
@@ -1259,6 +1263,9 @@ export function staffLine(now: string): string {
   s = s.replace(/PAPER_ONLY/gi, "Paper only");
   s = s.replace(/fuse off/gi, "Fuse off");
   s = s.replace(/invent on/gi, "Invent is on");
+  s = s.replace(/empty-hole hunt on/gi, "Empty-hole hunt is on");
+  s = s.replace(/invent_empty_holes/gi, "empty-hole hunt");
+  s = s.replace(/mill parked/gi, "mill parked");
   s = s.replace(/invent\s*\([^)]*\)/gi, "");
   s = s.replace(/\bdensify\b/gi, "");
   s = s.replace(/hunter\s+(\w+)/gi, (_, n) => hunterName(String(n).toLowerCase()));

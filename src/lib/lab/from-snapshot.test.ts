@@ -289,6 +289,34 @@ test("oracle snapshot invent replaces bundled digest densify plantLine", () => {
   assert.equal((live as LiveStamp & { mill_n_armed?: number }).mill_n_armed, 23);
 });
 
+test("oracle snapshot invent overlays staff seats and Invent fire KPI without densify", () => {
+  const snap = {
+    truth: { keep: 1, measuring: 54, gathering: 6, dropped: 4 },
+    invent: "empty-hole hunt on · invent_empty_holes · mill parked",
+    invent_mode: "invent_empty_holes",
+    mill_mode: "parked",
+    staff: [
+      {
+        seat: "Bauron",
+        status: "GREEN",
+        watching: "invent on · invent (densify) · hunter Geo · proving=21 · passed=4188",
+      },
+    ],
+    ts: "20260903T013706Z",
+    cells: [],
+  };
+  const live = applySnapshot(snap, base());
+  const bauron = live.seats.find((s) => s.id === "bauron");
+  assert.ok(bauron);
+  assert.match(bauron!.now, /empty-hole hunt/);
+  assert.match(bauron!.now, /mill parked/);
+  assert.ok(!/densify/i.test(bauron!.now));
+  const inventKpi = live.kpis.find((k) => k.id === "invent");
+  assert.ok(inventKpi);
+  assert.match(inventKpi!.detail, /empty-hole hunt/);
+  assert.ok(!/densify/i.test(inventKpi!.detail));
+});
+
 test("mill parked uses occupancy_post_epoch holes and invent n_armed not all measuring cells", () => {
   const live = applySnapshot(
     {

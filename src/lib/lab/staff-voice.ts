@@ -104,9 +104,19 @@ function nowBubbles(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchStamp): str
   const britain = f.tape ? speakBook(f.tape.title) : "";
   switch (seat.id) {
     case "bauron": {
+      const inventWhy = stamp.office?.inventWhy ?? "";
+      const emptyHoleHunt = /empty-hole hunt|invent_empty/i.test(inventWhy);
       const look = f.inventCell !== EMPTY ? speakLook(f.inventCell) : "";
       const idea = f.inventCell !== EMPTY ? speakBook(f.inventCell) : "";
       if (!look && !f.densify && !stamp.office?.invent) return [];
+      if (emptyHoleHunt && !idea) {
+        return [
+          "Invent is on.",
+          /mill parked/i.test(inventWhy)
+            ? "We are hunting empty holes — mill parked."
+            : "We are hunting empty holes, not densifying the tape.",
+        ];
+      }
       return [
         idea ? `I'm writing ${idea}.` : stamp.office?.invent ? "I'm writing a new winner idea." : "",
         f.densify ? "New market, not a patch on Britain." : "",

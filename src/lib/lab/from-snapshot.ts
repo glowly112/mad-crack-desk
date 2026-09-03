@@ -468,7 +468,8 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
     },
     recipes: plantOracle ? recipes : recipes.length ? recipes : base.recipes,
     solids: plantOracle ? solids : recipes.length ? solids : n_solid > 0 ? base.solids : [],
-    seats: overlaySeats(base.seats, snap),
+    seats: overlaySeats(base.seats, snap, inventCaption),
+    kpis: overlayKpis(base.kpis, inventCaption, inventOn),
     trends,
     trades: Array.isArray(snap.fills) ? parseFills(snap.fills) : base.trades,
     wait_open: Array.isArray(snap.wait_open) ? parseWaitOpen(snap.wait_open) : (base.wait_open ?? []),
@@ -512,11 +513,24 @@ function rejectsFromSnap(snap: Record<string, unknown>): string[] | null {
   return out.length ? out : null;
 }
 
-function overlaySeats(base: LiveStamp["seats"], snap: Record<string, unknown>): LiveStamp["seats"] {
+const INVENT_SEAT_IDS = new Set(["bauron", "mercator", "foreman"]);
+
+function overlaySeats(
+  base: LiveStamp["seats"],
+  snap: Record<string, unknown>,
+  inventCaption: string | null,
+): LiveStamp["seats"] {
   const seatRows = Array.isArray(snap.seats) ? snap.seats : [];
   const staffRows = Array.isArray(snap.staff) ? snap.staff : [];
   const rows = seatRows.length ? seatRows : staffRows;
-  if (!rows.length) return base;
+  if (!rows.length) {
+    if (!inventCaption) return base;
+    return base.map((seat) =>
+      INVENT_SEAT_IDS.has(seat.id)
+        ? { ...seat, now: overlaySeatNow(seat.id, seat.now, inventCaption) }
+        : seat,
+    );
+  }
   return base.map((seat) => {
     const row = rows.find((s) => {
       const recs = rec(s);
@@ -525,15 +539,63 @@ function overlaySeats(base: LiveStamp["seats"], snap: Record<string, unknown>): 
       return seatKey(name) === seat.id;
     });
     const r = rec(row);
-    if (!r) return seat;
+    if (!r) {
+      return INVENT_SEAT_IDS.has(seat.id) && inventCaption
+        ? { ...seat, now: overlaySeatNow(seat.id, seat.now, inventCaption) }
+        : seat;
+    }
     const status = String(r.status || seat.status);
-    const now = typeof r.watching === "string" && r.watching ? r.watching : seat.now;
+    const rawNow = typeof r.watching === "string" && r.watching ? r.watching : seat.now;
+    const now = overlaySeatNow(seat.id, rawNow, inventCaption);
     return {
       ...seat,
       status: (status as LiveStamp["seats"][number]["status"]) || seat.status,
       now,
     };
   });
+}
+
+/** Invent seats: live oracle invent_mode wins over stale plant_digest densify watching. */
+function overlaySeatNow(seatId: string, watching: string, inventCaption: string | null): string {
+  if (!inventCaption || !INVENT_SEAT_IDS.has(seatId)) return watching;
+  const staleDensify = /\bdensify\b/i.test(watching) || /invent\s*\(densify\)/i.test(watching);
+  const liveHunt = /empty-hole hunt|invent_empty/i.test(inventCaption);
+  if (!staleDensify && !liveHunt) return watching;
+  if (!staleDensify && liveHunt && !/empty-hole hunt|invent_empty/i.test(watching)) {
+    const tail = stripStaleInventTokens(watching);
+    return tail ? `${inventCaption} · ${tail}` : inventCaption;
+  }
+  if (staleDensify || liveHunt) {
+    const tail = stripStaleInventTokens(watching);
+    return tail ? `${inventCaption} · ${tail}` : inventCaption;
+  }
+  return watching;
+}
+
+function stripStaleInventTokens(s: string): string {
+  return s
+    .replace(/\binvent on\b/gi, "")
+    .replace(/invent\s*\([^)]*\)/gi, "")
+    .replace(/\bdensify\b/gi, "")
+    .replace(/^[\s·—]+|[\s·—]+$/g, "")
+    .replace(/\s*·\s*/g, " · ")
+    .trim();
+}
+
+function overlayKpis<T extends LiveStamp["kpis"]>(
+  base: T,
+  inventCaption: string | null,
+  inventOn: boolean,
+): T {
+  if (!inventCaption) return base;
+  return base.map((k) => {
+    if (k.id !== "invent") return k;
+    return {
+      ...k,
+      detail: inventCaption,
+      status: inventOn ? (k.status === "RED" ? k.status : "GREEN") : k.status,
+    };
+  }) as unknown as T;
 }
 
 /** Live oracle plant_digest / snapshot invent — never keep bundled digest.json densify caption. */
