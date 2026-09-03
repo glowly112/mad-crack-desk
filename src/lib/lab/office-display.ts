@@ -17,8 +17,8 @@ import type { Fill, SettledTradeCounts } from "./trades.ts";
 import {
   fmtWinLoseCounts,
   firstBookPaperSettledFills,
+  firstBookProductionSettledFills,
   fillsOnDay,
-  settledProductionCountsForRecipeIds,
   settledTradeCountsFromFills,
 } from "./trades.ts";
 import type { Recipe } from "./stamp.ts";
@@ -58,7 +58,19 @@ export type OfficeBookInput = {
   trades?: readonly Fill[];
   n_keep?: number;
   paperTotals?: ReadonlyMap<string, number>;
+  paperCounts?: ReadonlyMap<string, SettledTradeCounts | null>;
+  productionCounts?: ReadonlyMap<string, SettledTradeCounts | null>;
 };
+
+/** Recipe id → Office row id for paper/production roll-up (twin skins). */
+function officeRowByRecipeId(recipes: readonly Recipe[]): Map<string, string> {
+  const rows = officeBookRecipes(recipes);
+  const out = new Map<string, string>();
+  for (const row of rows) {
+    for (const id of millPaperRecipeIds(row, recipes)) out.set(id, row.id);
+  }
+  return out;
+}
 
 function officeBookState(recipe: Recipe): OfficeBookState | null {
   if (recipe.status === "KILL" || recipe.badge === "Dead") return "killed";
@@ -136,44 +148,48 @@ function paperPnlCell(
   };
 }
 
+function rollFillsToOfficeRows(
+  fills: readonly Fill[],
+  rowByRecipe: ReadonlyMap<string, string>,
+): { totals: Map<string, number>; counts: Map<string, SettledTradeCounts | null> } {
+  const totals = new Map<string, number>();
+  const buckets = new Map<string, Fill[]>();
+  const seen = new Set<string>();
+  for (const fill of fills) {
+    if (seen.has(fill.id)) continue;
+    const rowId = rowByRecipe.get(fill.recipeId);
+    if (!rowId) continue;
+    seen.add(fill.id);
+    totals.set(rowId, (totals.get(rowId) ?? 0) + (fill.pnl ?? 0));
+    const list = buckets.get(rowId) ?? [];
+    list.push(fill);
+    buckets.set(rowId, list);
+  }
+  const counts = new Map<string, SettledTradeCounts | null>();
+  for (const [rowId, list] of buckets) counts.set(rowId, settledTradeCountsFromFills(list));
+  return { totals, counts };
+}
+
 /** One fill → one Office row; twins roll to the displayed skin. */
 export function officePaperTotals(input: OfficeBookInput): Map<string, number> {
   const trades = input.trades ?? [];
   const fills = firstBookPaperSettledFills(fillsOnDay(trades, input.day), input.recipes);
-  const rows = officeBookRecipes(input.recipes);
-  const totals = new Map<string, number>();
-  const seen = new Set<string>();
-  for (const fill of fills) {
-    if (seen.has(fill.id)) continue;
-    const row = rows.find((r) => millPaperRecipeIds(r, input.recipes).has(fill.recipeId));
-    if (!row) continue;
-    seen.add(fill.id);
-    totals.set(row.id, (totals.get(row.id) ?? 0) + (fill.pnl ?? 0));
-  }
-  return totals;
+  const rowByRecipe = officeRowByRecipeId(input.recipes);
+  return rollFillsToOfficeRows(fills, rowByRecipe).totals;
 }
 
 /** One fill → one Office row; twins roll to the displayed skin. */
 export function officePaperCounts(input: OfficeBookInput): Map<string, SettledTradeCounts | null> {
   const trades = input.trades ?? [];
   const fills = firstBookPaperSettledFills(fillsOnDay(trades, input.day), input.recipes);
-  const rows = officeBookRecipes(input.recipes);
-  const counts = new Map<string, SettledTradeCounts | null>();
-  const buckets = new Map<string, Fill[]>();
-  const seen = new Set<string>();
-  for (const fill of fills) {
-    if (seen.has(fill.id)) continue;
-    const row = rows.find((r) => millPaperRecipeIds(r, input.recipes).has(fill.recipeId));
-    if (!row) continue;
-    seen.add(fill.id);
-    const list = buckets.get(row.id) ?? [];
-    list.push(fill);
-    buckets.set(row.id, list);
-  }
-  for (const [rowId, list] of buckets) {
-    counts.set(rowId, settledTradeCountsFromFills(list));
-  }
-  return counts;
+  const rowByRecipe = officeRowByRecipeId(input.recipes);
+  return rollFillsToOfficeRows(fills, rowByRecipe).counts;
+}
+
+function officeProductionCounts(input: OfficeBookInput): Map<string, SettledTradeCounts | null> {
+  const trades = input.trades ?? [];
+  const fills = firstBookProductionSettledFills(fillsOnDay(trades, input.day), input.recipes);
+  return rollFillsToOfficeRows(fills, officeRowByRecipeId(input.recipes)).counts;
 }
 
 function officePnlCells(
@@ -192,16 +208,10 @@ function officePnlCells(
   | "laterRacePnlTone"
 > {
   const paperTotals = input.paperTotals ?? officePaperTotals(input);
-  const paperCountMap = officePaperCounts(input);
+  const paperCountMap = input.paperCounts ?? officePaperCounts(input);
+  const productionCountMap = input.productionCounts ?? officeProductionCounts(input);
   const paper = paperPnlCell(recipe, paperTotals, paperCountMap);
-  const recipeIds = millPaperRecipeIds(recipe, input.recipes);
-  const trades = input.trades ?? [];
-  const prodCountRaw = settledProductionCountsForRecipeIds(
-    trades,
-    input.day,
-    recipeIds,
-    input.recipes,
-  );
+  const prodCountRaw = productionCountMap.get(recipe.id) ?? null;
   const nKeep = input.n_keep ?? 0;
   const periods = bookPeriods(recipe);
   const freeze = Number.isFinite(recipe.freezePnl) ? recipe.freezePnl : null;
@@ -269,11 +279,26 @@ export function officeBookRecipes(recipes: readonly Recipe[]): Recipe[] {
 
 export function officeBookRows(input: OfficeBookInput): OfficeBookRow[] {
   const recipes = input.recipes;
-  const paperTotals = officePaperTotals(input);
-  const withTotals: OfficeBookInput = { ...input, paperTotals };
+  const rowByRecipe = officeRowByRecipeId(recipes);
+  const dayFills = fillsOnDay(input.trades ?? [], input.day);
+  const paperRollup = rollFillsToOfficeRows(
+    firstBookPaperSettledFills(dayFills, recipes),
+    rowByRecipe,
+  );
+  const paperTotals = input.paperTotals ?? paperRollup.totals;
+  const paperCounts = input.paperCounts ?? paperRollup.counts;
+  const productionCounts =
+    input.productionCounts ??
+    rollFillsToOfficeRows(firstBookProductionSettledFills(dayFills, recipes), rowByRecipe).counts;
+  const withRollups: OfficeBookInput = {
+    ...input,
+    paperTotals,
+    paperCounts,
+    productionCounts,
+  };
   return officeBookRecipes(recipes).map((recipe) => {
     const state = officeBookState(recipe)!;
-    const pnl = officePnlCells(recipe, state, withTotals);
+    const pnl = officePnlCells(recipe, state, withRollups);
     return {
       id: recipe.id,
       hole: officeHoleLabel(recipe),

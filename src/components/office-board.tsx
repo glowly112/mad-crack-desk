@@ -1,3 +1,4 @@
+import { memo, useMemo } from "react";
 import { Link } from "@tanstack/react-router";
 import { DeskScroll } from "@/components/desk-scroll";
 import { EmptyState } from "@/components/empty-state";
@@ -6,6 +7,7 @@ import { EMPTY } from "@/lib/lab/desk";
 import {
   officeBookCounts,
   officeBookRows,
+  type OfficeBookRow,
   type OfficePnlTone,
 } from "@/lib/lab/office-display";
 import { cn } from "@/lib/utils";
@@ -21,10 +23,27 @@ function officeInput(stamp: ReturnType<typeof useStamp>) {
   };
 }
 
+function useOfficeDesk() {
+  const stamp = useStamp();
+  const trend = stamp.trends.find((t) => t.day === stamp.day);
+  return useMemo(() => {
+    const rows = officeBookRows(officeInput(stamp));
+    const counts = officeBookCounts(rows, stamp.fuse_on, stamp.pipe.scaling);
+    return { rows, counts };
+  }, [
+    stamp.generated,
+    stamp.day,
+    stamp.fuse_on,
+    stamp.pipe.scaling,
+    stamp.recipes,
+    stamp.trades,
+    trend?.n_keep,
+  ]);
+}
+
 export function OfficeCounts() {
   const stamp = useStamp();
-  const rows = officeBookRows(officeInput(stamp));
-  const counts = officeBookCounts(rows, stamp.fuse_on, stamp.pipe.scaling);
+  const { counts } = useOfficeDesk();
 
   const tiles = [
     { label: "Strategies", value: String(counts.strategies), hint: "First-book skins" },
@@ -86,10 +105,32 @@ function PnlCell({
   );
 }
 
+const OfficeBookTableRow = memo(function OfficeBookTableRow({ row }: { row: OfficeBookRow }) {
+  return (
+    <tr className="border-b border-border">
+      <td className="px-2 py-2.5 text-sm text-muted">{row.hole}</td>
+      <td className="px-2 py-2.5 text-sm">
+        <Link
+          to="/holdings/$id"
+          params={{ id: row.holdingId }}
+          className="transition-colors hover:text-fg"
+        >
+          {row.strategy}
+        </Link>
+      </td>
+      <td className="px-2 py-2.5 font-mono text-xs text-subtle">{row.side}</td>
+      <td className="px-2 py-2.5 font-mono text-xs text-subtle">{row.market}</td>
+      <td className="px-2 py-2.5 text-xs text-muted">{row.state}</td>
+      <PnlCell pnl={row.paperPnl} tone={row.paperPnlTone} counts={row.paperCounts} />
+      <PnlCell pnl={row.productionPnl} tone={row.productionPnlTone} counts={row.productionCounts} />
+      <td className={pnlClass(row.laterRacePnlTone)}>{row.laterRacePnl}</td>
+    </tr>
+  );
+});
+
 /** One row per strategy/book — hole, name, side, market, state, paper / production / later-race P&L. */
 export function OfficeBooksTable() {
-  const stamp = useStamp();
-  const rows = officeBookRows(officeInput(stamp));
+  const { rows } = useOfficeDesk();
 
   return (
     <section>
@@ -100,7 +141,7 @@ export function OfficeBooksTable() {
       {rows.length === 0 ? (
         <EmptyState copy={EMPTY} />
       ) : (
-        <DeskScroll className="min-w-0">
+        <DeskScroll axis="y" className="min-w-0 max-h-[min(70vh,42rem)]">
           <table className="w-full min-w-[52rem] table-fixed border-collapse text-left">
             <colgroup>
               <col className="w-[22%]" />
@@ -112,7 +153,7 @@ export function OfficeBooksTable() {
               <col className="w-[4.5rem]" />
               <col className="w-[4.5rem]" />
             </colgroup>
-            <thead>
+            <thead className="sticky top-0 z-[1] bg-bg">
               <tr className="border-b border-border">
                 {HEADERS.map((h) => (
                   <th
@@ -129,30 +170,7 @@ export function OfficeBooksTable() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
-                <tr key={row.id} className="border-b border-border">
-                  <td className="px-2 py-2.5 text-sm text-muted">{row.hole}</td>
-                  <td className="px-2 py-2.5 text-sm">
-                    <Link
-                      to="/holdings/$id"
-                      params={{ id: row.holdingId }}
-                      className="transition-colors hover:text-fg"
-                    >
-                      {row.strategy}
-                    </Link>
-                  </td>
-                  <td className="px-2 py-2.5 font-mono text-xs text-subtle">{row.side}</td>
-                  <td className="px-2 py-2.5 font-mono text-xs text-subtle">{row.market}</td>
-                  <td className="px-2 py-2.5 text-xs text-muted">{row.state}</td>
-                  <PnlCell pnl={row.paperPnl} tone={row.paperPnlTone} counts={row.paperCounts} />
-                  <PnlCell
-                    pnl={row.productionPnl}
-                    tone={row.productionPnlTone}
-                    counts={row.productionCounts}
-                  />
-                  <td className={pnlClass(row.laterRacePnlTone)}>{row.laterRacePnl}</td>
-                </tr>
-              ))}
+              {rows.map((row) => <OfficeBookTableRow key={row.id} row={row} />)}
             </tbody>
           </table>
         </DeskScroll>
