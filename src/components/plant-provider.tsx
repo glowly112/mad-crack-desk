@@ -21,7 +21,7 @@ export function PlantProvider({
           if (on) setState({ stamp: p.stamp, source: p.source, detail: p.detail });
         })
         .catch(() => {
-          if (on) setState(boot);
+          if (on && !initial) setState(boot);
         });
     };
     pull();

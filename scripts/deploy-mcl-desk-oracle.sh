@@ -1,0 +1,66 @@
+#!/bin/bash
+# Build and hot-swap Mad Crack Lab desk on Oracle (8791). Display only.
+set -eu
+cd "$(dirname "$0")/../"
+HOST="${ORACLE_SSH_HOST:-ubuntu@140.238.126.80}"
+KEY="${MULTIBOT_SSH_ORACLE_HRBOT_KEY:-}"
+SSH_OPTS=(-o BatchMode=yes -o StrictHostKeyChecking=accept-new)
+if [ -n "$KEY" ] && echo "$KEY" | grep -q "BEGIN OPENSSH PRIVATE KEY"; then
+  KF=$(mktemp)
+  printf '%s\n' "$KEY" >"$KF"
+  chmod 600 "$KF"
+  SSH_OPTS+=(-i "$KF")
+fi
+
+export VITE_DESK_BASEPATH=/desk
+export DESK_BASEPATH=/desk
+export NITRO_PRESET=node-server
+npm run build
+
+tar czf /tmp/mcl-desk-out.tar.gz .output
+scp "${SSH_OPTS[@]}" /tmp/mcl-desk-out.tar.gz "$HOST:~/mcl-desk/mcl-desk-out.tar.gz"
+
+ssh "${SSH_OPTS[@]}" "$HOST" 'set -eu
+APP="$HOME/mcl-desk"
+ROOT="${BBB_ROOT:-$HOME/bbb}"
+mkdir -p "$APP" "$ROOT/logs"
+cat >"$APP/desk.env" <<EOF
+HOST=127.0.0.1
+PORT=8791
+NITRO_HOST=127.0.0.1
+NITRO_PORT=8791
+BBB_ROOT=$ROOT
+DESK_HTPASSWD=$ROOT/.secrets/desk.htpasswd
+DESK_SESSION_SECRET=$(tr -d "\n" < "$ROOT/.secrets/desk.session")
+DESK_COOKIE_SECURE=1
+DESK_COOKIE_PATH=/desk
+ORACLE_SCOREBOARD_PATH=$ROOT/data/firm/lab/latest/scoreboard.json
+VITE_AUTH_ENABLED=false
+PATH=$HOME/opt/node/bin:/usr/bin:/bin
+EOF
+if [ -f "$APP/desk.pid" ]; then kill "$(cat "$APP/desk.pid")" 2>/dev/null || true; fi
+pkill -f "$APP/.output/server/index.mjs" 2>/dev/null || true
+sleep 2
+cd "$APP"
+rm -rf .output
+tar xzf mcl-desk-out.tar.gz
+set -a
+source "$APP/desk.env"
+set +a
+nohup "$HOME/opt/node/bin/node" .output/server/index.mjs >>"$ROOT/logs/mcl_desk.log" 2>&1 &
+echo $! >"$APP/desk.pid"
+sleep 8
+curl -sS -m 25 -L http://127.0.0.1:8791/desk/ | python3 -c "
+import sys,re
+t=sys.stdin.read()
+t2=re.sub(r\"<script[^>]*>.*?</script>\",\"\",t,flags=re.S)
+t2=re.sub(r\"<[^>]+>\",\" \",t2)
+words=\" \".join(t2.split())
+m=re.search(r\"(\d+) empty of (\d+)\", words)
+print(\"empty\", m.groups() if m else None)
+print(\"square\", \"The square\" in words)
+stamps=sorted(set(re.findall(r\"20260903T\d{6}Z\", t)))
+print(\"stamp\", stamps[-1] if stamps else \"none\")
+print(\"live\", words.count(\"live oracle\"))
+"'
+rm -f "$KF" 2>/dev/null || true

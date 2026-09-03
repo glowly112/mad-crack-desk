@@ -26,6 +26,16 @@ function scoreboardPath(): string {
   return process.env.ORACLE_SCOREBOARD_PATH?.trim() || join(labLatestDir(), "scoreboard.json");
 }
 
+export async function oracleScoreboardExists(): Promise<boolean> {
+  try {
+    const { access } = await import("node:fs/promises");
+    await access(scoreboardPath());
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function digestPath(): string {
   return (
     process.env.ORACLE_PLANT_DIGEST_PATH?.trim() || join(labLatestDir(), "plant_digest.json")

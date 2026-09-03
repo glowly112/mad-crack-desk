@@ -6,7 +6,7 @@ import { promisify } from "node:util";
 import liveSnap from "./live-snapshot.json" with { type: "json" };
 import { applyBoardResetView, isBoardResetView, hasLivePlantArms } from "./board-reset.ts";
 import { applySnapshot } from "./from-snapshot.ts";
-import { readLocalOraclePlant } from "./oracle-local-plant.ts";
+import { readLocalOraclePlant, oracleScoreboardExists } from "./oracle-local-plant.ts";
 import { bootStamp, digestStamp, plantFromTape, type PlantPayload } from "./plant-boot.ts";
 import type { LiveStamp } from "./from-digest.ts";
 
@@ -215,39 +215,35 @@ function finishOraclePayload(hit: PlantPayload): PlantPayload {
 }
 
 export async function loadPlant(): Promise<PlantPayload> {
+  const base = digestStamp();
   try {
-    const base = digestStamp();
-    const remote = Promise.race([
+    const local = await tryLocal(base);
+    if (local) return finishOraclePayload(local);
+
+    const remote = await Promise.race([
       (async () => {
-        const local = await tryLocal(base);
-        const ssh = local ? null : await trySsh(base);
-        const http = local || ssh ? null : await tryHttp(base);
-
-        let hit: PlantPayload | null = local ?? ssh ?? http;
-        if (!hit) return null;
-
-        if (local && ssh) {
-          hit = {
-            ...local,
-            stamp: {
-              ...local.stamp,
-              trades: local.stamp.trades.length ? local.stamp.trades : ssh.stamp.trades,
-              wait_open:
-                (local.stamp.wait_open?.length ?? 0) > 0
-                  ? local.stamp.wait_open
-                  : ssh.stamp.wait_open,
-            },
-          };
-        }
-
-        return finishOraclePayload(hit);
+        const ssh = await trySsh(base);
+        if (ssh) return finishOraclePayload(ssh);
+        const http = await tryHttp(base);
+        return http ? finishOraclePayload(http) : null;
       })(),
       new Promise<null>((resolve) => {
-        setTimeout(() => resolve(null), 10_000);
+        setTimeout(() => resolve(null), 15_000);
       }),
     ]);
-    return (await remote) ?? fromLiveFile(base);
+    if (remote) return remote;
+
+    if (await oracleScoreboardExists()) {
+      const retry = await tryLocal(base);
+      if (retry) return finishOraclePayload(retry);
+    }
+
+    return fromLiveFile(base);
   } catch {
+    if (await oracleScoreboardExists()) {
+      const local = await tryLocal(base);
+      if (local) return finishOraclePayload(local);
+    }
     return fromLiveFile(digestStamp());
   }
 }

@@ -145,7 +145,13 @@ function authPopupPlugin(): Plugin {
 // `0.0.0.0:8080` is the live-preview contract — don't change host/port.
 // The dev server starts once `src/router.tsx` and `src/routes/` exist — see
 // AGENTS.md § "First scaffold".
+const deskBase =
+  process.env.VITE_DESK_BASEPATH?.trim().replace(/\/$/, "") ||
+  process.env.DESK_BASEPATH?.trim().replace(/\/$/, "") ||
+  "";
+
 export default defineConfig(({ command, isPreview }) => ({
+  base: deskBase ? `${deskBase}/` : "/",
   server: {
     host: "0.0.0.0",
     port: 8080,
