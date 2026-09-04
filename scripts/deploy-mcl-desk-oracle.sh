@@ -22,8 +22,9 @@ if [ ! -f .output/server/index.mjs ]; then
   exit 1
 fi
 
-tar czf /tmp/mcl-desk-out.tar.gz .output
+tar czf /tmp/mcl-desk-out.tar.gz .output scripts/mcl-desk-health.sh
 scp "${SSH_OPTS[@]}" /tmp/mcl-desk-out.tar.gz "$HOST:~/mcl-desk/mcl-desk-out.tar.gz"
+scp "${SSH_OPTS[@]}" scripts/mcl-desk-health.sh "$HOST:~/mcl-desk/mcl-desk-health.sh"
 scp "${SSH_OPTS[@]}" scripts/nginx/mcl-desk.conf "$HOST:~/mcl-desk/mcl-desk.conf"
 
 ssh "${SSH_OPTS[@]}" "$HOST" 'set -eu
@@ -92,4 +93,11 @@ stamps=sorted(set(re.findall(r\"20\d{6}T\d{6}Z\", t)))
 print(\"stamp\", stamps[-1] if stamps else \"none\")
 print(\"live\", words.count(\"live oracle\"))
 "'
+chmod +x "$APP/mcl-desk-health.sh" 2>/dev/null || chmod +x "$HOME/mcl-desk/mcl-desk-health.sh" 2>/dev/null || true
+HEALTH_SH="$APP/mcl-desk-health.sh"
+if [ -f "$HEALTH_SH" ]; then
+  chmod +x "$HEALTH_SH"
+  (crontab -l 2>/dev/null | grep -v mcl-desk-health || true; echo "*/2 * * * * $HEALTH_SH >>$ROOT/logs/mcl_desk_health.log 2>&1") | crontab -
+  "$HEALTH_SH" || true
+fi
 rm -f "$KF" 2>/dev/null || true
