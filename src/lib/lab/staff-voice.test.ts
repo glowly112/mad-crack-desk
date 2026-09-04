@@ -4,7 +4,8 @@ import { applyBoardResetView, isBoardResetView } from "./board-reset.ts";
 import { EMPTY } from "./desk.ts";
 import { STAMP } from "./stamp.ts";
 import type { LiveStamp } from "./from-digest.ts";
-import { hasJargon, seatBubbles, speakBook, speakLook } from "./staff-voice.ts";
+import { hasJargon, seatBubbles, seatPreview, speakBook, speakLook } from "./staff-voice.ts";
+import { scrubMillWatchingLine } from "./mill-ingest.ts";
 import { fillFromRow } from "./trades.ts";
 
 const solidGb = {
@@ -157,6 +158,23 @@ test("Empty seat has no bubbles", () => {
   );
   assert.ok(bubbles.length > 0);
   assert.equal(EMPTY, "Empty");
+});
+
+test("Staff preview scrubs aim and Hyde poison from seat.now fallback", () => {
+  const clerk = STAMP.seats.find((s) => s.id === "clerk")!;
+  const stamp = {
+    ...STAMP,
+    day: "2026-09-04",
+    trades: [],
+    office: { ...STAMP.office, inventWhy: "empty-hole hunt on · invent_empty_holes · mill parked" },
+  };
+  const preview = seatPreview(
+    { ...clerk, now: "aim £100/day: -9.49u · Hyde paper" },
+    stamp,
+  );
+  assert.ok(!/aim|100\/day|hyde paper/i.test(preview));
+  assert.notEqual(preview, EMPTY);
+  assert.equal(scrubMillWatchingLine("aim £100/day: -9.49u"), EMPTY);
 });
 
 test("Staff hunt bubbles use plant seat.now, not in-play square scan", () => {

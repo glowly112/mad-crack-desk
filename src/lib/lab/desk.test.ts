@@ -21,6 +21,7 @@ import {
   floorFactDayValue,
   scrubPostResetTrendPaper,
   ensurePostResetTrendDays,
+  trendProductionScore,
   hopTally,
   floorSeats,
   hopMoves,
@@ -285,9 +286,12 @@ test("ensurePostResetTrendDays restores missing settled days on the chart", () =
   const ensured = ensurePostResetTrendDays(trendsMissingDay, trades, [], deskDay);
   const sep3 = ensured.find((t) => t.day === day);
   assert.ok(sep3);
-  assert.equal(sep3?.paper_live_day_u, rollup.u);
+  assert.equal(sep3?.paper_live_day_u, null);
+  assert.equal(rollup.u, -3.75);
   assert.equal(sep3?.factory_day_pnl_u, null);
   assert.ok(ensured.some((t) => t.day === deskDay));
+  const solidDay = { ...sep3!, n_solid: 1, paper_live_day_u: rollup.u };
+  assert.equal(trendProductionScore(solidDay), rollup.u);
 });
 
 test("Floor paper tile matches Trades settled tape roll-up", () => {
