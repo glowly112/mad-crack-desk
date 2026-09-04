@@ -10,6 +10,18 @@ function rec(v: unknown): Record<string, unknown> | null {
 
 export { matrixKeyFromArmedYamlName, matrixKeyFromScoreboardCell } from "./hollow-keys.ts";
 
+const DEFAULT_HOLLOW_CACHE_MS = 5_000;
+let hollowCache: { key: string; at: number; keys: string[] } | null = null;
+
+function hollowCacheMs(): number {
+  const raw = Number(process.env.ORACLE_HOLLOW_CACHE_MS);
+  return Number.isFinite(raw) && raw >= 0 ? raw : DEFAULT_HOLLOW_CACHE_MS;
+}
+
+export function resetHollowOccupancyCacheForTests(): void {
+  hollowCache = null;
+}
+
 /** Match firm_runtime hollow_occupancy_counts — path mtime since hollow reset + armed yaml. */
 export async function computeHollowOccupiedKeys(
   root: string,
@@ -27,6 +39,23 @@ export async function computeHollowOccupiedKeys(
   }
   if (!resetUnix) return [];
 
+  const cacheKey = `${root}|${resetUnix}|${cells.length}|${stampOccupied?.length ?? 0}`;
+  const ttl = hollowCacheMs();
+  if (hollowCache && hollowCache.key === cacheKey && ttl > 0 && Date.now() - hollowCache.at < ttl) {
+    return hollowCache.keys;
+  }
+
+  const keys = await computeHollowOccupiedKeysInner(root, cells, stampOccupied, resetUnix);
+  if (ttl > 0) hollowCache = { key: cacheKey, at: Date.now(), keys };
+  return keys;
+}
+
+async function computeHollowOccupiedKeysInner(
+  root: string,
+  cells: unknown[],
+  stampOccupied: readonly string[] | undefined,
+  resetUnix: number,
+): Promise<string[]> {
   const keys = new Set<string>();
   const countedPaths = new Set<string>();
 

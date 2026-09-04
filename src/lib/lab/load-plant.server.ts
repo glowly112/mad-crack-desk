@@ -10,6 +10,7 @@ import { readLocalOraclePlant, oracleScoreboardExists, readBookTapeRows } from "
 import { parseFills, seedTapeFromBook, ingestMillFills } from "./trades.ts";
 import { sealFloorPaperFromTape } from "./mill-ingest.ts";
 import { bootStamp, digestStamp, plantFromTape, type PlantPayload } from "./plant-boot.ts";
+import { cachedPlantLoad, peekCachedPlant } from "./plant-cache.server.ts";
 import type { LiveStamp } from "./from-digest.ts";
 
 const execFileAsync = promisify(execFile);
@@ -247,7 +248,13 @@ function fromLiveFile(base: LiveStamp): PlantPayload {
 
 async function finishOraclePayload(hit: PlantPayload): Promise<PlantPayload> {
   let stamp = applyBoardResetView(hit.stamp);
-  if (stamp.source === "oracle" && stamp.day && (await oracleScoreboardExists())) {
+  const localPlantLoaded = hit.detail === "local oracle scoreboard";
+  if (
+    stamp.source === "oracle" &&
+    stamp.day &&
+    (await oracleScoreboardExists()) &&
+    !localPlantLoaded
+  ) {
     const bookRows = await readBookTapeRows(stamp.day);
     if (bookRows.length) {
       const bookFills = parseFills(bookRows);
@@ -268,6 +275,10 @@ async function finishOraclePayload(hit: PlantPayload): Promise<PlantPayload> {
 }
 
 export async function loadPlant(): Promise<PlantPayload> {
+  return cachedPlantLoad(loadPlantUncached, () => peekCachedPlant() ?? fromLiveFile(digestStamp()));
+}
+
+async function loadPlantUncached(): Promise<PlantPayload> {
   const base = digestStamp();
   try {
     const local = await tryLocal(base);
