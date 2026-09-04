@@ -132,7 +132,7 @@ export function scrubDeskStampArchive(stamp: LiveStamp): LiveStamp {
       ...stamp.office,
       inventWhy: scrubMillWatchingLine(stamp.office.inventWhy ?? ""),
     },
-    square_occupied_n: undefined,
+    square_occupied_n: (stamp as LiveStamp & { square_occupied_n?: number }).square_occupied_n,
     researchKeepGbp: 0,
     hero: {
       ...stamp.hero,

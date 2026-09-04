@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { applyDigest, type Digest, type LiveStamp } from "./from-digest.ts";
 import { applySnapshot } from "./from-snapshot.ts";
+import { squareOccupancyCounts } from "./boards.ts";
 import { productionScore } from "./hero.ts";
 import { STAMP } from "./stamp.ts";
 import digest from "./digest.json" with { type: "json" };
@@ -200,7 +201,7 @@ test("fills overlay lists today's paper tape and does not invent production", ()
         {
           pick_id: "nz-1",
           ts: "2026-09-02T00:07:45Z",
-          cell_id: "H-20260828T020000Z-nz-morning-win-one-pick-band-2-5-4-49",
+          cell_id: "H-ehole-nz-morning-win-one-pick-02634Z",
           mode: "auto_dry",
           status: "SETTLED",
           odds: 3.35,
@@ -361,5 +362,38 @@ test("ehole cells paint the square without occupancy_post_epoch dumps", () => {
   );
   assert.equal((live as LiveStamp & { n_armed?: number }).n_armed, 23);
   assert.equal(live.holes?.length, 3);
+  assert.equal((live as LiveStamp & { square_occupied_n?: number }).square_occupied_n, 26);
   assert.ok(live.holes?.every((h) => ["GB", "AU"].includes(h.region)));
+});
+
+test("occupancy_post_epoch drives square holes and occupied count on oracle", () => {
+  const keys = Array.from({ length: 24 }, (_, i) => {
+    const regions = ["GB", "AU", "IE", "US", "NZ", "ZA", "HK", "FR"];
+    const windows = ["morning", "late_pre", "near_off", "in_play"];
+    const r = regions[i % regions.length];
+    const w = windows[Math.floor(i / regions.length) % windows.length];
+    return `${r}|${w}|WIN`;
+  });
+  const live = applySnapshot(
+    {
+      sourceMode: "oracle",
+      mill_mode: "parked",
+      mill_n_armed: 36,
+      n_armed: 36,
+      occupancy_post_epoch: { n_occupied_cells: 47, occupied_cells: keys },
+      cells: keys.slice(0, 3).map((k, i) => ({
+        id: `H-ehole-${i}`,
+        title: k,
+        status: "MEASURING",
+        country_scope: [k.split("|")[0]],
+        window_scope: [k.split("|")[1]],
+        market_type: "WIN",
+      })),
+    },
+    base(),
+  );
+  assert.equal((live as LiveStamp & { square_occupied_n?: number }).square_occupied_n, 47);
+  assert.equal(live.holes?.length, 24);
+  const { emptyN } = squareOccupancyCounts({ squareOccupiedN: 47, paintedOccupied: 24, total: 64 });
+  assert.equal(emptyN, 17);
 });

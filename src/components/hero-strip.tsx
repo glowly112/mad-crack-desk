@@ -16,7 +16,7 @@ import {
   type FloorFact,
   type FloorFactId,
 } from "@/lib/lab/desk";
-import { floorRacingSquare, holeSideOccupied } from "@/lib/lab/boards";
+import { floorRacingSquare, holeSideOccupied, squareOccupancyCounts } from "@/lib/lab/boards";
 import {
   scrubMillVoidNamedHoles,
   squareOpenFillsForPaint,
@@ -40,10 +40,13 @@ export function PlantPane() {
       side: f.side,
     })),
   });
-  const authOccupied = undefined;
   const paintedOccupied = holes.filter((h) => holeSideOccupied(h)).length;
-  const occupiedN = paintedOccupied;
-  const emptyHoles = holes.length - occupiedN;
+  const stampOcc = (stamp as { square_occupied_n?: number }).square_occupied_n;
+  const { emptyN: emptyHoles } = squareOccupancyCounts({
+    squareOccupiedN: stampOcc,
+    paintedOccupied,
+    total: holes.length,
+  });
   const facts = floorFacts(stamp, scope, emptyHoles);
   const selected = facts.find((f) => f.id === fact) ?? facts[0];
   const live = plant.source === "oracle";

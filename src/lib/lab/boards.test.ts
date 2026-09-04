@@ -35,6 +35,7 @@ import {
   sizeMarket,
   sizePackBoxes,
   squareGlanceLine,
+  squareOccupancyCounts,
   seatWatching,
   staffLine,
   waffleCols,
@@ -356,6 +357,14 @@ test("square glance is 64-hole occupancy, not mill cells", () => {
     squareGlanceLine({ occupied: 55, n_solid: 0, kill: 0 }),
     /0 solid\. 55 armed of 64 holes\. 9 empty/,
   );
+});
+
+test("squareOccupancyCounts prefers live mill occupied over painted lag", () => {
+  const live = squareOccupancyCounts({ squareOccupiedN: 47, paintedOccupied: 38, total: 64 });
+  assert.equal(live.occupiedN, 47);
+  assert.equal(live.emptyN, 17);
+  const paintOnly = squareOccupancyCounts({ paintedOccupied: 38, total: 64 });
+  assert.equal(paintOnly.emptyN, 26);
 });
 
 test("paper and holdout are two periods of one book", () => {
