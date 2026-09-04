@@ -1,6 +1,7 @@
 /** Ordinary-English staff bubbles. Stamp facts only. Never invents P&L. */
 
 import { EMPTY, hopMoves, recipeBookName, bookDisplayName } from "./desk.ts";
+import { scrubMillWatchingLine, isMillArchivePoison } from "./mill-ingest.ts";
 import { ukHopAt } from "./uk-time.ts";
 import { isBoardResetView } from "./board-reset.ts";
 import { bookStages, bookLabel, holeName, staffBookFacts, staffLine, type StaffWatchStamp } from "./boards.ts";
@@ -293,7 +294,13 @@ export function seatBubbles(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchSta
 export function seatPreview(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchStamp): string {
   const now = seatBubbles(seat, stamp).filter((b) => !b.older);
   if (now[0]?.text) return now[0].text;
-  const watching = staffLine(seat.now ?? "", stamp.recipes ?? []);
+  const cleaned = scrubMillWatchingLine(seat.now ?? "");
+  if (cleaned === EMPTY || isMillArchivePoison(cleaned)) {
+    const mill = millSeatLines(seat.id, stamp);
+    if (mill[0]) return mill[0];
+    return EMPTY;
+  }
+  const watching = staffLine(cleaned, stamp.recipes ?? []);
   if (watching !== EMPTY) return watching;
   const older = seatBubbles(seat, stamp).filter((b) => b.older);
   return older[older.length - 1]?.text ?? EMPTY;

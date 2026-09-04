@@ -159,6 +159,12 @@ export function floorFactDayValue(
   return floorDayValue(fact, point);
 }
 
+/** Production score on Trends — only when later-race KEEP proved a Solid. Measuring paper ≠ production. */
+export function trendProductionScore(point: TrendPoint): number | null {
+  if (point.n_solid <= 0) return null;
+  return point.paper_live_day_u;
+}
+
 /** Post-reset trend rows — paper from tape roll-up; mill factory_day_pnl never paints Floor. */
 export function scrubPostResetTrendPaper(
   trends: readonly TrendPoint[],
@@ -166,12 +172,12 @@ export function scrubPostResetTrendPaper(
   recipes: readonly Recipe[],
 ): TrendPoint[] {
   return trends.map((t) => {
-    if (t.day < BOARD_RESET_DAY) return t;
-    return {
-      ...t,
-      paper_live_day_u: deskSettledTapeRollup(trades, t.day, recipes).u,
-      factory_day_pnl_u: null,
-    };
+    if (t.day < BOARD_RESET_DAY) {
+      return { ...t, paper_live_day_u: trendProductionScore(t) };
+    }
+    const rollup = deskSettledTapeRollup(trades, t.day, recipes).u;
+    const scored = { ...t, paper_live_day_u: rollup, factory_day_pnl_u: null as number | null };
+    return { ...scored, paper_live_day_u: trendProductionScore(scored) };
   });
 }
 
@@ -508,6 +514,8 @@ export type DeskRow = {
   id: string;
   time: string;
   name: string;
+  /** H-ehole skin id — secondary under strategy on Trades tape. */
+  nameSub?: string;
   market: string;
   side: string;
   odds: string;

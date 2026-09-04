@@ -40,6 +40,8 @@ import {
   fillDeskRow,
   fillResultWord,
   tradeName,
+  tradeTapeName,
+  eholeSkinLabel,
   waitDeskRow,
   measuringEholeWaitChips,
   dedupeWaitChipsByHole,
@@ -209,7 +211,7 @@ test("paper P&L is not income; live is 0 while fuse off", () => {
   assert.deepEqual(tapePnl(liveFill, true), { pnl: 4, caption: null });
 });
 
-test("trade name is the mark plus horse; odds live in Odds", () => {
+test("trades tape name is strategy hole; odds and side stay in columns", () => {
   const opens = [3.2, 25, 10, 9.4].map((odds) => fillFromRow({ ...gbOpen, odds, pick_id: `${gbOpen.pick_id}:${odds}` }));
   const rows = opens.map((f) => {
     assert.ok(f);
@@ -219,13 +221,13 @@ test("trade name is the mark plus horse; odds live in Odds", () => {
   assert.deepEqual(
     rows.map((r) => r.name),
     [
-      "Britain · near-off · winner · 3.2 BACK",
-      "Britain · near-off · winner · 25 BACK",
-      "Britain · near-off · winner · 10 BACK",
-      "Britain · near-off · winner · 9.4 BACK",
+      "Britain · near-off · winner",
+      "Britain · near-off · winner",
+      "Britain · near-off · winner",
+      "Britain · near-off · winner",
     ],
   );
-  assert.equal(new Set(rows.map((r) => r.name)).size, 4);
+  assert.equal(new Set(rows.map((r) => r.name)).size, 1);
   assert.ok(rows.every((r) => r.book === "paper"));
   assert.ok(rows.every((r) => r.side === "BACK"));
   assert.ok(rows.every((r) => r.market === "WIN"));
@@ -337,6 +339,29 @@ test("measuring recipe desk row names hunter and run, not hole alone", () => {
   assert.match(row.name, /New Zealand · late-pre · place · Geo · 01741Z/);
 });
 
+test("tradeTapeName shows strategy hole and ehole skin secondary", () => {
+  const settled = fillFromRow({
+    pick_id: "harb-34829",
+    date: "2026-09-03",
+    cell_id: "H-ehole-gb-latepre-win-34829Z",
+    mode: "auto_dry",
+    status: "SETTLED",
+    horse_name: "Harb",
+    paper_pnl_gbp: 3.724,
+    stake_gbp: 2,
+    placed_result: true,
+    side: "BACK",
+    ts: "2026-09-03T14:00:00Z",
+  })!;
+  const row = fillDeskRow(settled, false);
+  assert.match(row.name, /Britain · late-pre · winner · Harb/);
+  assert.equal(row.market, "WIN");
+  assert.equal(row.side, "BACK");
+  assert.equal(row.nameSub, "ehole · 34829Z");
+  const tape = tradeTapeName(settled);
+  assert.match(tape.name, /Britain · late-pre · winner/);
+});
+
 test("open ticket shows real side/odds/stake; unsettled P&L stays Empty", () => {
   const nzOpen = fillFromRow({
     pick_id: "nz-open|1.26|102|BACK|2026-09-03",
@@ -360,7 +385,7 @@ test("open ticket shows real side/odds/stake; unsettled P&L stays Empty", () => 
   assert.equal(row.time, "09:14:03");
   assert.equal(row.result, "Open");
   assert.match(row.name, /New Zealand · morning · winner/);
-  assert.match(row.name, /3\.55 BACK/);
+  assert.ok(!/3\.55 BACK/.test(row.name));
   assert.equal(row.pnl, null);
 });
 

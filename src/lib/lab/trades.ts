@@ -18,10 +18,11 @@ import {
   deskMarketFromParts,
   deskStampedSide,
   EMPTY,
+  strategyMark,
+  eholeRunSuffix,
   cellName,
   hopMoves,
   recipeBookName,
-  strategyMark,
   WAITING,
   type DeskRow,
 } from "./desk.ts";
@@ -195,6 +196,37 @@ export function fillFromRow(raw: unknown): Fill | null {
   };
 }
 
+/** Short H-ehole skin id for tape secondary line. */
+export function eholeSkinLabel(recipeId: string): string | null {
+  const id = recipeId.split("|")[0]?.trim() ?? "";
+  if (!/^H-ehole-/i.test(id)) return null;
+  const run = eholeRunSuffix(id);
+  if (run) return `ehole · ${run}`;
+  return id.replace(/^H-/i, "");
+}
+
+/**
+ * Trades tape name — strategy/hole in plain English; horse or skin id secondary.
+ * Side and odds stay in their columns — never duplicated in Name.
+ */
+export function tradeTapeName(
+  fill: Fill,
+  recipe?: Pick<Recipe, "id" | "title" | "hunterName"> | null,
+): { name: string; nameSub?: string } {
+  const strategy = strategyMark(fill.recipe, fill.recipeId);
+  const skin = eholeSkinLabel(fill.recipeId);
+  const horse = fill.horse && fill.horse !== EMPTY ? fill.horse : null;
+
+  if (!strategy || strategy === EMPTY) {
+    const legacy = tradeName(fill, recipe);
+    return { name: legacy, nameSub: skin ?? undefined };
+  }
+
+  const name = horse ? `${strategy} · ${horse}` : strategy;
+  const nameSub = skin && !name.includes(skin.replace(/^ehole · /, "")) ? skin : undefined;
+  return { name, nameSub };
+}
+
 /** Name on the board. Open tickets: horse, else recipe bits + odds + side. */
 export function tradeName(fill: Fill, recipe?: Pick<Recipe, "id" | "title" | "hunterName"> | null): string {
   return bookDisplayName({
@@ -238,10 +270,12 @@ export function fillDeskRow(fill: Fill, fuseOn: boolean): DeskRow {
   const sideStr =
     rawSide === "BACK" || rawSide === "LAY" ? rawSide : deskStampedSide(fill.recipeId, fill.recipe);
   const pending = (value: string) => (value && value !== EMPTY ? value : isOpen ? WAITING : EMPTY);
+  const tapeName = tradeTapeName(fill);
   return {
     id: fill.id,
     time: pending(time),
-    name: tradeName(fill),
+    name: tapeName.name,
+    nameSub: tapeName.nameSub,
     market: market !== EMPTY ? market : isOpen ? WAITING : EMPTY,
     side: sideStr !== EMPTY ? sideStr : EMPTY,
     odds: pending(oddsStr === EMPTY ? "" : oddsStr),
@@ -1056,7 +1090,8 @@ export function recipeForFill(recipes: readonly Recipe[], fill: Fill): Recipe | 
 }
 
 export function fillTradeName(fill: Fill, recipes: readonly Recipe[] = []): string {
-  return tradeName(fill, recipeForFill(recipes, fill));
+  const { name, nameSub } = tradeTapeName(fill, recipeForFill(recipes, fill));
+  return nameSub ? `${name} · ${nameSub}` : name;
 }
 
 /** Day's tape totals from signed settles — paper line is full tape u (all books). */

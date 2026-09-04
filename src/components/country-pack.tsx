@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { EmptyState } from "@/components/empty-state";
+import { HolePaneCard } from "@/components/hole-pane";
 import { useStamp } from "@/components/plant-context";
 import { millDisplayRecipes } from "@/lib/lab/mill-display.ts";
 import {
@@ -21,6 +23,7 @@ import {
   squareOpenFillsForPaint,
 } from "@/lib/lab/junk-fills.ts";
 import { EMPTY } from "@/lib/lab/desk";
+import { emptyHolePane } from "@/lib/lab/hole-pane";
 import type { CountryRow, HoleCell, MarketSquare, SquareMarket } from "@/lib/lab/boards";
 import { cn } from "@/lib/utils";
 
@@ -45,6 +48,7 @@ const TONE_LABEL: Record<MarketSquare["tone"], string> = {
 /** Morning board square: empty holes visible. BACK/LAY split on each WIN/PLACE cell. */
 export function FloorSquare() {
   const stamp = useStamp();
+  const [picked, setPicked] = useState<HoleCell | null>(null);
   const open = squareOpenFillsForPaint(stamp.trades);
   const holes = floorRacingSquare({
     namedHoles: scrubMillVoidNamedHoles(stamp.holes, stamp.trades),
@@ -65,6 +69,7 @@ export function FloorSquare() {
     total: holes.length,
   });
   const glance = `${emptyN} empty of ${total} holes on the square`;
+  const pane = picked ? emptyHolePane(picked, stamp) : null;
 
   return (
     <section>
@@ -82,8 +87,9 @@ export function FloorSquare() {
         <EmptyState copy={EMPTY} />
       ) : (
         <div role="img" aria-label={glance}>
-          <SquareGrid holes={holes} markets={markets} />
+          <SquareGrid holes={holes} markets={markets} onPickEmpty={setPicked} />
           <p className="mt-2 text-sm text-muted">{glance}</p>
+          {pane ? <HolePaneCard pane={pane} onClose={() => setPicked(null)} /> : null}
         </div>
       )}
     </section>
@@ -155,7 +161,15 @@ export function CountryPack() {
   );
 }
 
-function SquareGrid({ holes, markets }: { holes: readonly HoleCell[]; markets: readonly SquareMarket[] }) {
+function SquareGrid({
+  holes,
+  markets,
+  onPickEmpty,
+}: {
+  holes: readonly HoleCell[];
+  markets: readonly SquareMarket[];
+  onPickEmpty?: (cell: HoleCell) => void;
+}) {
   const byId = new Map(holes.map((h) => [h.id, h]));
   const regions = [...new Set(holes.map((h) => h.region))];
   return (
@@ -199,7 +213,16 @@ function SquareGrid({ holes, markets }: { holes: readonly HoleCell[]; markets: r
               <div key={`${region}-${window}`} className="flex justify-center gap-1">
                 {markets.map((market) => {
                   const cell = byId.get(`${region}|${window}|${market}`);
-                  return <HoleSquare key={market} cell={cell} regionName={name} window={window} market={market} />;
+                  return (
+                    <HoleSquare
+                      key={market}
+                      cell={cell}
+                      regionName={name}
+                      window={window}
+                      market={market}
+                      onPickEmpty={onPickEmpty}
+                    />
+                  );
                 })}
               </div>
             ))}
@@ -215,11 +238,13 @@ function HoleSquare({
   regionName,
   window,
   market,
+  onPickEmpty,
 }: {
   cell: HoleCell | undefined;
   regionName: string;
   window: (typeof SQUARE_WINDOWS)[number];
   market: SquareMarket;
+  onPickEmpty?: (cell: HoleCell) => void;
 }) {
   const back = cell?.backTone ?? (cell?.tone !== "empty" ? cell?.tone : "empty") ?? "empty";
   const lay = cell?.layTone ?? "empty";
@@ -229,10 +254,31 @@ function HoleSquare({
     back !== "empty" ? `BACK · ${TONE_LABEL[back]}` : "BACK · Empty",
     lay !== "empty" ? `LAY · ${TONE_LABEL[lay]}` : "LAY · Empty",
   ];
+  const clickable = bothEmpty && cell && onPickEmpty;
+  const pick = () => {
+    if (clickable && cell) onPickEmpty(cell);
+  };
   return (
     <span
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={clickable ? pick : undefined}
+      onKeyDown={
+        clickable
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                pick();
+              }
+            }
+          : undefined
+      }
       title={titleParts.join(" · ")}
-      className={cn("relative inline-block size-4 rounded-[2px]", bothEmpty && TONE.empty)}
+      className={cn(
+        "relative inline-block size-4 rounded-[2px]",
+        bothEmpty && TONE.empty,
+        clickable && "cursor-pointer hover:ring-2 hover:ring-fg/30",
+      )}
       aria-label={titleParts.join(" · ")}
     >
       {!bothEmpty ? (

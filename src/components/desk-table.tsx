@@ -95,7 +95,7 @@ function DataRow({ row }: { row: DeskRow }) {
       onClick={clickable ? pick : undefined}
     >
       <Cell k="Time" v={row.time} />
-      <Cell k="Name" v={row.name} />
+      <NameCell name={row.name} nameSub={row.nameSub} />
       <Cell k="Market" v={row.market} />
       <Cell k="Side" v={row.side} />
       <Cell k="Odds" v={row.odds} />
@@ -104,6 +104,16 @@ function DataRow({ row }: { row: DeskRow }) {
       <Cell k="Result" v={row.result} />
       <PnlCell v={row.pnl} />
     </tr>
+  );
+}
+
+function NameCell({ name, nameSub }: { name: string; nameSub?: string }) {
+  const shown = name && name !== EMPTY ? name : EMPTY;
+  return (
+    <td className="px-2 py-2 align-middle text-sm break-words text-fg">
+      <div>{shown}</div>
+      {nameSub ? <div className="mt-0.5 font-mono text-[10px] leading-snug text-subtle">{nameSub}</div> : null}
+    </td>
   );
 }
 
