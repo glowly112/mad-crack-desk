@@ -367,6 +367,11 @@ test("squareOccupancyCounts prefers live mill occupied over painted lag", () => 
   assert.equal(paintOnly.emptyN, 26);
 });
 
+test("squareOccupancyCounts uses stamp n when truncated list paints fewer holes", () => {
+  const live = squareOccupancyCounts({ squareOccupiedN: 42, paintedOccupied: 39, total: 64 });
+  assert.equal(live.emptyN, 22);
+});
+
 test("paper and holdout are two periods of one book", () => {
   const solid = STAMP.recipes.find((r) => r.badge === "Solid");
   const proving = STAMP.recipes.find((r) => r.status === "MEASURING");
