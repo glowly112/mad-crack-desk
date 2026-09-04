@@ -182,8 +182,7 @@ test("daily window and domain keep Empty days off the scale", () => {
 });
 
 test("Floor facts are plant numbers, not a 100u quota", () => {
-  const emptyHoles = 42;
-  const facts = floorFacts(STAMP, { day: STAMP.day, lookingBack: false }, emptyHoles);
+  const facts = floorFacts(STAMP, { day: STAMP.day, lookingBack: false });
   const blob = JSON.stringify(facts).toLowerCase();
   assert.ok(!blob.includes("aim"));
   assert.ok(!blob.includes("behind"));
@@ -191,11 +190,10 @@ test("Floor facts are plant numbers, not a 100u quota", () => {
   assert.ok(!blob.includes("remaining"));
   assert.ok(!blob.includes("100"));
   assert.ok(!blob.includes("£"));
-  assert.equal(facts.find((f) => f.id === "holes")?.value, emptyHoles);
   assert.equal(facts.find((f) => f.id === "paper")?.value, null);
   assert.equal(facts.find((f) => f.id === "production")?.value, null);
   assert.equal(facts.find((f) => f.id === "live")?.value, null);
-  assert.deepEqual(facts.map((f) => f.id), ["holes", "paper", "production", "live"]);
+  assert.deepEqual(facts.map((f) => f.id), ["paper", "production", "live"]);
   const hydeFacts = floorFacts(
     {
       ...STAMP,
@@ -221,7 +219,6 @@ test("Floor facts are plant numbers, not a 100u quota", () => {
       ],
     },
     { day: STAMP.day, lookingBack: false },
-    emptyHoles,
   );
   assert.equal(hydeFacts.find((f) => f.id === "paper")?.value, null);
   const tally = hopTally(STAMP.moves);
@@ -326,7 +323,6 @@ test("Floor paper tile matches Trades settled tape roll-up", () => {
   const facts = floorFacts(
     { ...STAMP, day, trades, trends: STAMP.trends },
     { day, lookingBack: false },
-    0,
   );
   const paper = facts.find((f) => f.id === "paper");
   assert.equal(paper?.value, rollup.u);

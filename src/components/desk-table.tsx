@@ -144,7 +144,11 @@ function Cell({ k, v }: { k: (typeof DESK_HEADERS)[number]; v: string }) {
 
 function PnlCell({ v }: { v: number | null }) {
   if (v == null) {
-    return <td className="px-2 py-2 text-right font-mono text-xs tabular-nums text-subtle">{EMPTY}</td>;
+    return (
+      <td className="px-2 py-2 text-right font-mono text-xs tabular-nums text-muted" aria-label="Pending">
+        —
+      </td>
+    );
   }
   return (
     <td

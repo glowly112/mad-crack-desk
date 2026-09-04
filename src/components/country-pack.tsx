@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { EmptyState } from "@/components/empty-state";
-import { HoleCellMark, HolePane } from "@/components/hole-pane";
+import { HolePane } from "@/components/hole-pane";
 import { useDayScope } from "@/components/day-scope";
 import { useStamp } from "@/components/plant-context";
 import { millDisplayRecipes } from "@/lib/lab/mill-display.ts";
@@ -23,7 +23,7 @@ import {
   squareOpenFillsForPaint,
 } from "@/lib/lab/junk-fills.ts";
 import { EMPTY } from "@/lib/lab/desk";
-import { holeCellMark, holePaneDetail } from "@/lib/lab/hole-pane";
+import { holePaneDetail } from "@/lib/lab/hole-pane";
 import type { CountryRow, HoleCell, MarketSquare, SquareMarket } from "@/lib/lab/boards";
 import { cn } from "@/lib/utils";
 
@@ -249,7 +249,6 @@ function SquareGrid({
                       window={window}
                       market={market}
                       selected={picked === cell?.id}
-                      mark={paneCtx && cell ? holeCellMark(cell.id, cell, paneCtx) : EMPTY}
                       onPick={onPick && cell ? () => onPick(cell.id) : undefined}
                     />
                   );
@@ -269,7 +268,6 @@ function HoleSquare({
   window,
   market,
   selected,
-  mark,
   onPick,
 }: {
   cell: HoleCell | undefined;
@@ -277,7 +275,6 @@ function HoleSquare({
   window: (typeof SQUARE_WINDOWS)[number];
   market: SquareMarket;
   selected?: boolean;
-  mark?: string;
   onPick?: () => void;
 }) {
   const back = cell?.backTone ?? (cell?.tone !== "empty" ? cell?.tone : "empty") ?? "empty";
@@ -287,7 +284,6 @@ function HoleSquare({
     `${regionName} ${SQUARE_WINDOW_LABEL[window]} ${market}`,
     back !== "empty" ? `BACK · ${TONE_LABEL[back]}` : "BACK · Empty",
     lay !== "empty" ? `LAY · ${TONE_LABEL[lay]}` : "LAY · Empty",
-    mark && mark !== EMPTY ? mark : "",
   ];
   return (
     <button
@@ -297,7 +293,7 @@ function HoleSquare({
       aria-pressed={selected}
       onClick={onPick}
       className={cn(
-        "relative mb-3 inline-block size-4 rounded-[2px] transition-shadow",
+        "relative inline-block size-4 rounded-[2px] transition-shadow",
         bothEmpty && TONE.empty,
         selected && "ring-2 ring-fg ring-offset-1 ring-offset-bg",
         onPick && "cursor-pointer hover:ring-1 hover:ring-border-strong",
@@ -321,7 +317,6 @@ function HoleSquare({
           />
         </>
       ) : null}
-      <HoleCellMark mark={mark ?? EMPTY} selected={selected} />
     </button>
   );
 }
