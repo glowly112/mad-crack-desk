@@ -808,6 +808,55 @@ export function refreshTapeFromBook(
   return [...byId.values()].sort((a, b) => b.ts.localeCompare(a.ts));
 }
 
+/**
+ * Seed desk tape from book.jsonl across calendar day roll.
+ * Prior-day OPEN first-books move to deskDay; prior-day Settled stay on book day for trends.
+ */
+export function seedTapeFromBook(
+  tapeTrades: readonly Fill[],
+  bookFills: readonly Fill[],
+  deskDay: string,
+  _recipes: readonly Recipe[] = [],
+): Fill[] {
+  const byId = new Map<string, Fill>();
+
+  for (const f of tapeTrades) {
+    if (f.day !== deskDay) byId.set(f.id, f);
+  }
+  for (const f of tapeTrades) {
+    if (f.day === deskDay) byId.set(f.id, f);
+  }
+
+  for (const f of bookFills) {
+    if (!isFirstBookTapeFill(f) || isHydeFastLegacyFill(f) || isPreResetDayFill(f)) continue;
+
+    if (f.day === deskDay) {
+      if (f.result === "waiting") {
+        byId.set(f.id, f);
+        continue;
+      }
+      if (byId.has(f.id)) {
+        byId.set(f.id, f);
+        continue;
+      }
+      if (!isCountableSettledFill(f)) {
+        byId.set(f.id, f);
+      }
+      continue;
+    }
+
+    if (f.day < deskDay) {
+      if (f.result === "waiting") {
+        byId.set(f.id, { ...f, day: deskDay });
+      } else {
+        byId.set(f.id, f);
+      }
+    }
+  }
+
+  return [...byId.values()].sort((a, b) => b.ts.localeCompare(a.ts));
+}
+
 /** @deprecated use refreshTapeFromBook */
 export function patchTapeWithBookSettledSigned(
   tapeTrades: readonly Fill[],

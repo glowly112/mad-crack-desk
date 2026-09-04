@@ -175,6 +175,35 @@ export function scrubPostResetTrendPaper(
   });
 }
 
+/** Keep every post-reset day on the chart when the tape has settled rows (cheap roll-up per day). */
+export function ensurePostResetTrendDays(
+  trends: readonly TrendPoint[],
+  trades: readonly import("./trades.ts").Fill[],
+  recipes: readonly Recipe[],
+  deskDay: string,
+): TrendPoint[] {
+  const byDay = new Map(trends.map((t) => [t.day, t]));
+  const days = new Set<string>([deskDay]);
+  for (const f of trades) {
+    if (f.day >= BOARD_RESET_DAY) days.add(f.day);
+  }
+  for (const d of days) {
+    if (!byDay.has(d)) {
+      byDay.set(d, {
+        day: d,
+        paper_live_day_u: null,
+        factory_day_pnl_u: null,
+        n_solid: 0,
+        n_keep: 0,
+        n_measuring: 0,
+        n_dropped: 0,
+      });
+    }
+  }
+  const merged = [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day));
+  return scrubPostResetTrendPaper(merged, trades, recipes);
+}
+
 /** Independent Floor facts. No aim, mill, or quota language. */
 export function floorFacts(
   stamp: FloorStamp,

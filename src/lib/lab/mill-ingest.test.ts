@@ -10,7 +10,7 @@ import {
 } from "./mill-ingest.ts";
 import type { LiveStamp } from "./from-digest.ts";
 import { STAMP } from "./stamp.ts";
-import { fillFromRow, deskSettledTapeRollup, mergeMillTradesTape, assertDeskTapeFloorAligns } from "./trades.ts";
+import { fillFromRow, deskSettledTapeRollup, mergeMillTradesTape, assertDeskTapeFloorAligns, seedTapeFromBook } from "./trades.ts";
 import { floorFacts } from "./desk.ts";
 
 test("mill archive poison detects aim and hyde history", () => {
@@ -243,4 +243,53 @@ test("sealFloorPaperFromTape ignores mill stamp paper_live and factory_day_pnl",
   assert.equal(churnRollup.counts?.losses, 46);
   const churnPaper = floorFacts(afterChurn, { day, lookingBack: false }, 24).find((f) => f.id === "paper");
   assert.equal(churnPaper?.value, rollup.u);
+});
+
+test("day roll seals Sep 4 Empty while Sep 3 opens carry and trend bar survives", () => {
+  const priorDay = "2026-09-03";
+  const deskDay = "2026-09-04";
+  const openRows = Array.from({ length: 6 }, (_, i) =>
+    fillFromRow({
+      pick_id: `roll-open-${i}`,
+      date: priorDay,
+      cell_id: `H-ehole-gb-nearoff-win-${String(84000 + i)}Z`,
+      mode: "auto_dry",
+      status: "OPEN",
+      odds: 2.2 + i * 0.1,
+      stake_gbp: 2,
+      side: "BACK",
+      ts: `2026-09-03T1${i}:00:00Z`,
+    })!,
+  );
+  const settled = fillFromRow({
+    pick_id: "roll-set-1",
+    date: priorDay,
+    cell_id: "H-ehole-ie-nearoff-win-73339Z",
+    mode: "auto_dry",
+    status: "SETTLED",
+    paper_pnl_gbp: -2,
+    stake_gbp: 2,
+    placed_result: false,
+    side: "BACK",
+    ts: "2026-09-03T14:00:00Z",
+  })!;
+  const bookFills = [...openRows, settled!].filter(Boolean) as NonNullable<ReturnType<typeof fillFromRow>>[];
+  const seeded = seedTapeFromBook([], bookFills, deskDay, STAMP.recipes);
+  const sealed = sealFloorPaperFromTape({
+    ...STAMP,
+    day: deskDay,
+    source: "oracle",
+    trades: seeded,
+    trends: STAMP.trends.filter((t) => t.day !== priorDay),
+    hero: { ...STAMP.hero, day_u: null },
+  } as unknown as LiveStamp);
+
+  const opens = sealed.trades.filter((f) => f.result === "waiting" && f.day === deskDay);
+  assert.equal(opens.length, 6);
+  const sep3 = sealed.trends.find((t) => t.day === priorDay);
+  assert.ok(sep3);
+  assert.equal(sep3?.paper_live_day_u, deskSettledTapeRollup(sealed.trades, priorDay, STAMP.recipes).u);
+  const todayPaper = floorFacts(sealed, { day: deskDay, lookingBack: false }, 24).find((f) => f.id === "paper");
+  assert.equal(todayPaper?.value, null);
+  assert.equal(todayPaper?.countsLine, null);
 });

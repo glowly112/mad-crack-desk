@@ -160,6 +160,11 @@ async function readBookDayRows(
   }
 }
 
+/** Full book.jsonl rows for recent days — tape seed across day roll (not focal-day-only). */
+export async function readBookTapeRows(focalDay: string): Promise<Record<string, unknown>[]> {
+  return readBookDayRows(focalDay);
+}
+
 /** Full book.jsonl for one day — patch scan only; never the Trades tape source. */
 export async function readFullBookDayFills(focalDay: string): Promise<Record<string, unknown>[]> {
   const rows = await readBookDayRows(focalDay, 0);
@@ -171,11 +176,10 @@ async function readRecentFills(
   digest: Record<string, unknown>,
   snapInner: Record<string, unknown>,
 ): Promise<Record<string, unknown>[]> {
-  const tape = digestTapeFills(digest, snapInner);
-  if (tape) return tape;
   const book = await readBookDayRows(focalDay);
-  const focal = book.filter((r) => r.date === focalDay);
-  return focal.slice(-120);
+  if (book.length) return book;
+  const tape = digestTapeFills(digest, snapInner);
+  return tape ?? [];
 }
 
 async function readWaitOpen(): Promise<Record<string, unknown>[]> {

@@ -20,6 +20,7 @@ import {
   floorFacts,
   floorFactDayValue,
   scrubPostResetTrendPaper,
+  ensurePostResetTrendDays,
   hopTally,
   floorSeats,
   hopMoves,
@@ -248,6 +249,48 @@ test("Floor paper chart uses first-book tape on post-reset days", () => {
   assert.equal(floorFactDayValue(stamp, "paper", "2026-09-03"), null);
   const scrubbed = scrubPostResetTrendPaper(stamp.trends, [], stamp.recipes);
   assert.equal(scrubbed.find((t) => t.day === "2026-09-03")?.paper_live_day_u, null);
+});
+
+test("ensurePostResetTrendDays restores missing settled days on the chart", () => {
+  const day = "2026-09-03";
+  const deskDay = "2026-09-04";
+  const wins = Array.from({ length: 16 }, (_, i) =>
+    fillFromRow({
+      pick_id: `trend-w-${i}`,
+      date: day,
+      cell_id: `H-ehole-gb-morning-win-${String(10000 + i)}Z`,
+      mode: "auto_dry",
+      status: "SETTLED",
+      paper_pnl_gbp: 1,
+      stake_gbp: 2,
+      placed_result: true,
+      side: "BACK",
+      ts: `2026-09-03T10:${String(i).padStart(2, "0")}:00Z`,
+    })!,
+  );
+  const losses = Array.from({ length: 47 }, (_, i) =>
+    fillFromRow({
+      pick_id: `trend-l-${i}`,
+      date: day,
+      cell_id: `H-ehole-ie-nearoff-win-${String(20000 + i)}Z`,
+      mode: "auto_dry",
+      status: "SETTLED",
+      paper_pnl_gbp: -0.5,
+      stake_gbp: 2,
+      placed_result: false,
+      side: "BACK",
+      ts: `2026-09-03T11:${String(i).padStart(2, "0")}:00Z`,
+    })!,
+  );
+  const trades = [...wins, ...losses].filter(Boolean) as NonNullable<ReturnType<typeof fillFromRow>>[];
+  const rollup = deskSettledTapeRollup(trades, day, []);
+  const trendsMissingDay = STAMP.trends.filter((t) => t.day !== day);
+  const ensured = ensurePostResetTrendDays(trendsMissingDay, trades, [], deskDay);
+  const sep3 = ensured.find((t) => t.day === day);
+  assert.ok(sep3);
+  assert.equal(sep3?.paper_live_day_u, rollup.u);
+  assert.equal(sep3?.factory_day_pnl_u, null);
+  assert.ok(ensured.some((t) => t.day === deskDay));
 });
 
 test("Floor paper tile matches Trades settled tape roll-up", () => {

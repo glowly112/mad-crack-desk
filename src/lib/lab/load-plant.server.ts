@@ -6,8 +6,8 @@ import { promisify } from "node:util";
 import liveSnap from "./live-snapshot.json" with { type: "json" };
 import { applyBoardResetView, isBoardResetView, hasLivePlantArms } from "./board-reset.ts";
 import { applySnapshot } from "./from-snapshot.ts";
-import { readLocalOraclePlant, oracleScoreboardExists, readFullBookDayFills } from "./oracle-local-plant.ts";
-import { parseFills, refreshTapeFromBook, ingestMillFills } from "./trades.ts";
+import { readLocalOraclePlant, oracleScoreboardExists, readBookTapeRows } from "./oracle-local-plant.ts";
+import { parseFills, seedTapeFromBook, ingestMillFills } from "./trades.ts";
 import { sealFloorPaperFromTape } from "./mill-ingest.ts";
 import { bootStamp, digestStamp, plantFromTape, type PlantPayload } from "./plant-boot.ts";
 import type { LiveStamp } from "./from-digest.ts";
@@ -248,13 +248,13 @@ function fromLiveFile(base: LiveStamp): PlantPayload {
 async function finishOraclePayload(hit: PlantPayload): Promise<PlantPayload> {
   let stamp = applyBoardResetView(hit.stamp);
   if (stamp.source === "oracle" && stamp.day && (await oracleScoreboardExists())) {
-    const bookRows = await readFullBookDayFills(stamp.day);
+    const bookRows = await readBookTapeRows(stamp.day);
     if (bookRows.length) {
       const bookFills = parseFills(bookRows);
-      const refreshed = refreshTapeFromBook(stamp.trades, bookFills, stamp.day);
+      const seeded = seedTapeFromBook(stamp.trades, bookFills, stamp.day, stamp.recipes);
       stamp = applyBoardResetView({
         ...stamp,
-        trades: ingestMillFills(refreshed, stamp.day, stamp.recipes),
+        trades: ingestMillFills(seeded, stamp.day, stamp.recipes),
       });
     }
   }

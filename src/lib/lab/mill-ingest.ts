@@ -1,7 +1,7 @@
 /** Fail-closed mill ingest — archive Hyde/history off the desk; never mix into tiles or stamps. */
 
 import { BOARD_RESET_DAY } from "./board-reset.ts";
-import { EMPTY, scrubPostResetTrendPaper } from "./desk.ts";
+import { EMPTY, scrubPostResetTrendPaper, ensurePostResetTrendDays } from "./desk.ts";
 import type { LiveStamp } from "./from-digest.ts";
 import type { Recipe } from "./stamp.ts";
 import {
@@ -66,7 +66,7 @@ export function sealFloorPaperFromTape(stamp: LiveStamp): LiveStamp {
   const recipes = stamp.recipes ?? [];
   const trades = ingestMillFills(stamp.trades ?? [], day, recipes);
   const rollup = deskSettledTapeRollup(trades, day, recipes);
-  const trends = scrubPostResetTrendPaper(stamp.trends, trades, recipes);
+  const trends = ensurePostResetTrendDays(stamp.trends, trades, recipes, day);
   const sealed: LiveStamp = {
     ...stamp,
     trades,

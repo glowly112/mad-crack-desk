@@ -25,6 +25,7 @@ import {
   mergeMillTradesTape,
   patchTapeWithBookSettledSigned,
   refreshTapeFromBook,
+  seedTapeFromBook,
   reconcileTodayTradesWithBook,
   assertMillSettledSignedPresent,
   paperSettledFills,
@@ -989,6 +990,71 @@ test("board reset view keeps Harb and Splendid on settled tape", () => {
     { horse: "Harb" },
     { horse: "Splendid Fellow" },
   ]);
+});
+
+test("seedTapeFromBook carries prior-day OPEN to desk day and keeps Settled on book day", () => {
+  const deskDay = "2026-09-04";
+  const priorDay = "2026-09-03";
+  const open = fillFromRow({
+    pick_id: "open-carry-1",
+    date: priorDay,
+    cell_id: "H-ehole-gb-nearoff-win-83959Z",
+    mode: "auto_dry",
+    status: "OPEN",
+    odds: 2.5,
+    stake_gbp: 2,
+    side: "BACK",
+    ts: "2026-09-03T18:00:00Z",
+  })!;
+  const settled = fillFromRow({
+    pick_id: "set-carry-1",
+    date: priorDay,
+    cell_id: "H-ehole-ie-nearoff-win-73339Z",
+    mode: "auto_dry",
+    status: "SETTLED",
+    paper_pnl_gbp: -2,
+    stake_gbp: 2,
+    placed_result: false,
+    side: "BACK",
+    ts: "2026-09-03T14:00:00Z",
+  })!;
+  const hydeOpen = fillFromRow({
+    pick_id: "hyde-open",
+    date: priorDay,
+    cell_id: "H-hyde-gb-morning-win",
+    mode: "auto_dry",
+    status: "OPEN",
+    odds: 3,
+    stake_gbp: 2,
+    side: "BACK",
+    ts: "2026-09-03T17:00:00Z",
+  })!;
+  const seeded = seedTapeFromBook([], [open!, settled!, hydeOpen!], deskDay, []);
+  const opens = seeded.filter((f) => f.result === "waiting");
+  assert.equal(opens.length, 1);
+  assert.equal(opens[0]?.day, deskDay);
+  assert.equal(opens[0]?.id, open!.id);
+  const priorSettled = seeded.filter((f) => f.day === priorDay && f.result !== "waiting");
+  assert.equal(priorSettled.length, 1);
+  assert.equal(seeded.filter((f) => f.day === deskDay && f.result !== "waiting").length, 0);
+});
+
+test("seedTapeFromBook does not grow today settled from book when not already on tape", () => {
+  const day = "2026-09-04";
+  const bookOnly = fillFromRow({
+    pick_id: "today-settle-only",
+    date: day,
+    cell_id: "H-ehole-gb-morning-win-12001Z",
+    mode: "auto_dry",
+    status: "SETTLED",
+    paper_pnl_gbp: 1.5,
+    stake_gbp: 2,
+    placed_result: true,
+    side: "BACK",
+    ts: "2026-09-04T10:00:00Z",
+  })!;
+  const seeded = seedTapeFromBook([], [bookOnly!], day, []);
+  assert.equal(seeded.length, 0);
 });
 
 test("wait chips dedupe by country window market", () => {
