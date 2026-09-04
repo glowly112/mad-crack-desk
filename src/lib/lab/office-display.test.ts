@@ -299,6 +299,16 @@ test("office paper totals sum to Floor settled tape u on a single day", () => {
   assert.equal(officeSum, floorU);
 });
 
+test("office strategy is plain hole without Geo Card Steam twin tags", () => {
+  const geo = ehole("H-ehole-au-latepre-place-82406Z", { region: "AU", hunterName: "Geo" });
+  const card = ehole("H-ehole-au-latepre-place-35151Z", { region: "AU", hunterName: "Card" });
+  const rows = officeBookRows({ recipes: [geo, card], day });
+  assert.equal(rows.length, 1);
+  assert.match(rows[0]!.strategy, /Australia · late-pre · place/);
+  assert.ok(!/Geo|Card|Steam/i.test(rows[0]!.strategy));
+  assert.equal(rows[0]!.strategySub, "ehole · 35151Z");
+});
+
 test("twins collapse to one measuring row per hole", () => {
   const recipes = [
     ehole("H-ehole-nz-latepre-place-35151Z", { region: "NZ" }),
