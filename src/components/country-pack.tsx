@@ -1,16 +1,29 @@
+import { useState } from "react";
 import { EmptyState } from "@/components/empty-state";
+import { HolePaneCard } from "@/components/hole-pane";
 import { useStamp } from "@/components/plant-context";
+import { millDisplayRecipes } from "@/lib/lab/mill-display.ts";
 import {
   SQUARE_WINDOW_LABEL,
   SQUARE_WINDOWS,
-  capitalisingLine,
   countryMarket,
+  floorRacingSquare,
+  holeSideOccupied,
   inventHole,
+  millHuntCaption,
   officeCountries,
   plantMarkets,
   racingSquare,
+  squareGlanceLine,
+  squareGridMarkets,
+  squareOccupancyCounts,
 } from "@/lib/lab/boards";
+import {
+  scrubMillVoidNamedHoles,
+  squareOpenFillsForPaint,
+} from "@/lib/lab/junk-fills.ts";
 import { EMPTY } from "@/lib/lab/desk";
+import { emptyHolePane } from "@/lib/lab/hole-pane";
 import type { CountryRow, HoleCell, MarketSquare, SquareMarket } from "@/lib/lab/boards";
 import { cn } from "@/lib/utils";
 
@@ -32,21 +45,31 @@ const TONE_LABEL: Record<MarketSquare["tone"], string> = {
   parked: "parked",
 };
 
-/** Morning board square: empty holes visible. No mill roll-up or invent lines. */
+/** Morning board square: empty holes visible. BACK/LAY split on each WIN/PLACE cell. */
 export function FloorSquare() {
   const stamp = useStamp();
-  const huntNotes = [stamp.office.inventWhy, ...stamp.hunters.map((h) => h.note)];
-  const holes = racingSquare({
-    recipes: stamp.recipes,
-    coverage: stamp.coverage,
-    moves: stamp.moves,
-    floorLog: stamp.floorLog,
-    huntNotes,
-    namedHoles: stamp.holes,
+  const [picked, setPicked] = useState<HoleCell | null>(null);
+  const open = squareOpenFillsForPaint(stamp.trades);
+  const holes = floorRacingSquare({
+    namedHoles: scrubMillVoidNamedHoles(stamp.holes, stamp.trades),
+    recipes: millDisplayRecipes(stamp.recipes),
+    openFills: open.map((f) => ({
+      id: f.id,
+      recipeId: f.recipeId,
+      recipe: f.recipe,
+      side: f.side,
+    })),
   });
-  const markets = plantMarkets(holes.map((h) => h.market));
-  const emptyN = holes.filter((h) => h.tone === "empty").length;
-  const glance = `${emptyN} empty of ${holes.length} holes on the square`;
+  const markets = squareGridMarkets();
+  const paintedOccupied = holes.filter((h) => holeSideOccupied(h)).length;
+  const stampOcc = (stamp as { square_occupied_n?: number }).square_occupied_n;
+  const { emptyN, total } = squareOccupancyCounts({
+    squareOccupiedN: stampOcc,
+    paintedOccupied,
+    total: holes.length,
+  });
+  const glance = `${emptyN} empty of ${total} holes on the square`;
+  const pane = picked ? emptyHolePane(picked, stamp) : null;
 
   return (
     <section>
@@ -54,17 +77,19 @@ export function FloorSquare() {
         <h2 className="text-sm font-medium text-muted">The square</h2>
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-subtle">
           <LegendDot tone="empty" label="Empty" />
+          <LegendSide label="BACK" />
+          <LegendSide label="LAY" split="right" />
           <LegendDot tone="win" label="solid" />
           <LegendDot tone="parked" label="parked" />
-          <LegendDot tone="loss" label="killed" />
         </p>
       </header>
       {holes.length === 0 ? (
         <EmptyState copy={EMPTY} />
       ) : (
         <div role="img" aria-label={glance}>
-          <SquareGrid holes={holes} markets={markets} />
+          <SquareGrid holes={holes} markets={markets} onPickEmpty={setPicked} />
           <p className="mt-2 text-sm text-muted">{glance}</p>
+          {pane ? <HolePaneCard pane={pane} onClose={() => setPicked(null)} /> : null}
         </div>
       )}
     </section>
@@ -83,13 +108,26 @@ export function CountryPack() {
     huntNotes,
     namedHoles: stamp.holes,
   });
-  const markets = plantMarkets(holes.map((h) => h.market));
-  const countries = countryMarket(officeCountries(stamp.coverage, stamp.recipes));
-  const cap = capitalisingLine(stamp.counts);
-  const hole =
-    huntNotes.map(inventHole).find((n) => n !== EMPTY) ?? EMPTY;
-  const emptyN = holes.filter((h) => h.tone === "empty").length;
-  const glance = `${holes.length} holes. ${emptyN} Empty. WIN beside PLACE. ${cap}`;
+  const markets = squareGridMarkets();
+  const countries = countryMarket(officeCountries(stamp.coverage, millDisplayRecipes(stamp.recipes)));
+  const authOccupied = undefined;
+  const paintedOccupied = holes.filter((h) => holeSideOccupied(h)).length;
+  const occupiedN = paintedOccupied;
+  const cap = squareGlanceLine({
+    occupied: occupiedN,
+    n_solid: stamp.counts.certified,
+    kill: stamp.counts.kill,
+  });
+  const inventWhy = millHuntCaption(stamp.office.inventWhy?.trim() ?? "", {
+    mill_mode: (stamp as { mill_mode?: string }).mill_mode,
+    mill_n_armed: (stamp as { mill_n_armed?: number }).mill_n_armed,
+    n_armed: (stamp as { n_armed?: number }).n_armed,
+  });
+  const huntLine = /empty-hole hunt|invent_empty/i.test(inventWhy)
+    ? inventWhy
+    : (huntNotes.map(inventHole).find((n) => n !== EMPTY) ?? EMPTY);
+  const emptyN = holes.length - occupiedN;
+  const glance = `${emptyN} empty of ${holes.length} holes. WIN beside PLACE. ${cap}`;
 
   return (
     <section>
@@ -112,10 +150,10 @@ export function CountryPack() {
             <SquareGrid holes={holes} markets={markets} />
           </div>
           <p className="mt-2 text-sm text-muted">
-            {emptyN} Empty of {holes.length} holes. WIN beside PLACE.
+            {emptyN} empty of {holes.length} holes. WIN beside PLACE.
           </p>
-          <p className="mt-0.5 text-xs text-subtle">Opened mill: {cap}</p>
-          {hole !== EMPTY ? <p className="mt-0.5 text-xs text-subtle">Looking at {hole}.</p> : null}
+          <p className="mt-0.5 text-xs text-subtle">Square: {cap}</p>
+          {huntLine !== EMPTY ? <p className="mt-0.5 text-xs text-subtle">{huntLine}</p> : null}
           <CountryRowList rows={countries} />
         </div>
       )}
@@ -123,7 +161,15 @@ export function CountryPack() {
   );
 }
 
-function SquareGrid({ holes, markets }: { holes: readonly HoleCell[]; markets: readonly SquareMarket[] }) {
+function SquareGrid({
+  holes,
+  markets,
+  onPickEmpty,
+}: {
+  holes: readonly HoleCell[];
+  markets: readonly SquareMarket[];
+  onPickEmpty?: (cell: HoleCell) => void;
+}) {
   const byId = new Map(holes.map((h) => [h.id, h]));
   const regions = [...new Set(holes.map((h) => h.region))];
   return (
@@ -135,6 +181,9 @@ function SquareGrid({ holes, markets }: { holes: readonly HoleCell[]; markets: r
         {SQUARE_WINDOWS.map((w) => (
           <p key={w} className="text-center font-mono text-[9px] leading-tight text-subtle sm:text-[10px]">
             {SQUARE_WINDOW_LABEL[w]}
+            {w === "in_play" ? (
+              <span className="block text-[8px] font-normal normal-case text-subtle/80">sparse OK</span>
+            ) : null}
           </p>
         ))}
       </div>
@@ -144,7 +193,7 @@ function SquareGrid({ holes, markets }: { holes: readonly HoleCell[]; markets: r
           <div key={`${w}-mkt`} className="flex justify-center gap-1">
             {markets.map((m) => (
               <span key={m} className="w-4 text-center font-mono text-[9px] text-subtle">
-                {m === "PLACE" ? "P" : m === "LAY" ? "L" : "W"}
+                {m === "PLACE" ? "P" : "W"}
               </span>
             ))}
           </div>
@@ -164,12 +213,14 @@ function SquareGrid({ holes, markets }: { holes: readonly HoleCell[]; markets: r
               <div key={`${region}-${window}`} className="flex justify-center gap-1">
                 {markets.map((market) => {
                   const cell = byId.get(`${region}|${window}|${market}`);
-                  const tone = cell?.tone ?? "empty";
                   return (
-                    <span
+                    <HoleSquare
                       key={market}
-                      title={`${name} ${SQUARE_WINDOW_LABEL[window]} ${market} · ${TONE_LABEL[tone]}`}
-                      className={cn("size-4 rounded-[2px]", TONE[tone])}
+                      cell={cell}
+                      regionName={name}
+                      window={window}
+                      market={market}
+                      onPickEmpty={onPickEmpty}
                     />
                   );
                 })}
@@ -179,6 +230,94 @@ function SquareGrid({ holes, markets }: { holes: readonly HoleCell[]; markets: r
         );
       })}
     </div>
+  );
+}
+
+function HoleSquare({
+  cell,
+  regionName,
+  window,
+  market,
+  onPickEmpty,
+}: {
+  cell: HoleCell | undefined;
+  regionName: string;
+  window: (typeof SQUARE_WINDOWS)[number];
+  market: SquareMarket;
+  onPickEmpty?: (cell: HoleCell) => void;
+}) {
+  const back = cell?.backTone ?? (cell?.tone !== "empty" ? cell?.tone : "empty") ?? "empty";
+  const lay = cell?.layTone ?? "empty";
+  const bothEmpty = back === "empty" && lay === "empty";
+  const titleParts = [
+    `${regionName} ${SQUARE_WINDOW_LABEL[window]} ${market}`,
+    back !== "empty" ? `BACK · ${TONE_LABEL[back]}` : "BACK · Empty",
+    lay !== "empty" ? `LAY · ${TONE_LABEL[lay]}` : "LAY · Empty",
+  ];
+  const clickable = bothEmpty && cell && onPickEmpty;
+  const pick = () => {
+    if (clickable && cell) onPickEmpty(cell);
+  };
+  return (
+    <span
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={clickable ? pick : undefined}
+      onKeyDown={
+        clickable
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                pick();
+              }
+            }
+          : undefined
+      }
+      title={titleParts.join(" · ")}
+      className={cn(
+        "relative inline-block size-4 rounded-[2px]",
+        bothEmpty && TONE.empty,
+        clickable && "cursor-pointer hover:ring-2 hover:ring-fg/30",
+      )}
+      aria-label={titleParts.join(" · ")}
+    >
+      {!bothEmpty ? (
+        <>
+          <span
+            className={cn(
+              "absolute inset-y-0 left-0 w-1/2 rounded-l-[2px] ring-1 ring-inset ring-border/40",
+              back !== "empty" ? TONE[back] : "bg-elev",
+            )}
+            aria-hidden
+          />
+          <span
+            className={cn(
+              "absolute inset-y-0 right-0 w-1/2 rounded-r-[2px] ring-1 ring-inset ring-border/40",
+              lay !== "empty" ? TONE[lay] : "bg-elev",
+            )}
+            aria-hidden
+          />
+        </>
+      ) : null}
+    </span>
+  );
+}
+
+const markets = squareGridMarkets();
+
+function LegendSide({ label, split }: { label: string; split?: "left" | "right" }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="relative inline-block size-2 rounded-[1px] ring-1 ring-inset ring-border-strong" aria-hidden>
+        <span
+          className={cn(
+            "absolute inset-y-0 w-1/2 bg-subtle",
+            split === "right" ? "right-0" : "left-0",
+          )}
+        />
+      </span>
+      {label}
+    </span>
   );
 }
 

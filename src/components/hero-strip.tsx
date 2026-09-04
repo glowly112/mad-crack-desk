@@ -1,21 +1,27 @@
 import { useState } from "react";
 import { DayChips } from "@/components/day-chips";
 import { useDayScope } from "@/components/day-scope";
-import { LiveDot } from "@/components/live-dot";
+import { OracleStampLine } from "@/components/oracle-stamp-line";
 import { usePlantSource, useStamp } from "@/components/plant-context";
 import { EmptyState } from "@/components/empty-state";
-import { racingSquare } from "@/lib/lab/boards";
 import {
   axisDay,
   dailyDomain,
   dailyTicks,
   EMPTY,
-  floorDayValue,
+  floorFactDayValue,
   floorFacts,
   seriesWindow,
+  ensureWindowEndsOn,
   type FloorFact,
   type FloorFactId,
 } from "@/lib/lab/desk";
+import { floorRacingSquare, holeSideOccupied, squareOccupancyCounts } from "@/lib/lab/boards";
+import {
+  scrubMillVoidNamedHoles,
+  squareOpenFillsForPaint,
+} from "@/lib/lab/junk-fills.ts";
+import { millDisplayRecipes } from "@/lib/lab/mill-display.ts";
 import { cn, fmtScore } from "@/lib/utils";
 
 export function PlantPane() {
@@ -23,28 +29,41 @@ export function PlantPane() {
   const plant = usePlantSource();
   const scope = useDayScope();
   const [fact, setFact] = useState<FloorFactId>("paper");
-  const huntNotes = [stamp.office.inventWhy, ...stamp.hunters.map((h) => h.note)];
-  const holes = racingSquare({
-    recipes: stamp.recipes,
-    coverage: stamp.coverage,
-    moves: stamp.moves,
-    floorLog: stamp.floorLog,
-    huntNotes,
-    namedHoles: stamp.holes,
+  const open = squareOpenFillsForPaint(stamp.trades);
+  const holes = floorRacingSquare({
+    namedHoles: scrubMillVoidNamedHoles(stamp.holes, stamp.trades),
+    recipes: millDisplayRecipes(stamp.recipes),
+    openFills: open.map((f) => ({
+      id: f.id,
+      recipeId: f.recipeId,
+      recipe: f.recipe,
+      side: f.side,
+    })),
   });
-  const emptyHoles = holes.filter((h) => h.tone === "empty").length;
+  const paintedOccupied = holes.filter((h) => holeSideOccupied(h)).length;
+  const stampOcc = (stamp as { square_occupied_n?: number }).square_occupied_n;
+  const { emptyN: emptyHoles } = squareOccupancyCounts({
+    squareOccupiedN: stampOcc,
+    paintedOccupied,
+    total: holes.length,
+  });
   const facts = floorFacts(stamp, scope, emptyHoles);
   const selected = facts.find((f) => f.id === fact) ?? facts[0];
   const live = plant.source === "oracle";
 
   return (
     <section className="space-y-4">
-      <p className="inline-flex items-center gap-2 font-mono text-xs text-subtle">
-        <LiveDot tone={live ? "ok" : "warn"} tick={stamp.generated} />
-        <span key={stamp.generated} className="stamp-tick">
-          {live ? `${stamp.generated} · live oracle` : plant.detail}
-        </span>
-      </p>
+      <OracleStampLine
+        generated={stamp.generated}
+        live={live}
+        detail={plant.detail}
+        tone={live ? "ok" : "warn"}
+      />
+      {stamp.plantLine ? (
+        <p className="font-mono text-xs text-subtle" data-plant-line>
+          {stamp.plantLine}
+        </p>
+      ) : null}
 
       <div role="tablist" aria-label="Plant" className="flex flex-wrap border-b border-border">
         {facts.map((f) => (
@@ -103,6 +122,9 @@ function FactCell({
       <p key={`${fact.id}-${fact.value}`} className={cn("log-in mt-1 font-mono text-2xl leading-none tracking-tight", tone)}>
         {display}
       </p>
+      {fact.countsLine && fact.countsLine !== EMPTY ? (
+        <p className="mt-1 font-mono text-[10px] text-subtle tabular-nums">{fact.countsLine}</p>
+      ) : null}
       <p className="mt-1.5 text-[10px] text-subtle">{fact.hint}</p>
     </button>
   );
@@ -112,16 +134,26 @@ function DailyBars({ fact }: { fact: FloorFactId }) {
   const stamp = useStamp();
   const scope = useDayScope();
   const days = stamp.trends.map((t) => t.day);
-  const points = seriesWindow(days, scope.day, (d) =>
-    floorDayValue(
-      fact,
-      stamp.trends.find((t) => t.day === d),
-    ),
+  const points = ensureWindowEndsOn(
+    scope.today,
+    seriesWindow(days, scope.today, (d) => floorFactDayValue(stamp, fact, d)),
+    8,
   );
-  const series = points
-    .map((d) => stamp.trends.find((t) => t.day === d))
-    .filter(Boolean) as typeof stamp.trends;
-  const nums = series.map((p) => floorDayValue(fact, p));
+  const series = points.map((d) => {
+    const hit = stamp.trends.find((t) => t.day === d);
+    return (
+      hit ?? {
+        day: d,
+        paper_live_day_u: null,
+        n_solid: 0,
+        n_keep: 0,
+        n_measuring: 0,
+        n_dropped: 0,
+        factory_day_pnl_u: null,
+      }
+    );
+  });
+  const nums = series.map((p) => floorFactDayValue(stamp, fact, p.day));
   const vacant = fact === "holes" || nums.every((v) => v == null);
   if (vacant) {
     return (
@@ -183,7 +215,8 @@ function DailyBars({ fact }: { fact: FloorFactId }) {
         ))}
         {series.map((p, i) => {
           const selected = p.day === scope.day;
-          const v = floorDayValue(fact, p);
+          const oracleEnd = p.day === scope.today;
+          const v = floorFactDayValue(stamp, fact, p.day);
           const cx = xAt(i);
           const barW = Math.max(6, slot * 0.55);
           return (
@@ -217,7 +250,7 @@ function DailyBars({ fact }: { fact: FloorFactId }) {
                 className={selected ? "fill-fg font-mono" : "fill-subtle font-mono"}
                 fontSize="8"
               >
-                {i === 0 || i === series.length - 1 || selected ? axisDay(p.day) : String(Number(p.day.slice(8)))}
+                {i === 0 || oracleEnd || selected ? axisDay(p.day) : String(Number(p.day.slice(8)))}
               </text>
             </g>
           );

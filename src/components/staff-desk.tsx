@@ -4,7 +4,8 @@ import { FloorLog } from "@/components/floor-log";
 import { Portrait } from "@/components/portrait";
 import { useStamp } from "@/components/plant-context";
 import { EMPTY } from "@/lib/lab/desk";
-import { seatBubbles, seatPreview } from "@/lib/lab/staff-voice";
+import { seatBubbles, seatPreview, staffPeopleHops } from "@/lib/lab/staff-voice";
+import { staffSeats } from "@/lib/lab/staff-seats";
 import { isSeatRead, markSeatRead } from "@/lib/staff-read";
 import type { Seat } from "@/lib/lab/stamp";
 import { cn } from "@/lib/utils";
@@ -25,8 +26,10 @@ export function StaffDesk({ selectedId }: { selectedId?: string }) {
   const stamp = useStamp();
   const desktop = useDesktop();
   const [tick, setTick] = useState(0);
-  const openId = selectedId || (desktop ? "clerk" : undefined);
-  const seat = stamp.seats.find((s) => s.id === openId) ?? null;
+  const roster = staffSeats(stamp);
+  const peopleHops = staffPeopleHops(stamp);
+  const openId = selectedId || (desktop ? "invent" : roster[0]?.id);
+  const seat = roster.find((s) => s.id === openId) ?? null;
 
   useEffect(() => {
     if (!openId) return;
@@ -47,8 +50,21 @@ export function StaffDesk({ selectedId }: { selectedId?: string }) {
             <h1 className="text-2xl">Staff</h1>
             <p className="mt-1 text-sm text-muted">Who is watching the same bets.</p>
           </header>
+          {peopleHops.length > 0 ? (
+            <div className="border-b border-border px-4 py-3">
+              <p className="text-xs text-subtle">Recent hops</p>
+              <ul className="mt-2 space-y-1.5">
+                {peopleHops.slice(-4).map((h) => (
+                  <li key={`${h.at}:${h.text}`} className="text-xs text-muted leading-snug">
+                    {h.at ? <span className="font-mono text-subtle">{h.at} </span> : null}
+                    {h.text}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           <ul className="min-h-0 flex-1 overflow-y-auto">
-            {stamp.seats.map((s) => (
+            {roster.map((s) => (
               <SeatRow key={`${s.id}:${tick}`} seat={s} selected={s.id === openId} />
             ))}
           </ul>
@@ -59,7 +75,11 @@ export function StaffDesk({ selectedId }: { selectedId?: string }) {
             !openId && "hidden md:flex",
           )}
         >
-          {seat ? <Thread seat={seat} showBack={!desktop} /> : <p className="p-6 text-sm text-subtle">{EMPTY}</p>}
+          {seat ? (
+            <Thread seat={seat} showBack={!desktop && Boolean(selectedId)} />
+          ) : (
+            <p className="p-6 text-sm text-subtle">{EMPTY}</p>
+          )}
         </section>
       </div>
       <div className="shrink-0 border-t border-border px-4 py-6 md:px-6">
@@ -124,7 +144,7 @@ function Thread({ seat, showBack }: { seat: Seat; showBack: boolean }) {
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
         {bubbles.length === 0 ? (
-          <p className="text-sm text-subtle">{EMPTY}</p>
+          <p className="text-sm text-muted">{seatPreview(seat, stamp)}</p>
         ) : (
           <ol className="space-y-4">
             {bubbles.map((b, i) => {

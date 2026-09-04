@@ -10,6 +10,7 @@ import {
   YAxis,
 } from "recharts";
 import { useStamp } from "@/components/plant-context";
+import { EMPTY, trendProductionScore } from "@/lib/lab/desk";
 import { fmtU } from "@/lib/utils";
 
 export const Route = createFileRoute("/trends")({ component: Trends });
@@ -20,7 +21,10 @@ function Trends() {
   const points = stamp.trends.map((p) => ({
     ...p,
     label: p.day.slice(5),
+    paper_live_day_u: trendProductionScore(p),
   }));
+  const todayTrend = stamp.trends.find((t) => t.day === stamp.day);
+  const productionEmpty = (todayTrend?.n_solid ?? stamp.n_solid) <= 0;
 
   return (
     <div className="space-y-10">
@@ -31,7 +35,17 @@ function Trends() {
         </p>
       </header>
 
-        <ChartBlock title="Today's production score" sub="Solid recipes only. Still paper. Aim 100u/day.">
+        <ChartBlock
+          title="Today's production score"
+          sub={
+            productionEmpty
+              ? "KEEP 0 · no Solid recipes — production is Empty. Measuring paper is not the score."
+              : "Solid recipes only. Still paper. Empty until settled fills."
+          }
+        >
+        {productionEmpty ? (
+          <p className="py-8 text-center font-mono text-sm text-subtle">{EMPTY}</p>
+        ) : null}
         <ResponsiveContainer width="100%" height={220}>
           <LineChart data={points} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <CartesianGrid stroke="var(--color-border)" vertical={false} />
@@ -77,10 +91,22 @@ function Trends() {
           </LineChart>
         </ResponsiveContainer>
         <ul className="mt-3 flex flex-wrap gap-4 font-mono text-xs text-muted">
-          <li>Keep</li>
-          <li>Measuring</li>
-          <li className="text-bad">Dropped</li>
-          <li className="text-up">Solid</li>
+          <li className="inline-flex items-center gap-1.5">
+            <span className="inline-block h-0.5 w-3 bg-fg" aria-hidden />
+            Keep
+          </li>
+          <li className="inline-flex items-center gap-1.5">
+            <span className="inline-block h-0.5 w-3 bg-muted" aria-hidden />
+            Measuring
+          </li>
+          <li className="inline-flex items-center gap-1.5 text-bad">
+            <span className="inline-block h-0.5 w-3 bg-bad" aria-hidden />
+            Dropped
+          </li>
+          <li className="inline-flex items-center gap-1.5 text-up">
+            <span className="inline-block h-0.5 w-3 bg-up" aria-hidden />
+            Solid
+          </li>
         </ul>
       </ChartBlock>
 

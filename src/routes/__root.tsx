@@ -5,6 +5,7 @@ import { PlantProvider } from "@/components/plant-provider";
 import { PrefsProvider } from "@/components/prefs-provider";
 import { AppShell } from "@/components/app-shell";
 import { AppErrorComponent, AppNotFoundComponent } from "@/lib/error-component";
+import { getPlant } from "@/lib/lab/get-plant";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "Mad Crack Lab";
@@ -14,6 +15,10 @@ const PREFS_BOOT = `(function(){try{var p=JSON.parse(localStorage.getItem("mcl.p
 export const Route = createRootRoute({
   errorComponent: AppErrorComponent,
   notFoundComponent: AppNotFoundComponent,
+  loader: async () => {
+    const plant = await getPlant();
+    return { plant };
+  },
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -43,9 +48,16 @@ export const Route = createRootRoute({
       },
     ],
   }),
-  component: () => (
-    <html lang="en" className="antialiased" suppressHydrationWarning>
+  component: RootDocument,
+});
+
+function RootDocument() {
+  const { plant } = Route.useLoaderData();
+  return (
+    <html lang="en" className="antialiased" data-theme="charcoal" data-font="satoshi" data-size="m" suppressHydrationWarning>
       <head>
+        {/* Blocking stylesheet — must paint styled before route chunks hydrate */}
+        <link rel="stylesheet" href={appCss} />
         <HeadContent />
         <script dangerouslySetInnerHTML={{ __html: PREFS_BOOT }} />
       </head>
@@ -53,15 +65,15 @@ export const Route = createRootRoute({
         <PreviewHostBridge />
         <AuthProvider>
           <PrefsProvider>
-            <PlantProvider>
-            <AppShell>
-              <Outlet />
-            </AppShell>
+            <PlantProvider initial={plant}>
+              <AppShell>
+                <Outlet />
+              </AppShell>
             </PlantProvider>
           </PrefsProvider>
         </AuthProvider>
         <Scripts />
       </body>
     </html>
-  ),
-});
+  );
+}

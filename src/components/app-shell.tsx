@@ -3,6 +3,7 @@ import { DeskScroll } from "@/components/desk-scroll";
 import { LabMark, MarkSettings, NAV_MARKS } from "@/components/marks";
 import { LiveDot } from "@/components/live-dot";
 import { usePlantSource, useStamp } from "@/components/plant-context";
+import { oracleUtcMeta, ukStampLine } from "@/lib/lab/uk-time";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -38,7 +39,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               {plant.source === "oracle"
                 ? `${stamp.day} · live oracle`
                 : plant.source === "freeze"
-                  ? `frozen ${stamp.generated}`
+                  ? ukStampLine(stamp.generated, "frozen")
                   : plant.detail}
             </p>
           </div>
@@ -78,11 +79,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <LabMark className="size-5 shrink-0 text-fg" />
             <div className="min-w-0">
               <p className="text-sm font-medium">Mad Crack Lab</p>
-              <p className="truncate font-mono text-xs text-subtle">
+              <p
+                className="truncate font-mono text-xs text-subtle"
+                data-oracle-stamp={oracleUtcMeta(stamp.generated)}
+              >
                 {plant.source === "oracle"
                   ? `${stamp.day} · live oracle`
                   : plant.source === "freeze"
-                    ? `frozen ${stamp.generated}`
+                    ? ukStampLine(stamp.generated, "frozen")
                     : plant.detail}
               </p>
             </div>

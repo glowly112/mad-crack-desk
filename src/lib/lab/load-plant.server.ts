@@ -4,7 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import liveSnap from "./live-snapshot.json" with { type: "json" };
+import { applyBoardResetView, isBoardResetView, hasLivePlantArms } from "./board-reset.ts";
 import { applySnapshot } from "./from-snapshot.ts";
+import { readLocalOraclePlant, oracleScoreboardExists, readBookTapeRows } from "./oracle-local-plant.ts";
+import { parseFills, seedTapeFromBook, ingestMillFills } from "./trades.ts";
+import { sealFloorPaperFromTape } from "./mill-ingest.ts";
 import { bootStamp, digestStamp, plantFromTape, type PlantPayload } from "./plant-boot.ts";
 import type { LiveStamp } from "./from-digest.ts";
 
@@ -28,28 +32,39 @@ if day:
     d["day"] = day
 book = pathlib.Path.home() / "bbb/data/firm/live_ledger/book.jsonl"
 keys = ("pick_id","ts","settled_ts","cell_id","mode","status","odds","stake_gbp","paper_stake_gbp","paper_pnl_gbp","placed_result","certified_keep","gate_verdict","side","lab_status","date","unmatched","unmatched_size","atb_size_gbp","phase","in_play","off_ts","off_time","horse","runner","horse_name","runner_name","selection_name","sel_name")
-want = set()
-try:
-    end = date.fromisoformat(str(day))
-    want = {(end - timedelta(days=i)).isoformat() for i in range(14)}
-except Exception:
+tape = d.get("fills")
+if not isinstance(tape, list):
+    snap = d.get("snapshot") if isinstance(d.get("snapshot"), dict) else {}
+    tape = snap.get("fills") if isinstance(snap.get("fills"), list) else []
+if tape:
+    d["fills"] = tape
+else:
     want = set()
-by = defaultdict(list)
-if book.exists() and want:
-    for line in book.read_text().splitlines()[-4000:]:
-        if not line.strip():
-            continue
-        try:
-            row = json.loads(line)
-        except Exception:
-            continue
-        dte = row.get("date")
-        if dte in want:
-            by[dte].append({k: row.get(k) for k in keys})
-fills = []
-for dte in sorted(by):
-    fills.extend(by[dte][-80:])
-d["fills"] = fills
+    try:
+        end = date.fromisoformat(str(day))
+        want = {(end - timedelta(days=i)).isoformat() for i in range(14)}
+    except Exception:
+        want = set()
+    by = defaultdict(list)
+    if book.exists() and want:
+        for line in book.read_text().splitlines():
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except Exception:
+                continue
+            dte = row.get("date")
+            if dte in want:
+                by[dte].append({k: row.get(k) for k in keys})
+    fills = []
+    for dte in sorted(by):
+        bucket = by[dte]
+        if dte == day:
+            fills.extend(bucket[-120:])
+        else:
+            fills.extend(bucket[-120:])
+    d["fills"] = fills
 wait_open = []
 lf = pathlib.Path.home() / "bbb/data/firm/lab/latest/live_fast_auto.json"
 if lf.exists():
@@ -60,10 +75,47 @@ if lf.exists():
     except Exception:
         pass
 d["wait_open"] = wait_open
+lf_p = pathlib.Path.home() / "bbb/data/firm/lab/latest/live_fast_auto.json"
+if lf_p.exists():
+    try:
+        lf = json.loads(lf_p.read_text())
+        d["live_fast"] = lf
+        d["path_runs"] = lf.get("path_runs") or []
+    except Exception:
+        pass
+d["mill_n_armed"] = d.get("mill_n_armed")
+d["n_armed"] = d.get("n_armed")
+if d.get("ts"):
+    d["generated_at_utc"] = d.get("ts")
+    d["generatedAt"] = d.get("ts")
+hunt_p = pathlib.Path.home() / "bbb/data/firm/lab/latest/factory_empty_hole_hunt_stamp.json"
+if hunt_p.exists():
+    hs = json.loads(hunt_p.read_text())
+    d["occupancy_post_epoch"] = hs.get("occupancy_post_epoch")
+    d["mill_mode"] = hs.get("mill_mode")
+    d["invent_mode"] = hs.get("invent_mode")
+    d["empty_hole_hunt"] = hs
+    if hs.get("ts"):
+        d["generated_at_utc"] = hs["ts"]
+        d["generatedAt"] = hs["ts"]
+im_p = pathlib.Path.home() / "bbb/data/firm/lab/latest/invent_mill.json"
+if im_p.exists():
+    im = json.loads(im_p.read_text())
+    d["invent_mill"] = im
+    if im.get("mill_mode"):
+        d["mill_mode"] = im["mill_mode"]
+    if im.get("n_armed"):
+        d["n_armed"] = im["n_armed"]
+        if not d.get("mill_n_armed"):
+            d["mill_n_armed"] = im["n_armed"]
+snap_inner = d.get("snapshot") if isinstance(d.get("snapshot"), dict) else {}
+if snap_inner.get("mill_n_armed") and not d.get("mill_n_armed"):
+    d["mill_n_armed"] = snap_inner.get("mill_n_armed")
+if snap_inner.get("n_armed") and not d.get("n_armed"):
+    d["n_armed"] = snap_inner.get("n_armed")
 print(json.dumps(d))
 `.trim();
 
-const LAB_SNAPSHOT = "https://stridesmart.uk/lab/api/snapshot";
 const LOOPBACK = ["http://127.0.0.1:8788/api/snapshot", "http://127.0.0.1:8780/api/snapshot"];
 
 function onVercel(): boolean {
@@ -74,12 +126,7 @@ function snapshotUrls(): string[] {
   const out: string[] = [];
   const envUrl = process.env.ORACLE_SNAPSHOT_URL?.trim();
   if (envUrl) out.push(envUrl);
-  // Live lab console. Auth required; 401 is a miss. On Vercel always try so
-  // ORACLE_BASIC_AUTH in project env actually wires the floor. Off-box preview
-  // only hits it when auth is set (bare TLS hung the last poll).
-  if (process.env.ORACLE_BASIC_AUTH?.trim() || onVercel()) {
-    if (!out.includes(LAB_SNAPSHOT)) out.push(LAB_SNAPSHOT);
-  }
+  // Never default to stridesmart.uk/lab — nginx 302s to /desk HTML, not JSON.
   if (!onVercel()) {
     for (const u of LOOPBACK) {
       if (!out.includes(u)) out.push(u);
@@ -100,6 +147,14 @@ function httpHeaders(): Record<string, string> {
   return { Authorization: `Basic ${token}` };
 }
 
+async function tryLocal(base: LiveStamp): Promise<PlantPayload | null> {
+  const snap = await readLocalOraclePlant();
+  if (!snap) return null;
+  const stamp = applySnapshot(snap, base);
+  if (stamp.source !== "oracle") return null;
+  return { stamp, source: "oracle", detail: "local oracle scoreboard" };
+}
+
 async function tryHttp(base: LiveStamp): Promise<PlantPayload | null> {
   const headers = httpHeaders();
   const hits = await Promise.all(
@@ -111,7 +166,12 @@ async function tryHttp(base: LiveStamp): Promise<PlantPayload | null> {
           headers: { ...headers, Accept: "application/json", "Cache-Control": "no-cache" },
         });
         if (!res.ok) return null;
-        const snap = (await res.json()) as unknown;
+        const ctype = res.headers.get("content-type") ?? "";
+        const text = await res.text();
+        const trimmed = text.trimStart();
+        if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return null;
+        if (ctype.includes("text/html") || trimmed.startsWith("<!")) return null;
+        const snap = JSON.parse(text) as unknown;
         const stamp = applySnapshot(snap, base);
         if (stamp.source !== "oracle") return null;
         return { stamp, source: "oracle" as const, detail: url };
@@ -169,47 +229,79 @@ async function trySsh(base: LiveStamp): Promise<PlantPayload | null> {
 }
 
 function fromLiveFile(base: LiveStamp): PlantPayload {
-  const stamp = applySnapshot(liveSnap, base);
+  const snapStamp = applySnapshot(liveSnap, base);
+  const stamp = applyBoardResetView(snapStamp);
   const frozen = {
     ...stamp,
     source: "freeze" as const,
   };
+  const detail = isBoardResetView(stamp)
+    ? `board reset · frozen ${frozen.generated}`
+    : `frozen ${frozen.generated} · post-reset arms on board`;
   return {
     stamp: frozen,
     source: "freeze",
-    detail: `oracle unreachable · frozen ${frozen.generated}`,
+    detail,
   };
 }
 
+async function finishOraclePayload(hit: PlantPayload): Promise<PlantPayload> {
+  let stamp = applyBoardResetView(hit.stamp);
+  if (stamp.source === "oracle" && stamp.day && (await oracleScoreboardExists())) {
+    const bookRows = await readBookTapeRows(stamp.day);
+    if (bookRows.length) {
+      const bookFills = parseFills(bookRows);
+      const seeded = seedTapeFromBook(stamp.trades, bookFills, stamp.day, stamp.recipes);
+      stamp = applyBoardResetView({
+        ...stamp,
+        trades: ingestMillFills(seeded, stamp.day, stamp.recipes),
+      });
+    }
+  }
+  stamp = sealFloorPaperFromTape(stamp);
+  const detail = hasLivePlantArms(stamp)
+    ? `live oracle · ${stamp.recipes.length} on board · ${stamp.holes?.length ?? 0} holes · stamp ${stamp.generated}`
+    : isBoardResetView(stamp)
+      ? "new run · board reset"
+      : `live oracle · post-reset arms (${stamp.recipes.length} recipes · ${stamp.trades.length} fills)`;
+  return { ...hit, stamp, detail };
+}
+
 export async function loadPlant(): Promise<PlantPayload> {
+  const base = digestStamp();
   try {
-    const base = digestStamp();
-    const remote = Promise.race([
+    const local = await tryLocal(base);
+    if (local) return finishOraclePayload(local);
+
+    const remote = await Promise.race([
       (async () => {
-        const [http, ssh] = await Promise.all([tryHttp(base), trySsh(base)]);
-        if (http && ssh) {
-          const trades =
-            http.stamp.trades.length === 0 && ssh.stamp.trades.length > 0
-              ? ssh.stamp.trades
-              : http.stamp.trades;
-          const wait_open =
-            (http.stamp.wait_open?.length ?? 0) === 0 && (ssh.stamp.wait_open?.length ?? 0) > 0
-              ? ssh.stamp.wait_open
-              : (http.stamp.wait_open ?? []);
-          return { ...http, stamp: { ...http.stamp, trades, wait_open } };
-        }
-        return http ?? ssh;
+        const ssh = await trySsh(base);
+        if (ssh) return finishOraclePayload(ssh);
+        const http = await tryHttp(base);
+        return http ? finishOraclePayload(http) : null;
       })(),
       new Promise<null>((resolve) => {
-        setTimeout(() => resolve(null), 10_000);
+        setTimeout(() => resolve(null), 15_000);
       }),
     ]);
-    return (await remote) ?? fromLiveFile(base);
+    if (remote) return remote;
+
+    if (await oracleScoreboardExists()) {
+      const retry = await tryLocal(base);
+      if (retry) return finishOraclePayload(retry);
+    }
+
+    return fromLiveFile(base);
   } catch {
+    if (await oracleScoreboardExists()) {
+      const local = await tryLocal(base);
+      if (local) return finishOraclePayload(local);
+    }
     return fromLiveFile(digestStamp());
   }
 }
 
 export function fallbackPlant(): PlantPayload {
-  return plantFromTape(bootStamp());
+  const payload = plantFromTape(bootStamp());
+  return { ...payload, stamp: applyBoardResetView(payload.stamp) };
 }

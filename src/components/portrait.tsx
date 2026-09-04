@@ -1,3 +1,4 @@
+import { STAFF_PORTRAIT_ID, isLockedStaffId } from "@/lib/lab/staff-seats";
 import { cn } from "@/lib/utils";
 
 const HAS_FACE = new Set([
@@ -21,6 +22,11 @@ const OWNER_TO_ID: Record<string, string> = {
   Foreman: "foreman",
   Curator: "curator",
   Grok: "bauron",
+  Invent: "bauron",
+  Holdout: "igor",
+  Auditor: "clerk",
+  "Night + mill watch": "foreman",
+  Wiki: "curator",
 };
 
 export function ownerId(owner: string): string | null {
@@ -36,8 +42,9 @@ export function Portrait({
   name: string;
   size?: "sm" | "md" | "lg";
 }) {
+  const portraitId = isLockedStaffId(id) ? STAFF_PORTRAIT_ID[id] : id;
   const box = size === "sm" ? "size-8" : size === "lg" ? "size-14" : "size-11";
-  if (!HAS_FACE.has(id)) {
+  if (!HAS_FACE.has(portraitId)) {
     return (
       <span
         className={cn(
@@ -52,7 +59,7 @@ export function Portrait({
   }
   return (
     <img
-      src={`/portraits/${id}.jpg`}
+      src={`/portraits/${portraitId}.jpg`}
       alt=""
       width={size === "lg" ? 56 : size === "sm" ? 32 : 44}
       height={size === "lg" ? 56 : size === "sm" ? 32 : 44}
