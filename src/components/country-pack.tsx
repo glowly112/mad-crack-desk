@@ -1,4 +1,7 @@
+import { useState } from "react";
 import { EmptyState } from "@/components/empty-state";
+import { HoleCellMark, HolePane } from "@/components/hole-pane";
+import { useDayScope } from "@/components/day-scope";
 import { useStamp } from "@/components/plant-context";
 import { millDisplayRecipes } from "@/lib/lab/mill-display.ts";
 import {
@@ -20,6 +23,7 @@ import {
   squareOpenFillsForPaint,
 } from "@/lib/lab/junk-fills.ts";
 import { EMPTY } from "@/lib/lab/desk";
+import { holeCellMark, holePaneDetail } from "@/lib/lab/hole-pane";
 import type { CountryRow, HoleCell, MarketSquare, SquareMarket } from "@/lib/lab/boards";
 import { cn } from "@/lib/utils";
 
@@ -44,6 +48,8 @@ const TONE_LABEL: Record<MarketSquare["tone"], string> = {
 /** Morning board square: empty holes visible. BACK/LAY split on each WIN/PLACE cell. */
 export function FloorSquare() {
   const stamp = useStamp();
+  const scope = useDayScope();
+  const [picked, setPicked] = useState<string | null>(null);
   const open = squareOpenFillsForPaint(stamp.trades);
   const holes = floorRacingSquare({
     namedHoles: scrubMillVoidNamedHoles(stamp.holes, stamp.trades),
@@ -61,6 +67,17 @@ export function FloorSquare() {
   const occupiedN = paintedOccupied;
   const emptyN = holes.length - occupiedN;
   const glance = `${emptyN} empty of ${holes.length} holes on the square`;
+  const paneCtx = {
+    day: scope.day,
+    recipes: stamp.recipes,
+    trades: stamp.trades,
+    inventWhy: stamp.office.inventWhy,
+    seatNow: stamp.seats.find((s) => s.id === "invent")?.now ?? stamp.seats[0]?.now,
+    hunters: stamp.hunters,
+    rejects: stamp.office.rejects,
+  };
+  const selectedCell = picked ? holes.find((h) => h.id === picked) : undefined;
+  const pane = picked ? holePaneDetail(picked, selectedCell, paneCtx) : null;
 
   return (
     <section>
@@ -77,9 +94,18 @@ export function FloorSquare() {
       {holes.length === 0 ? (
         <EmptyState copy={EMPTY} />
       ) : (
-        <div role="img" aria-label={glance}>
-          <SquareGrid holes={holes} markets={markets} />
+        <div>
+          <div role="img" aria-label={glance}>
+            <SquareGrid
+              holes={holes}
+              markets={markets}
+              picked={picked}
+              onPick={setPicked}
+              paneCtx={paneCtx}
+            />
+          </div>
           <p className="mt-2 text-sm text-muted">{glance}</p>
+          {pane ? <HolePane detail={pane} /> : null}
         </div>
       )}
     </section>
@@ -151,7 +177,27 @@ export function CountryPack() {
   );
 }
 
-function SquareGrid({ holes, markets }: { holes: readonly HoleCell[]; markets: readonly SquareMarket[] }) {
+function SquareGrid({
+  holes,
+  markets,
+  picked,
+  onPick,
+  paneCtx,
+}: {
+  holes: readonly HoleCell[];
+  markets: readonly SquareMarket[];
+  picked?: string | null;
+  onPick?: (id: string) => void;
+  paneCtx?: {
+    day: string;
+    recipes: import("@/lib/lab/stamp").Recipe[];
+    trades: import("@/lib/lab/trades").Fill[];
+    inventWhy: string;
+    seatNow?: string;
+    hunters: readonly { note: string }[];
+    rejects?: readonly string[];
+  };
+}) {
   const byId = new Map(holes.map((h) => [h.id, h]));
   const regions = [...new Set(holes.map((h) => h.region))];
   return (
@@ -195,7 +241,18 @@ function SquareGrid({ holes, markets }: { holes: readonly HoleCell[]; markets: r
               <div key={`${region}-${window}`} className="flex justify-center gap-1">
                 {markets.map((market) => {
                   const cell = byId.get(`${region}|${window}|${market}`);
-                  return <HoleSquare key={market} cell={cell} regionName={name} window={window} market={market} />;
+                  return (
+                    <HoleSquare
+                      key={market}
+                      cell={cell}
+                      regionName={name}
+                      window={window}
+                      market={market}
+                      selected={picked === cell?.id}
+                      mark={paneCtx && cell ? holeCellMark(cell.id, cell, paneCtx) : EMPTY}
+                      onPick={onPick && cell ? () => onPick(cell.id) : undefined}
+                    />
+                  );
                 })}
               </div>
             ))}
@@ -211,11 +268,17 @@ function HoleSquare({
   regionName,
   window,
   market,
+  selected,
+  mark,
+  onPick,
 }: {
   cell: HoleCell | undefined;
   regionName: string;
   window: (typeof SQUARE_WINDOWS)[number];
   market: SquareMarket;
+  selected?: boolean;
+  mark?: string;
+  onPick?: () => void;
 }) {
   const back = cell?.backTone ?? (cell?.tone !== "empty" ? cell?.tone : "empty") ?? "empty";
   const lay = cell?.layTone ?? "empty";
@@ -224,12 +287,21 @@ function HoleSquare({
     `${regionName} ${SQUARE_WINDOW_LABEL[window]} ${market}`,
     back !== "empty" ? `BACK · ${TONE_LABEL[back]}` : "BACK · Empty",
     lay !== "empty" ? `LAY · ${TONE_LABEL[lay]}` : "LAY · Empty",
+    mark && mark !== EMPTY ? mark : "",
   ];
   return (
-    <span
-      title={titleParts.join(" · ")}
-      className={cn("relative inline-block size-4 rounded-[2px]", bothEmpty && TONE.empty)}
-      aria-label={titleParts.join(" · ")}
+    <button
+      type="button"
+      title={titleParts.filter(Boolean).join(" · ")}
+      aria-label={titleParts.filter(Boolean).join(" · ")}
+      aria-pressed={selected}
+      onClick={onPick}
+      className={cn(
+        "relative mb-3 inline-block size-4 rounded-[2px] transition-shadow",
+        bothEmpty && TONE.empty,
+        selected && "ring-2 ring-fg ring-offset-1 ring-offset-bg",
+        onPick && "cursor-pointer hover:ring-1 hover:ring-border-strong",
+      )}
     >
       {!bothEmpty ? (
         <>
@@ -249,7 +321,8 @@ function HoleSquare({
           />
         </>
       ) : null}
-    </span>
+      <HoleCellMark mark={mark ?? EMPTY} selected={selected} />
+    </button>
   );
 }
 

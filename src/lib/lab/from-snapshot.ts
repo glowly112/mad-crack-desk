@@ -425,8 +425,20 @@ function armedFromSnap(
  * Overlay a live oracle snapshot (Linear / local_api / firm scoreboard) onto a
  * digest-applied stamp. Never treats KEEP paper (pnlTotal) as the production score.
  */
+const LEGACY_SEAT_ALIASES: Record<string, string> = {
+  bauron: "invent",
+  mercator: "invent",
+  clerk: "holdout",
+  igor: "night",
+  foreman: "night",
+  hyde: "auditor",
+  virchow: "auditor",
+  curator: "wiki",
+};
+
 function seatKey(name: string): string {
-  return name.toLowerCase().replace(/^dr\.?\s*/, "").replace(/\s+/g, "");
+  const key = name.toLowerCase().replace(/^dr\.?\s*/, "").replace(/\s+/g, "");
+  return LEGACY_SEAT_ALIASES[key] ?? key;
 }
 
 export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
@@ -624,7 +636,7 @@ function rejectsFromSnap(snap: Record<string, unknown>): string[] | null {
   return out.length ? out : null;
 }
 
-const INVENT_SEAT_IDS = new Set(["bauron", "mercator", "foreman"]);
+const INVENT_SEAT_IDS = new Set(["invent"]);
 
 function overlaySeats(
   base: LiveStamp["seats"],

@@ -13,8 +13,6 @@ import {
   fillsOnDay,
   tradesMillOpenFills,
   tradesSettledVoidFills,
-  waitDeskRow,
-  tradesWaitChips,
 } from "@/lib/lab/trades";
 import { fmtU } from "@/lib/utils";
 
@@ -29,11 +27,10 @@ export function Trades() {
   const open = tradesMillOpenFills(stamp.trades, scope.day, stamp.recipes);
   const settled = rollup.fills;
   const voided = tradesSettledVoidFills(dayFills, stamp.recipes);
-  const chips = scope.lookingBack ? [] : tradesWaitChips(stamp.recipes, stamp.wait_open ?? [], open);
   const tape = dayTapePnl(settled, stamp.fuse_on);
   const live = plant.source === "oracle";
   const days = stamp.trends.map((t) => t.day);
-  const firstId = open[0]?.id ?? settled[0]?.id ?? chips[0]?.id ?? "";
+  const firstId = open[0]?.id ?? settled[0]?.id ?? "";
   const [picked, setPicked] = useState(firstId);
   const selected = picked || firstId;
 
@@ -44,19 +41,9 @@ export function Trades() {
       label: "Open",
       hint: scope.lookingBack ? axisDay(scope.day) : "Still in flight",
       rows: open.map((fill) => ({
-        ...fillDeskRow(fill, stamp.fuse_on),
+        ...fillDeskRow(fill, stamp.fuse_on, stamp.recipes),
         selected: selected === fill.id,
         onPick: pick(fill.id),
-      })),
-    },
-    {
-      id: "wait",
-      label: "Waiting for races",
-      hint: "Recipe · not a ticket",
-      rows: chips.map((chip) => ({
-        ...waitDeskRow(chip),
-        selected: selected === chip.id,
-        onPick: pick(chip.id),
       })),
     },
     {
@@ -64,7 +51,7 @@ export function Trades() {
       label: scope.lookingBack ? `${axisDay(scope.day)} settled` : "Settled",
       hint: "Won / lost in u",
       rows: settled.map((fill) => ({
-        ...fillDeskRow(fill, stamp.fuse_on),
+        ...fillDeskRow(fill, stamp.fuse_on, stamp.recipes),
         selected: selected === fill.id,
         onPick: pick(fill.id),
       })),
@@ -76,7 +63,7 @@ export function Trades() {
             label: "Void",
             hint: "0u · not a win or lose",
             rows: voided.map((fill) => ({
-              ...fillDeskRow(fill, stamp.fuse_on),
+              ...fillDeskRow(fill, stamp.fuse_on, stamp.recipes),
               selected: selected === fill.id,
               onPick: pick(fill.id),
             })),

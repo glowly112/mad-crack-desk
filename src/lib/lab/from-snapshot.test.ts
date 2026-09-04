@@ -200,7 +200,7 @@ test("fills overlay lists today's paper tape and does not invent production", ()
         {
           pick_id: "nz-1",
           ts: "2026-09-02T00:07:45Z",
-          cell_id: "H-20260828T020000Z-nz-morning-win-one-pick-band-2-5-4-49",
+          cell_id: "H-ehole-nz-morning-win-73508Z",
           mode: "auto_dry",
           status: "SETTLED",
           odds: 3.35,
@@ -215,7 +215,7 @@ test("fills overlay lists today's paper tape and does not invent production", ()
   );
   assert.equal(live.trades.length, 1);
   assert.equal(live.trades[0]?.book, "paper");
-  assert.equal(live.trades[0]?.recipe, "NZ morning WIN · one-pick 2.5–4.49");
+  assert.equal(live.trades[0]?.recipe, "NZ morning WIN");
   assert.deepEqual(
     live.trades.filter((t) => t.book === "production" || t.book === "live"),
     [],
@@ -308,11 +308,11 @@ test("oracle snapshot invent overlays staff seats and Invent fire KPI without de
     cells: [],
   };
   const live = applySnapshot(snap, base());
-  const bauron = live.seats.find((s) => s.id === "bauron");
-  assert.ok(bauron);
-  assert.match(bauron!.now, /empty-hole fast-arm hunt/);
-  assert.match(bauron!.now, /mill parked/);
-  assert.ok(!/densify/i.test(bauron!.now));
+  const invent = live.seats.find((s) => s.id === "invent");
+  assert.ok(invent);
+  assert.match(invent!.now, /empty-hole fast-arm hunt/);
+  assert.match(invent!.now, /mill parked/);
+  assert.ok(!/densify/i.test(invent!.now));
   const inventKpi = live.kpis.find((k) => k.id === "invent");
   assert.ok(inventKpi);
   assert.match(inventKpi!.detail, /empty-hole fast-arm hunt/);

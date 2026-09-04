@@ -70,10 +70,10 @@ function olderFor(seatId: string, stamp: StaffWatchStamp): SeatBubble[] {
     const certified = /certified|solid/i.test(m.to);
     const parked = /parked|research keep/i.test(m.to);
     const mine =
-      (seatId === "virchow" && dead) ||
-      (seatId === "clerk" && dead) ||
-      (seatId === "hyde" && (certified || parked)) ||
-      (seatId === "foreman" && (certified || parked));
+      ((seatId === "auditor" || seatId === "virchow") && dead) ||
+      ((seatId === "holdout" || seatId === "clerk") && dead) ||
+      ((seatId === "auditor" || seatId === "hyde") && (certified || parked)) ||
+      ((seatId === "night" || seatId === "foreman") && (certified || parked));
     if (mine) out.push({ text, at: ukHopAt(m.at) || m.at, older: true });
   }
   return out;
@@ -81,18 +81,23 @@ function olderFor(seatId: string, stamp: StaffWatchStamp): SeatBubble[] {
 
 function resetNowBubbles(seatId: string): string[] {
   switch (seatId) {
+    case "holdout":
     case "clerk":
       return ["The square is empty. Paper is Empty.", "Nothing from the old hunt is on today's tape."];
+    case "night":
     case "igor":
       return ["Watching the empty square.", "Nothing on today's tape yet."];
+    case "auditor":
     case "hyde":
       return ["Nothing certified is on today's tape.", "Tweaks wait for the next empty cell on the square."];
     case "foreman":
       return ["Nothing certified is on today's tape.", "The board reset — we start from empty holes."];
+    case "invent":
     case "mercator":
       return ["Watching empty holes on the square.", "Next pick lands when invent queues one."];
     case "bauron":
       return ["Invent is on.", "We are hunting empty holes, not replaying yesterday's tape."];
+    case "wiki":
     case "curator":
       return ["Race files stay on disk.", "Today's board is Empty."];
     case "virchow":
@@ -133,18 +138,22 @@ function millSeatLines(seatId: string, stamp: StaffWatchStamp): string[] {
     act.paperDayU != null ? `Today's settled paper is ${fmtU(act.paperDayU)}.` : "";
 
   switch (seatId) {
+    case "holdout":
     case "clerk":
       return [bookLine, openLine, settleLine].filter(Boolean);
+    case "night":
     case "igor":
       return [
         act.openCount > 0 ? `Paper is booking — ${act.openCount} open tickets.` : "",
         paperLine,
         act.openCount > 0 ? "Scoring those runs, not inventing." : "",
       ].filter(Boolean);
+    case "wiki":
     case "curator":
       return act.openCount > 0 || act.settledToday.length > 0
         ? ["Race files are in.", bookLine || settleLine || openLine].filter(Boolean)
         : [];
+    case "auditor":
     case "virchow":
       if (!act.lastSettled || act.lastSettled.result !== "lost") return [];
       return [
@@ -164,6 +173,7 @@ function millSeatLines(seatId: string, stamp: StaffWatchStamp): string[] {
           : "",
         paperLine,
       ].filter(Boolean);
+    case "invent":
     case "bauron":
     case "mercator":
       return [];
@@ -184,6 +194,7 @@ function tapeSeatLines(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchStamp): 
   const f = staffBookFacts(seat.now ?? "", stamp);
   const britain = f.tape ? speakBook(f.tape.title, f.tape) : "";
   switch (seat.id) {
+    case "invent":
     case "bauron": {
       const inventWhy = stamp.office?.inventWhy ?? "";
       const emptyHoleHunt = /empty-hole hunt|invent_empty/i.test(inventWhy);
@@ -205,10 +216,12 @@ function tapeSeatLines(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchStamp): 
         f.densify ? "New market, not a patch on Britain." : "",
       ].filter(Boolean);
     }
+    case "night":
     case "igor":
       return f.tapeName
         ? ["I'm scoring the paper bets already on the books.", "Not inventing."]
         : [];
+    case "auditor":
     case "hyde": {
       const trial = f.hydeTrials[0];
       if (trial) {
@@ -228,6 +241,7 @@ function tapeSeatLines(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchStamp): 
         "The one on the tape is still the original horses.",
       ];
     }
+    case "holdout":
     case "clerk": {
       if (!f.tape && !f.holdBook && f.fillAdjKills.length === 0) return [];
       const stages = f.tape ? bookStages(f.tape) : [];
@@ -249,6 +263,7 @@ function tapeSeatLines(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchStamp): 
       ];
       return lines.filter(Boolean);
     }
+    case "night":
     case "foreman": {
       const trial = f.trial ? speakBook(f.trial.title, f.trial) : "";
       const parked = f.parked[0] ? speakBook(f.parked[0].title, f.parked[0]) : "";
@@ -262,6 +277,7 @@ function tapeSeatLines(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchStamp): 
         "Don't mix them.",
       ].filter(Boolean);
     }
+    case "auditor":
     case "virchow": {
       const kill = f.fillAdjKills[0] ?? (stamp.moves ?? []).find((m) => /dead/i.test(m.to));
       if (!kill) return [];
@@ -270,11 +286,13 @@ function tapeSeatLines(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchStamp): 
         "Don't copy it.",
       ];
     }
+    case "invent":
     case "mercator": {
       const look = f.inventCell !== EMPTY ? f.inventCell : "";
       if (!look) return [];
       return [`Next empty market to look at: ${look}.`];
     }
+    case "wiki":
     case "curator":
       if (!f.tapeName) return [];
       return ["Today's British race files are in.", "Nothing missing to score."];
@@ -311,9 +329,9 @@ export function staffPeopleHops(stamp: StaffWatchStamp): SeatBubble[] {
     const parked = /parked|research keep/i.test(m.to);
     const who =
       dead
-        ? "Virchow · Clerk"
+        ? "Auditor · Holdout"
         : certified || parked
-          ? "Hyde · Foreman"
+          ? "Auditor · Night"
           : "Staff";
     out.push({ text: `${who}: ${text}`, at: ukHopAt(m.at) || m.at, older: true });
   }

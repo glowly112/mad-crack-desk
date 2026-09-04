@@ -312,7 +312,7 @@ export function productionSegments(
 }
 
 export function floorSeats<T extends { id: string }>(seats: readonly T[]): T[] {
-  const order = ["clerk", "foreman", "igor"];
+  const order = ["invent", "holdout", "night"];
   return order
     .map((id) => seats.find((s) => s.id === id))
     .filter((s): s is T => Boolean(s));
@@ -515,6 +515,8 @@ export type DeskRow = {
   book: string;
   result: string;
   pnl: number | null;
+  /** Muted ehole run tag beside strategy name on Trades. */
+  nameTag?: string | null;
   holdingId?: string;
   selected?: boolean;
   onPick?: () => void;

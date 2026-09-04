@@ -73,9 +73,9 @@ test("Floor next action is KEEP on hold while fuse is off, else Empty", () => {
   assert.match(line!, /fuse stays off/i);
 });
 
-test("floor watching strip is Clerk, Foreman, mill", () => {
+test("floor watching strip is Invent, Holdout, Night", () => {
   const ids = floorSeats(STAMP.seats).map((s) => s.id);
-  assert.deepEqual(ids, ["clerk", "foreman", "igor"]);
+  assert.deepEqual(ids, ["invent", "holdout", "night"]);
 });
 
 test("cell names carry country, window, market, and a pick hint", () => {

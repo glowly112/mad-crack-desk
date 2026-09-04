@@ -76,12 +76,12 @@ test("floor square is 64 empty holes on board reset", () => {
 
 test("staff on board reset watches empty square, not Britain tape", () => {
   const reset = applyBoardResetView(STAMP as unknown as LiveStamp);
-  const clerk = seatBubbles(reset.seats.find((s) => s.id === "clerk")!, reset).map((b) => b.text).join(" ");
-  assert.match(clerk, /empty/i);
-  assert.ok(!clerk.includes("Britain · near-off"));
-  const igor = seatBubbles(reset.seats.find((s) => s.id === "igor")!, reset).map((b) => b.text).join(" ");
-  assert.match(igor, /empty square/i);
-  assert.ok(!igor.includes("paper bets already on the books"));
+  const holdout = seatBubbles(reset.seats.find((s) => s.id === "holdout")!, reset).map((b) => b.text).join(" ");
+  assert.match(holdout, /empty/i);
+  assert.ok(!holdout.includes("Britain · near-off"));
+  const night = seatBubbles(reset.seats.find((s) => s.id === "night")!, reset).map((b) => b.text).join(" ");
+  assert.match(night, /empty square/i);
+  assert.ok(!night.includes("paper bets already on the books"));
 });
 
 test("STAMP legacy recipes do not count as armed — post-epoch arms only", () => {

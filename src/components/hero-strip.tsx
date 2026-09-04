@@ -28,7 +28,7 @@ export function PlantPane() {
   const stamp = useStamp();
   const plant = usePlantSource();
   const scope = useDayScope();
-  const [fact, setFact] = useState<FloorFactId>("paper");
+  const [fact, setFact] = useState<FloorFactId>("holes");
   const open = squareOpenFillsForPaint(stamp.trades);
   const holes = floorRacingSquare({
     namedHoles: scrubMillVoidNamedHoles(stamp.holes, stamp.trades),
@@ -113,10 +113,18 @@ function FactCell({
       className={cn(
         "min-w-[7rem] flex-1 border-r border-border px-3 py-3 text-left last:border-r-0",
         on && "shadow-[inset_0_-2px_0_0_var(--color-fg)]",
+        fact.id === "paper" && "max-sm:order-last opacity-90",
       )}
     >
-      <p className="text-xs text-muted">{fact.label}</p>
-      <p key={`${fact.id}-${fact.value}`} className={cn("log-in mt-1 font-mono text-2xl leading-none tracking-tight", tone)}>
+      <p className={cn("text-xs text-muted", fact.id === "paper" && "text-subtle")}>{fact.label}</p>
+      <p
+        key={`${fact.id}-${fact.value}`}
+        className={cn(
+          "log-in mt-1 font-mono leading-none tracking-tight",
+          fact.id === "paper" ? "text-lg" : "text-2xl",
+          tone,
+        )}
+      >
         {display}
       </p>
       {fact.countsLine && fact.countsLine !== EMPTY ? (
