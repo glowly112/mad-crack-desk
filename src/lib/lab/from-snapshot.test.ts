@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { applyDigest, type Digest, type LiveStamp } from "./from-digest.ts";
 import { applySnapshot } from "./from-snapshot.ts";
 import { squareOccupancyCounts } from "./boards.ts";
+import { stampSquareOccupiedN } from "./desk-invariants.ts";
 import { productionScore } from "./hero.ts";
 import { STAMP } from "./stamp.ts";
 import digest from "./digest.json" with { type: "json" };
@@ -396,4 +397,26 @@ test("occupancy_post_epoch drives square holes and occupied count on oracle", ()
   assert.equal(live.holes?.length, 24);
   const { emptyN } = squareOccupancyCounts({ squareOccupiedN: 47, paintedOccupied: 24, total: 64 });
   assert.equal(emptyN, 17);
+});
+
+test("hunt stamp n_occupied_cells wins over stale top-level occupancy_post_epoch", () => {
+  const keys = Array.from({ length: 24 }, (_, i) => `GB|morning|WIN-${i}`);
+  const live = applySnapshot(
+    {
+      sourceMode: "oracle",
+      occupancy_post_epoch: { n_occupied_cells: 39, occupied_cells: keys },
+      empty_hole_hunt: {
+        occupancy_post_epoch: { n_occupied_cells: 42, occupied_cells: keys },
+      },
+      cells: [],
+    },
+    base(),
+  );
+  assert.equal((live as LiveStamp & { square_occupied_n?: number }).square_occupied_n, 42);
+  const { emptyN } = squareOccupancyCounts({
+    squareOccupiedN: stampSquareOccupiedN(live),
+    paintedOccupied: 39,
+    total: 64,
+  });
+  assert.equal(emptyN, 22);
 });

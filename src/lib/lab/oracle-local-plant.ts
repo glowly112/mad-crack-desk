@@ -278,8 +278,8 @@ export async function readLocalOraclePlant(): Promise<Record<string, unknown> | 
     const stampN = int(stampOcc?.n_occupied_cells);
     const hollowKeys = await computeHollowOccupiedKeys(bbbRoot, cells, stampList);
     const occupied_cells = hollowKeys.length > 0 ? hollowKeys : stampList;
-    const n_occupied_cells =
-      stampN > 0 ? Math.max(stampN, occupied_cells.length) : occupied_cells.length;
+    // Law 5: caption empty-of-64 = 64 − hunt stamp n_occupied_cells — never truncated list length.
+    const n_occupied_cells = stampN > 0 ? stampN : occupied_cells.length;
     const occupancy_post_epoch =
       occupied_cells.length > 0 || stampN > 0
         ? { n_occupied_cells, occupied_cells }

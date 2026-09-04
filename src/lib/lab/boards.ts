@@ -942,7 +942,7 @@ export function squareOccupancyCounts(input: {
   const total = input.total ?? SQUARE_HOLE_COUNT;
   const painted = Math.max(0, Math.min(input.paintedOccupied ?? 0, total));
   const occupiedN =
-    input.squareOccupiedN != null && input.squareOccupiedN > 0
+    input.squareOccupiedN != null
       ? Math.max(0, Math.min(input.squareOccupiedN, total))
       : painted;
   const emptyN = Math.max(0, total - occupiedN);
