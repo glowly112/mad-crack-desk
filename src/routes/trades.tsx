@@ -10,9 +10,7 @@ import {
   dayTapePnl,
   deskSettledTapeRollup,
   fillDeskRow,
-  fillsOnDay,
   tradesMillOpenFills,
-  tradesSettledVoidFills,
 } from "@/lib/lab/trades";
 import { fmtU } from "@/lib/utils";
 
@@ -22,11 +20,9 @@ export function Trades() {
   const stamp = useStamp();
   const plant = usePlantSource();
   const scope = useDayScope();
-  const dayFills = fillsOnDay(stamp.trades, scope.day);
   const rollup = deskSettledTapeRollup(stamp.trades, scope.day, stamp.recipes);
   const open = tradesMillOpenFills(stamp.trades, scope.day, stamp.recipes);
   const settled = rollup.fills;
-  const voided = tradesSettledVoidFills(dayFills, stamp.recipes);
   const tape = dayTapePnl(settled, stamp.fuse_on);
   const live = plant.source === "oracle";
   const days = stamp.trends.map((t) => t.day);
@@ -56,20 +52,6 @@ export function Trades() {
         onPick: pick(fill.id),
       })),
     },
-    ...(voided.length
-      ? [
-          {
-            id: "void",
-            label: "Void",
-            hint: "0u · not a win or lose",
-            rows: voided.map((fill) => ({
-              ...fillDeskRow(fill, stamp.fuse_on, stamp.recipes),
-              selected: selected === fill.id,
-              onPick: pick(fill.id),
-            })),
-          },
-        ]
-      : []),
   ];
 
   return (
