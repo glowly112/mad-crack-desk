@@ -25,10 +25,10 @@ function Holding() {
   const hunter = r.hunterName?.trim();
   return (
     <DetailShell backTo="/" backLabel="Floor">
-      <h1 className="text-2xl">
-        {holdingHoleTitle(r)}
+      <h1 className="flex flex-wrap items-baseline gap-x-2 text-2xl">
+        <span>{holdingHoleTitle(r)}</span>
         {hunter ? (
-          <span className="ml-2 font-mono text-base font-normal text-subtle">{hunter}</span>
+          <span className="font-mono text-base font-normal text-subtle">{hunter}</span>
         ) : null}
       </h1>
       <p className="mt-2 text-xs text-subtle">One book</p>
