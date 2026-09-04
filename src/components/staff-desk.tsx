@@ -5,6 +5,7 @@ import { Portrait } from "@/components/portrait";
 import { useStamp } from "@/components/plant-context";
 import { EMPTY } from "@/lib/lab/desk";
 import { seatBubbles, seatPreview, staffPeopleHops } from "@/lib/lab/staff-voice";
+import { staffSeats } from "@/lib/lab/staff-seats";
 import { isSeatRead, markSeatRead } from "@/lib/staff-read";
 import type { Seat } from "@/lib/lab/stamp";
 import { cn } from "@/lib/utils";
@@ -25,9 +26,10 @@ export function StaffDesk({ selectedId }: { selectedId?: string }) {
   const stamp = useStamp();
   const desktop = useDesktop();
   const [tick, setTick] = useState(0);
+  const roster = staffSeats(stamp);
   const peopleHops = staffPeopleHops(stamp);
-  const openId = selectedId || (desktop ? "clerk" : stamp.seats[0]?.id);
-  const seat = stamp.seats.find((s) => s.id === openId) ?? null;
+  const openId = selectedId || (desktop ? "invent" : roster[0]?.id);
+  const seat = roster.find((s) => s.id === openId) ?? null;
 
   useEffect(() => {
     if (!openId) return;
@@ -62,7 +64,7 @@ export function StaffDesk({ selectedId }: { selectedId?: string }) {
             </div>
           ) : null}
           <ul className="min-h-0 flex-1 overflow-y-auto">
-            {stamp.seats.map((s) => (
+            {roster.map((s) => (
               <SeatRow key={`${s.id}:${tick}`} seat={s} selected={s.id === openId} />
             ))}
           </ul>

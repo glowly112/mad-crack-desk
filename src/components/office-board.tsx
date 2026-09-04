@@ -120,7 +120,10 @@ const OfficeBookTableRow = memo(function OfficeBookTableRow({ row }: { row: Offi
           params={{ id: row.holdingId }}
           className="transition-colors hover:text-fg"
         >
-          {row.strategy}
+          <div>{row.strategy}</div>
+          {row.strategySub ? (
+            <div className="mt-0.5 font-mono text-[10px] leading-snug text-subtle">{row.strategySub}</div>
+          ) : null}
         </Link>
       </td>
       <td className="px-2 py-2.5 font-mono text-xs text-subtle">{row.side}</td>

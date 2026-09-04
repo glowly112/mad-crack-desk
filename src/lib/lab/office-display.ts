@@ -7,12 +7,13 @@ import {
   SQUARE_WINDOW_LABEL,
   type SquareWindow,
 } from "./boards.ts";
-import { EMPTY, deskMarketFromParts, deskStampedSide, recipeBookName } from "./desk.ts";
+import { EMPTY, deskMarketFromParts, deskStampedSide, eholeRunSuffix, strategyMark } from "./desk.ts";
 import {
   isSprayClassInPlayEholeFirstBook,
-  millDisplayRecipes,
-  millPaperRecipeIds,
+  recipeDisplayHoleKey,
+  eholeChipRunOrder,
 } from "./mill-display.ts";
+import { isPostEpochEholeRecipe } from "./board-reset.ts";
 import type { Fill, SettledTradeCounts } from "./trades.ts";
 import {
   fmtWinLoseCounts,
@@ -30,6 +31,7 @@ export type OfficeBookRow = {
   id: string;
   hole: string;
   strategy: string;
+  strategySub?: string;
   side: string;
   market: string;
   state: OfficeBookState;
@@ -61,12 +63,12 @@ export type OfficeBookInput = {
   productionCounts?: ReadonlyMap<string, SettledTradeCounts | null>;
 };
 
-/** Recipe id → Office row id for paper/production roll-up (twin skins). */
+/** Recipe id → Office row id — twin skins on one hole roll to the first-book row. */
 function officeRowByRecipeId(recipes: readonly Recipe[]): Map<string, string> {
   const rows = officeBookRecipes(recipes);
   const out = new Map<string, string>();
   for (const row of rows) {
-    for (const id of millPaperRecipeIds(row, recipes)) out.set(id, row.id);
+    for (const id of officeHoleRecipeIds(row, recipes)) out.set(id, row.id);
   }
   return out;
 }
@@ -87,6 +89,58 @@ function officeHoleLabel(recipe: Recipe): string {
   const [region, window] = parsed.id.split("|");
   const wlabel = SQUARE_WINDOW_LABEL[window as SquareWindow] ?? window;
   return `${countryName(region)} · ${wlabel} · ${parsed.market}`;
+}
+
+/** Plain strategy/hole — country · window · winner|place. No Geo/Card/Steam twin tags. */
+export function officeStrategyLabel(recipe: Recipe): string {
+  const parsed = squareHoleKeyAndSide(recipe.id, recipe.title, recipe.region);
+  if (!parsed) return EMPTY;
+  const mark = strategyMark(parsed.id.replace(/\|/g, " "));
+  return mark && mark !== EMPTY ? mark : officeHoleLabel(recipe);
+}
+
+/** H-ehole skin id secondary — never hunter densify labels. */
+export function officeStrategySub(recipe: Recipe): string | undefined {
+  const run = eholeRunSuffix(recipe.id);
+  if (!run) return undefined;
+  const label = officeStrategyLabel(recipe);
+  if (label.includes(run)) return undefined;
+  return `ehole · ${run}`;
+}
+
+/** All recipe ids whose paper settles onto this Office row (one first-book skin per hole). */
+export function officeHoleRecipeIds(recipe: Recipe, recipes: readonly Recipe[]): Set<string> {
+  const ids = new Set<string>([recipe.id]);
+  if (!isPostEpochEholeRecipe(recipe)) return ids;
+  const holeKey = recipeDisplayHoleKey(recipe);
+  if (!holeKey) return ids;
+  for (const r of recipes) {
+    if (!isPostEpochEholeRecipe(r)) continue;
+    if (recipeDisplayHoleKey(r) === holeKey) ids.add(r.id);
+  }
+  return ids;
+}
+
+/** One measuring row per hole — earliest ehole skin; densify twins stay off the grid. */
+function collapseOfficeHoleSkins(recipes: readonly Recipe[]): Recipe[] {
+  const groups = new Map<string, Recipe[]>();
+  for (const r of recipes) {
+    if (!isPostEpochEholeRecipe(r)) continue;
+    const holeKey = recipeDisplayHoleKey(r);
+    if (!holeKey) continue;
+    const list = groups.get(holeKey) ?? [];
+    list.push(r);
+    groups.set(holeKey, list);
+  }
+  const drop = new Set<string>();
+  for (const group of groups.values()) {
+    if (group.length <= 1) continue;
+    const sorted = [...group].sort((a, b) =>
+      eholeChipRunOrder(a.id).localeCompare(eholeChipRunOrder(b.id)),
+    );
+    for (const r of sorted.slice(1)) drop.add(r.id);
+  }
+  return recipes.filter((r) => !drop.has(r.id));
 }
 
 function officeSide(recipe: Recipe): string {
@@ -248,8 +302,9 @@ function officePnlCells(
 
 /** Recipes that belong on Office — one row per first-book skin, not every ticket. */
 export function officeBookRecipes(recipes: readonly Recipe[]): Recipe[] {
-  const measuringDisplay = millDisplayRecipes(
-    recipes.filter((r) => r.status === "MEASURING" || r.status === "HUNTING"),
+  const measuringPool = recipes.filter((r) => r.status === "MEASURING" || r.status === "HUNTING");
+  const measuringDisplay = collapseOfficeHoleSkins(
+    measuringPool.filter((r) => !isSprayClassInPlayEholeFirstBook(r)),
   );
   const measuringIds = new Set(measuringDisplay.map((r) => r.id));
   const out: Recipe[] = [];
@@ -303,7 +358,8 @@ export function officeBookRows(input: OfficeBookInput): OfficeBookRow[] {
     return {
       id: recipe.id,
       hole: officeHoleLabel(recipe),
-      strategy: recipeBookName(recipe),
+      strategy: officeStrategyLabel(recipe),
+      strategySub: officeStrategySub(recipe),
       side: officeSide(recipe),
       market: officeMarket(recipe),
       state,

@@ -1,6 +1,6 @@
 /** Ordinary-English staff bubbles. Stamp facts only. Never invents P&L. */
 
-import { EMPTY, hopMoves, recipeBookName, bookDisplayName } from "./desk.ts";
+import { EMPTY, hopMoves, bookDisplayName } from "./desk.ts";
 import { scrubMillWatchingLine, isMillArchivePoison } from "./mill-ingest.ts";
 import { ukHopAt } from "./uk-time.ts";
 import { isBoardResetView } from "./board-reset.ts";
@@ -8,6 +8,7 @@ import { bookStages, bookLabel, holeName, staffBookFacts, staffLine, type StaffW
 import { millActivity, fillTradeName } from "./trades.ts";
 import type { Move, Recipe, Seat } from "./stamp.ts";
 import { fmtU } from "../utils.ts";
+import type { LockedStaffId } from "./staff-seats.ts";
 
 export type SeatBubble = {
   text: string;
@@ -24,7 +25,10 @@ export function hasJargon(text: string): boolean {
 
 /** Same short mark Staff, Office and Floor use. Never a paragraph, never H-fast-…. */
 export function speakBook(raw: string, recipe?: { id: string; title: string; hunterName?: string | null }): string {
-  if (recipe) return recipeBookName(recipe);
+  if (recipe) {
+    const mark = bookDisplayName({ title: recipe.title, id: recipe.id, hunterName: recipe.hunterName });
+    return mark;
+  }
   return bookDisplayName({ title: raw, id: raw });
 }
 
@@ -71,33 +75,27 @@ function olderFor(seatId: string, stamp: StaffWatchStamp): SeatBubble[] {
     const certified = /certified|solid/i.test(m.to);
     const parked = /parked|research keep/i.test(m.to);
     const mine =
-      (seatId === "virchow" && dead) ||
-      (seatId === "clerk" && dead) ||
-      (seatId === "hyde" && (certified || parked)) ||
-      (seatId === "foreman" && (certified || parked));
+      (seatId === "holdout" && dead) ||
+      (seatId === "auditor" && dead) ||
+      (seatId === "auditor" && (certified || parked)) ||
+      (seatId === "mill-watch" && (certified || parked));
     if (mine) out.push({ text, at: ukHopAt(m.at) || m.at, older: true });
   }
   return out;
 }
 
-function resetNowBubbles(seatId: string): string[] {
+function resetNowBubbles(seatId: LockedStaffId): string[] {
   switch (seatId) {
-    case "clerk":
-      return ["The square is empty. Paper is Empty.", "Nothing from the old hunt is on today's tape."];
-    case "igor":
-      return ["Watching the empty square.", "Nothing on today's tape yet."];
-    case "hyde":
-      return ["Nothing certified is on today's tape.", "Tweaks wait for the next empty cell on the square."];
-    case "foreman":
+    case "auditor":
+      return ["The square is empty. Paper is Empty.", "Nothing certified is on today's tape."];
+    case "holdout":
+      return ["Watching the empty square.", "Old kills stay in the archive — not on the morning board."];
+    case "mill-watch":
       return ["Nothing certified is on today's tape.", "The board reset — we start from empty holes."];
-    case "mercator":
-      return ["Watching empty holes on the square.", "Next pick lands when invent queues one."];
-    case "bauron":
+    case "invent":
       return ["Invent is on.", "We are hunting empty holes, not replaying yesterday's tape."];
-    case "curator":
+    case "wiki":
       return ["Race files stay on disk.", "Today's board is Empty."];
-    case "virchow":
-      return ["Old kills stay in the archive.", "They are not on the morning board."];
     default:
       return ["Watching the empty square."];
   }
@@ -134,39 +132,28 @@ function millSeatLines(seatId: string, stamp: StaffWatchStamp): string[] {
     act.paperDayU != null ? `Today's settled paper is ${fmtU(act.paperDayU)}.` : "";
 
   switch (seatId) {
-    case "clerk":
+    case "auditor":
       return [bookLine, openLine, settleLine].filter(Boolean);
-    case "igor":
+    case "holdout":
       return [
         act.openCount > 0 ? `Paper is booking — ${act.openCount} open tickets.` : "",
         paperLine,
-        act.openCount > 0 ? "Scoring those runs, not inventing." : "",
+        act.lastSettled && act.lastSettled.result === "lost"
+          ? `${lastSettleName} lost ${act.lastSettled.pnl != null ? fmtU(act.lastSettled.pnl) : "money"} on paper.`
+          : "",
       ].filter(Boolean);
-    case "curator":
+    case "wiki":
       return act.openCount > 0 || act.settledToday.length > 0
         ? ["Race files are in.", bookLine || settleLine || openLine].filter(Boolean)
         : [];
-    case "virchow":
-      if (!act.lastSettled || act.lastSettled.result !== "lost") return [];
-      return [
-        `${lastSettleName} lost ${act.lastSettled.pnl != null ? fmtU(act.lastSettled.pnl) : "money"} on paper.`,
-        "That settle is that book — not a twin of an old kill.",
-      ];
-    case "hyde":
-      if (act.openCount === 0) return [];
-      return [
-        "Nothing certified is on today's tape.",
-        `Measuring books are booking — ${act.openCount} open paper tickets.`,
-      ];
-    case "foreman":
+    case "mill-watch":
       return [
         act.openCount > 0
           ? `${act.openCount} armed tickets on the mill — paper, not live.`
           : "",
         paperLine,
       ].filter(Boolean);
-    case "bauron":
-    case "mercator":
+    case "invent":
       return [];
     default:
       return [bookLine, openLine].filter(Boolean);
@@ -174,7 +161,7 @@ function millSeatLines(seatId: string, stamp: StaffWatchStamp): string[] {
 }
 
 function nowBubbles(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchStamp): string[] {
-  if (isBoardResetView(stamp)) return resetNowBubbles(seat.id);
+  if (isBoardResetView(stamp)) return resetNowBubbles(seat.id as LockedStaffId);
   const mill = millSeatLines(seat.id, stamp);
   const tape = tapeSeatLines(seat, stamp);
   if (mill.length) return [...mill, ...tape];
@@ -185,7 +172,7 @@ function tapeSeatLines(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchStamp): 
   const f = staffBookFacts(seat.now ?? "", stamp);
   const britain = f.tape ? speakBook(f.tape.title, f.tape) : "";
   switch (seat.id) {
-    case "bauron": {
+    case "invent": {
       const inventWhy = stamp.office?.inventWhy ?? "";
       const emptyHoleHunt = /empty-hole hunt|invent_empty/i.test(inventWhy);
       const look = f.inventCell !== EMPTY ? f.inventCell : "";
@@ -200,37 +187,37 @@ function tapeSeatLines(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchStamp): 
         ].filter(Boolean);
       }
       const idea = look ? speakBook(f.inventCell) : "";
-      if (!look && !f.densify && !stamp.office?.invent) return [];
+      if (!look && !stamp.office?.invent) return [];
       return [
-        idea ? `I'm writing ${idea}.` : stamp.office?.invent ? "I'm writing a new winner idea." : "",
-        f.densify ? "New market, not a patch on Britain." : "",
+        idea ? `Next empty market to look at: ${idea}.` : stamp.office?.invent ? "Invent is on." : "",
       ].filter(Boolean);
     }
-    case "igor":
+    case "holdout":
       return f.tapeName
-        ? ["I'm scoring the paper bets already on the books.", "Not inventing."]
+        ? ["Scoring paper on the books.", "Not inventing new skins."]
         : [];
-    case "hyde": {
+    case "auditor": {
       const trial = f.hydeTrials[0];
       if (trial) {
         const fade = /steam|fade/i.test(`${trial.why} ${trial.id} ${seat.now}`);
         return [
           fade
-            ? "I wrote a tweak (fade the steam, one pick)."
-            : "I wrote a tweak — one pick, different horses.",
+            ? "Parked tweak (fade the steam, one pick) — not on today's tape."
+            : "Parked tweak — different horses, not on today's tape.",
           britain
             ? `That's different horses, not ${britain} coming back.`
             : "That's different horses, not the tape recipe coming back.",
         ];
       }
-      if (!britain) return [];
-      return [
-        `I have not written a tweak of ${britain}.`,
-        "The one on the tape is still the original horses.",
-      ];
-    }
-    case "clerk": {
-      if (!f.tape && !f.holdBook && f.fillAdjKills.length === 0) return [];
+      if (!f.tape && !f.holdBook && f.fillAdjKills.length === 0) {
+        if (actOpenCount(stamp) > 0) {
+          return [
+            "Nothing certified is on today's tape.",
+            `Measuring books are booking — ${actOpenCount(stamp)} open paper tickets.`,
+          ];
+        }
+        return [];
+      }
       const stages = f.tape ? bookStages(f.tape) : [];
       const same = stages.length > 0 && stages.filter((s) => s.key !== "live").every((s) => s.kind !== "split");
       const fill = f.fillAdjKills[0];
@@ -250,7 +237,7 @@ function tapeSeatLines(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchStamp): 
       ];
       return lines.filter(Boolean);
     }
-    case "foreman": {
+    case "mill-watch": {
       const trial = f.trial ? speakBook(f.trial.title, f.trial) : "";
       const parked = f.parked[0] ? speakBook(f.parked[0].title, f.parked[0]) : "";
       if (!britain && !trial && !parked) return [];
@@ -263,25 +250,20 @@ function tapeSeatLines(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchStamp): 
         "Don't mix them.",
       ].filter(Boolean);
     }
-    case "virchow": {
-      const kill = f.fillAdjKills[0] ?? (stamp.moves ?? []).find((m) => /dead/i.test(m.to));
-      if (!kill) return [];
-      return [
-        `${cap(bookLabel(kill.recipe, f.recipes))} died because later races of those same bets lost money after costs.`,
-        "Don't copy it.",
-      ];
-    }
-    case "mercator": {
-      const look = f.inventCell !== EMPTY ? f.inventCell : "";
-      if (!look) return [];
-      return [`Next empty market to look at: ${look}.`];
-    }
-    case "curator":
+    case "wiki":
       if (!f.tapeName) return [];
-      return ["Today's British race files are in.", "Nothing missing to score."];
+      return ["Today's race files are in.", "Nothing missing to score."];
     default:
       return [];
   }
+}
+
+function actOpenCount(stamp: StaffWatchStamp): number {
+  return millActivity({
+    day: stamp.day ?? "",
+    trades: stamp.trades ?? [],
+    recipes: stamp.recipes ?? [],
+  }).openCount;
 }
 
 /** Chat bubbles for one seat. Older hops first. Empty seat → []. */
@@ -318,9 +300,9 @@ export function staffPeopleHops(stamp: StaffWatchStamp): SeatBubble[] {
     const parked = /parked|research keep/i.test(m.to);
     const who =
       dead
-        ? "Virchow · Clerk"
+        ? "Holdout · Auditor"
         : certified || parked
-          ? "Hyde · Foreman"
+          ? "Auditor · Night + mill watch"
           : "Staff";
     out.push({ text: `${who}: ${text}`, at: ukHopAt(m.at) || m.at, older: true });
   }
