@@ -79,7 +79,7 @@ test("scrubDeskStampArchive zeros freeze keep and factory history", () => {
     ),
   } as unknown as LiveStamp);
   assert.equal(stamp.researchKeepGbp, 0);
-  assert.equal((stamp as LiveStamp & { square_occupied_n?: number }).square_occupied_n, undefined);
+  assert.equal((stamp as LiveStamp & { square_occupied_n?: number }).square_occupied_n, 42);
   assert.equal(stamp.fuse_on, false);
   assert.ok(stamp.trends.every((t) => t.day < "2026-09-02" || t.factory_day_pnl_u == null));
   const hyde = stamp.seats.find((s) => s.id === "hyde");

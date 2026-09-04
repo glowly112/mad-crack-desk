@@ -933,6 +933,22 @@ export function capitalisingLine(counts: {
 
 export const SQUARE_HOLE_COUNT = REGIONS.length * SQUARE_WINDOWS.length * 2;
 
+/** Floor caption occupancy — hollow = total − live mill square occupied (not painted cell lag). */
+export function squareOccupancyCounts(input: {
+  total?: number;
+  squareOccupiedN?: number | null;
+  paintedOccupied?: number;
+}): { total: number; occupiedN: number; emptyN: number } {
+  const total = input.total ?? SQUARE_HOLE_COUNT;
+  const painted = Math.max(0, Math.min(input.paintedOccupied ?? 0, total));
+  const occupiedN =
+    input.squareOccupiedN != null && input.squareOccupiedN > 0
+      ? Math.max(0, Math.min(input.squareOccupiedN, total))
+      : painted;
+  const emptyN = Math.max(0, total - occupiedN);
+  return { total, occupiedN, emptyN };
+}
+
 /** Morning square occupancy — 64 holes, not legacy mill cell roll-up. */
 export function squareGlanceLine(input: {
   occupied: number;
