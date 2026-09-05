@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Recipe } from "./stamp.ts";
-import { officeBookCounts, officeBookRows, officeBookRecipes, officePaperTotals, officeProductionHeroValue, filterOfficeRows } from "./office-display.ts";
+import { officeBookCounts, officeBookRows, officeBookRecipes, officePaperTotals, officeProductionHeroValue, filterOfficeRows, officeSliceStrategyType } from "./office-display.ts";
 import { settledPaperDayU } from "./trades.ts";
 import { EMPTY } from "./desk.ts";
 import { STAMP } from "./stamp.ts";
@@ -68,6 +68,8 @@ test("measuring row shows today's paper settles — measuring is not KEEP", () =
   assert.equal(rows[0]?.wlN, "1 · 0–1");
   assert.equal(rows[0]?.paperUnit, "−1.50u/n");
   assert.equal(rows[0]?.paperTodayCounts, "today 0–1 · n=1");
+  assert.equal(rows[0]?.todayWlN, "0–1 · n=1");
+  assert.equal(rows[0]?.todayPnl, "−1.50u");
   assert.equal(rows[0]?.productionPnl, "Empty");
   assert.equal(rows[0]?.laterRacePnl, "Empty");
 });
@@ -371,6 +373,20 @@ test("killed post-epoch ehole shows on Strategies board", () => {
   const rows = officeBookRows({ recipes: [killed], day });
   assert.equal(rows.length, 1);
   assert.equal(rows[0]?.stateLabel, "Killed");
+});
+
+test("armed skin uses invent_scale from plant when present", () => {
+  const mid = ehole("H-ehole-nz-morning-win-73508Z", { region: "NZ", inventScale: "mid" });
+  const rows = officeBookRows({ recipes: [mid], day });
+  assert.equal(rows[0]?.strategyType, "mid");
+});
+
+test("officeSliceStrategyType classifies odds-only tape as mid", () => {
+  assert.equal(officeSliceStrategyType({ oddsBand: "2.5–4.49" }), "mid");
+  assert.equal(
+    officeSliceStrategyType({ oddsBand: "2.5–4.49", course: "Ascot" }),
+    "nugget",
+  );
 });
 
 test("filter tabs slice measuring, KEEP, and killed", () => {

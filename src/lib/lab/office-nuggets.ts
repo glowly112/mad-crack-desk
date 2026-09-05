@@ -15,7 +15,14 @@ import {
   truncateCourse,
 } from "./strategy-columns.ts";
 import type { OfficeBookInput, OfficeBookRow, OfficeBookState, OfficePnlTone, OfficeStrategyType } from "./office-display.ts";
-import { filterOfficeRows, officeBookRows, officeCompactHoleFromKey, officePaperScale, officeWlNColumn } from "./office-display.ts";
+import {
+  filterOfficeRows,
+  officeBookRows,
+  officeCompactHoleFromKey,
+  officePaperScale,
+  officeSliceStrategyType,
+  officeWlNColumn,
+} from "./office-display.ts";
 import type { Fill } from "./trades.ts";
 import {
   fmtSettledWlN,
@@ -161,6 +168,7 @@ function nuggetState(_group: OfficeNuggetGroup, recipes: readonly import("./stam
 
 /** Nugget rows for Office — tape slices, not armed skins. */
 export function officeNuggetRows(input: OfficeBookInput, minN = 1): OfficeBookRow[] {
+  const day = input.day;
   const groups = officeNuggetGroups(input, minN);
   return groups.map((group) => {
     const { state, stateLabel } = nuggetState(group, input.recipes);
@@ -169,9 +177,18 @@ export function officeNuggetRows(input: OfficeBookInput, minN = 1): OfficeBookRo
     const scale = officePaperScale(hasPnl ? group.u : null, counts);
     const slice = group.slice;
     const courseSlice = truncateCourse(slice.course);
+    const strategyType = officeSliceStrategyType(slice);
+    const todayFills = group.fills.filter((f) => f.day === day);
+    const todayCounts = todayFills.length ? settledTradeCountsFromFills(todayFills) : null;
+    const todayU = todayFills.length ? todayFills.reduce((acc, f) => acc + (f.pnl ?? 0), 0) : null;
+    const todayLine = todayCounts ? `today ${fmtSettledWlN(todayCounts)}` : EMPTY;
+    const todayPnl =
+      todayU != null && todayCounts != null ? fmtPnlU(todayU) : EMPTY;
+    const todayPnlTone: OfficePnlTone =
+      todayU != null ? scoreTone(todayU) : todayCounts ? "neutral" : "empty";
     return {
       id: group.id,
-      strategyType: "nugget",
+      strategyType,
       paperU: hasPnl ? group.u : null,
       hole: officeCompactHoleFromKey(group.holeKey),
       strategy: group.label,
@@ -185,7 +202,10 @@ export function officeNuggetRows(input: OfficeBookInput, minN = 1): OfficeBookRo
       paperPnl: hasPnl ? fmtPnlU(group.u) : EMPTY,
       paperPnlTone: hasPnl ? scoreTone(group.u) : "empty",
       paperCounts: counts ? "since first seen" : EMPTY,
-      paperTodayCounts: EMPTY,
+      paperTodayCounts: todayLine,
+      todayWlN: todayCounts ? fmtSettledWlN(todayCounts) : EMPTY,
+      todayPnl,
+      todayPnlTone,
       ...scale,
       wlN: officeWlNColumn(scale.paperN, counts),
       spices: undefined,
@@ -206,11 +226,11 @@ export function filterOfficeNuggetRows(
   return filterOfficeRows(rows, filter);
 }
 
-/** Wide armed skins + Nuggets spice slices — one list, sorted by |paper u| then type then name. */
+/** Wide armed skins + mid/nugget spice slices — one list, sorted by |paper u| then type then name. */
 export function officeStrategyRows(input: OfficeBookInput): OfficeBookRow[] {
   const wide = officeBookRows(input);
   const nuggets = officeNuggetRows(input);
-  const typeOrder: Record<OfficeStrategyType, number> = { wide: 0, nugget: 1 };
+  const typeOrder: Record<OfficeStrategyType, number> = { wide: 0, mid: 1, nugget: 2 };
   return [...wide, ...nuggets].sort((a, b) => {
     const au = Math.abs(a.paperU ?? 0);
     const bu = Math.abs(b.paperU ?? 0);

@@ -8,9 +8,7 @@ import { EMPTY } from "@/lib/lab/desk";
 import {
   filterOfficeStrategyRows,
   officeBookCounts,
-  officeBookRecipes,
   officeProductionHeroValue,
-  officeStrategyTypeCounts,
   type OfficeBookRow,
   type OfficeFilter,
   type OfficePnlTone,
@@ -27,8 +25,9 @@ const FILTERS: { key: OfficeFilter; label: string }[] = [
 ];
 
 const TYPE_FILTERS: { key: OfficeTypeFilter; label: string }[] = [
-  { key: "all", label: "All types" },
+  { key: "all", label: "All" },
   { key: "wide", label: "Wide" },
+  { key: "mid", label: "Mid" },
   { key: "nugget", label: "Nugget" },
 ];
 
@@ -40,6 +39,7 @@ const HEADERS = [
   { key: "card", label: "Card", align: "left" },
   { key: "state", label: "State", align: "left" },
   { key: "n", label: "n / W–L", align: "right" },
+  { key: "today", label: "Today", align: "right" },
   { key: "pnl", label: "Paper P&L", align: "right" },
   { key: "unit", label: "u/n", align: "right" },
   { key: "prod", label: "Prd", align: "right" },
@@ -62,17 +62,14 @@ function useOfficeDesk() {
   return useMemo(() => {
     const input = officeInput(stamp);
     const rows = officeStrategyRows(input);
-    const typeCounts = officeStrategyTypeCounts(rows);
-    const wideRows = rows.filter((r) => r.strategyType === "wide");
-    const counts = officeBookCounts(wideRows, stamp.fuse_on, stamp.pipe.scaling);
+    const counts = officeBookCounts(rows, stamp.fuse_on, stamp.pipe.scaling);
     const armed = countArmed({
       recipes: stamp.recipes,
       wait_open: stamp.wait_open,
       mill_n_armed: (stamp as { mill_n_armed?: number }).mill_n_armed,
       n_armed: (stamp as { n_armed?: number }).n_armed,
     });
-    const recipeCount = officeBookRecipes(stamp.recipes).length;
-    return { rows, typeCounts, counts, armed, recipeCount };
+    return { rows, counts, armed, strategyCount: rows.length };
   }, [
     stamp.generated,
     stamp.day,
@@ -87,10 +84,10 @@ function useOfficeDesk() {
 
 export function OfficeCounts() {
   const stamp = useStamp();
-  const { counts, armed, recipeCount } = useOfficeDesk();
+  const { counts, armed, strategyCount } = useOfficeDesk();
 
   const tiles = [
-    { label: "Strategies", value: String(recipeCount), hint: armed > 0 ? `${armed} armed on mill` : "Armed skins" },
+    { label: "Strategies", value: String(strategyCount), hint: armed > 0 ? `${armed} armed on mill` : "Wide · mid · nugget" },
     { label: "KEEP", value: String(counts.keep), hint: "Later-race same-bets" },
     {
       label: "Production",
@@ -133,6 +130,7 @@ function cellText(value: string, className?: string) {
 }
 
 function TypeBadge({ type }: { type: OfficeBookRow["strategyType"] }) {
+  const label = type === "wide" ? "Wide" : type === "mid" ? "Mid" : "Nug";
   return (
     <span
       className={cn(
@@ -140,7 +138,7 @@ function TypeBadge({ type }: { type: OfficeBookRow["strategyType"] }) {
         type === "wide" ? "bg-elev text-fg" : "border border-border bg-surface text-subtle",
       )}
     >
-      {type === "wide" ? "Wide" : "Nug"}
+      {label}
     </span>
   );
 }
@@ -168,10 +166,16 @@ const OfficeStrategyTableRow = memo(function OfficeStrategyTableRow({ row }: { r
       <td className="max-w-[4.5rem] px-1.5 py-2">{cellText(row.cardSlice, "text-muted")}</td>
       <td className="px-1.5 py-2 text-[10px] text-muted">{row.stateLabel}</td>
       <td className={pnlClass("empty")}>{cellText(row.wlN, "text-right font-mono tabular-nums text-subtle")}</td>
+      <td className={pnlClass(row.todayPnlTone, row.todayWlN === EMPTY && row.todayPnl === EMPTY)}>
+        {row.todayWlN !== EMPTY ? (
+          <div className="text-[10px] text-subtle">{row.todayWlN}</div>
+        ) : null}
+        {row.todayPnl !== EMPTY ? <div>{row.todayPnl}</div> : null}
+      </td>
       <td className={pnlClass(row.paperPnlTone)}>
         <div>{row.paperPnl}</div>
-        {row.paperTodayCounts && row.paperTodayCounts !== EMPTY ? (
-          <div className="mt-0.5 truncate text-[9px] text-muted">{row.paperTodayCounts}</div>
+        {row.paperCounts && row.paperCounts !== EMPTY ? (
+          <div className="mt-0.5 truncate text-[9px] text-muted">{row.paperCounts}</div>
         ) : null}
       </td>
       <td className={pnlClass(row.paperUnitTone)}>{row.paperUnit}</td>
@@ -185,7 +189,7 @@ const OfficeStrategyTableRow = memo(function OfficeStrategyTableRow({ row }: { r
 
 /** Wide hole skins + spice nuggets — one compact Strategies table. */
 export function OfficeBooksTable() {
-  const { rows, typeCounts, armed } = useOfficeDesk();
+  const { rows, armed } = useOfficeDesk();
   const [filter, setFilter] = useState<OfficeFilter>("all");
   const [typeFilter, setTypeFilter] = useState<OfficeTypeFilter>("all");
   const filtered = useMemo(
@@ -199,7 +203,7 @@ export function OfficeBooksTable() {
         <div>
           <h2 className="text-sm font-medium">Strategies</h2>
           <p className="text-xs text-subtle">
-            {rows.length} rows · {typeCounts.wide} wide · {typeCounts.nugget} nuggets
+            {rows.length} strategies
             {armed > 0 ? ` · ${armed} armed on mill` : ""}
           </p>
         </div>
@@ -244,7 +248,7 @@ export function OfficeBooksTable() {
         <EmptyState copy={EMPTY} />
       ) : (
         <DeskScroll axis="y" className="min-w-0 max-h-[min(70vh,42rem)]">
-          <table className="w-full min-w-[44rem] table-fixed border-collapse text-left">
+          <table className="w-full min-w-[48rem] table-fixed border-collapse text-left">
             <colgroup>
               <col className="w-11" />
               <col className="w-[7.5rem]" />
@@ -253,6 +257,7 @@ export function OfficeBooksTable() {
               <col className="w-14" />
               <col className="w-16" />
               <col className="w-14" />
+              <col className="w-12" />
               <col className="w-14" />
               <col className="w-12" />
               <col className="w-11" />

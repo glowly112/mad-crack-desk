@@ -5,6 +5,8 @@ export type Chip = "Waiting for races" | "Booking" | "On tape today" | null;
 export type HunterState = "FLOWING" | "HELD";
 export type Health = "GREEN" | "AMBER" | "RED";
 
+export type InventScale = "wide" | "mid" | "nugget";
+
 export type Recipe = {
   id: string;
   title: string;
@@ -18,6 +20,8 @@ export type Recipe = {
   why: string;
   /** Oracle cell hunter_name — distinguishes books in the same hole. */
   hunterName?: string | null;
+  /** Plant invent scale — wide hole skin, mid odds band, or nugget spice slice. */
+  inventScale?: InventScale | null;
 };
 
 export type Move = {

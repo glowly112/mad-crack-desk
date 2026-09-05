@@ -3,7 +3,7 @@ import { mergeMillPathRuns } from "./mill-paths.ts";
 import { filterIngestMillFillRows, scrubMillWatchingLine } from "./mill-ingest.ts";
 import { cellName } from "./desk.ts";
 import { scrubPostResetTrendPaper } from "./desk.ts";
-import type { Badge, Chip, Recipe } from "./stamp.ts";
+import type { Badge, Chip, InventScale, Recipe } from "./stamp.ts";
 import { mergeOracleTape, parseFills, parseWaitOpen, settledPaperDayU } from "./trades.ts";
 import { parseHole, parseWindow, parseMarket, regionFromText, millHuntCaption, squareHoleKeyAndSide, normalizeSquareHoleKey, type ParsedSquareMarket, type SquareWindow } from "./boards.ts";
 import { isSprayClassInPlayEholeFirstBook } from "./mill-display.ts";
@@ -85,6 +85,14 @@ function regionOf(title: string): Recipe["region"] {
   return "AU";
 }
 
+function inventScaleOf(cell: Record<string, unknown>): InventScale | null {
+  const raw = cell.invent_scale ?? cell.inventScale ?? cell.scale;
+  if (typeof raw !== "string") return null;
+  const s = raw.trim().toLowerCase();
+  if (s === "wide" || s === "mid" || s === "nugget") return s;
+  return null;
+}
+
 function badgeOf(cell: Record<string, unknown>, status: Recipe["status"]): Badge {
   const b = cell.keep_badge;
   if (typeof b === "string" && (BADGES as string[]).includes(b)) return b as Badge;
@@ -154,6 +162,7 @@ function recipesFromCells(cells: Record<string, unknown>[]): Recipe[] {
       freezePnl: pnl,
       why,
       hunterName,
+      inventScale: inventScaleOf(c),
     };
     out.push(recipe);
   }

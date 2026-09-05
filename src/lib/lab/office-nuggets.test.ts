@@ -87,9 +87,23 @@ test("nugget key groups hole with odds band course race_type going", () => {
   assert.match(nuggetLabel("GB|morning|WIN", { oddsBand: "2.5–4.49", course: "Ascot", raceType: "Handicap", going: "Good" }), /Ascot/);
 });
 
+const emptySpice = {
+  course: null,
+  race_type: null,
+  going: null,
+  surface: null,
+  distance_m: null,
+  field_size: null,
+  card_join: null,
+  country: null,
+  window: null,
+  market_type: null,
+  race_id: null,
+};
+
 test("nugget rows include rare slices with n=1", () => {
   const trades = [
-    fill({ id: "rare", recipeId: "H-ehole-nz-morning-win-73508Z", odds: 15, pnl: 2, result: "won" }),
+    fill({ id: "rare", recipeId: "H-ehole-nz-morning-win-73508Z", odds: 15, pnl: 2, result: "won", spice: emptySpice }),
     fill({
       id: "common-1",
       recipeId: "H-ehole-gb-morning-win-83959Z",
@@ -110,7 +124,7 @@ test("nugget rows include rare slices with n=1", () => {
   assert.equal(rows.length, 2);
   const rare = rows.find((r) => r.oddsSlice === "13+");
   assert.ok(rare);
-  assert.equal(rare?.strategyType, "nugget");
+  assert.equal(rare?.strategyType, "mid");
   assert.equal(rare?.stateLabel, "Measuring");
   assert.equal(rare?.productionPnl, "Empty");
   assert.equal(rare?.laterRacePnl, "Empty");
@@ -175,9 +189,9 @@ test("nuggets sort by absolute u then n", () => {
   assert.equal(groups[1]?.u, 4);
 });
 
-test("office strategy rows merge wide and nuggets with type tags", () => {
+test("office strategy rows merge wide and mid/nugget tape slices with type tags", () => {
   const trades = [
-    fill({ id: "n1", recipeId: "H-ehole-nz-morning-win-73508Z", odds: 15, pnl: 2, result: "won" }),
+    fill({ id: "n1", recipeId: "H-ehole-nz-morning-win-73508Z", odds: 15, pnl: 2, result: "won", spice: emptySpice }),
   ];
   const recipes = [
     {
@@ -197,11 +211,12 @@ test("office strategy rows merge wide and nuggets with type tags", () => {
   const rows = officeStrategyRows({ recipes, day: "2026-09-03", trades });
   const counts = officeStrategyTypeCounts(rows);
   assert.equal(counts.wide, 1);
-  assert.equal(counts.nugget, 1);
+  assert.equal(counts.mid, 1);
+  assert.equal(counts.nugget, 0);
   assert.equal(rows.length, 2);
   assert.ok(rows.some((r) => r.strategyType === "wide"));
-  assert.ok(rows.some((r) => r.strategyType === "nugget"));
+  assert.ok(rows.some((r) => r.strategyType === "mid"));
   assert.equal(filterOfficeStrategyRows(rows, "all", "wide").length, 1);
-  assert.equal(filterOfficeStrategyRows(rows, "all", "nugget").length, 1);
+  assert.equal(filterOfficeStrategyRows(rows, "all", "mid").length, 1);
   assert.equal(filterOfficeStrategyRows(rows, "measuring", "all").length, 2);
 });

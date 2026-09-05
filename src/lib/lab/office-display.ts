@@ -31,9 +31,9 @@ export type OfficePnlTone = "empty" | "neutral" | "up" | "down";
 
 export type OfficeFilter = "all" | "measuring" | "keep" | "killed";
 
-export type OfficeTypeFilter = "all" | "wide" | "nugget";
+export type OfficeTypeFilter = "all" | "wide" | "mid" | "nugget";
 
-export type OfficeStrategyType = "wide" | "nugget";
+export type OfficeStrategyType = "wide" | "mid" | "nugget";
 
 export type OfficeBookRow = {
   id: string;
@@ -57,6 +57,10 @@ export type OfficeBookRow = {
   paperPnlTone: OfficePnlTone;
   paperCounts: string;
   paperTodayCounts: string;
+  /** Today's settled W–L · n — own column beside cumulative. */
+  todayWlN: string;
+  todayPnl: string;
+  todayPnlTone: OfficePnlTone;
   /** Settled paper volume — rare vs high-volume at a glance. */
   paperN: number | null;
   /** Average paper u per settled bet — u/n. */
@@ -134,18 +138,42 @@ export function filterOfficeStrategyRows(
 ): OfficeBookRow[] {
   let out = filterOfficeRows(rows, filter);
   if (typeFilter === "wide") out = out.filter((r) => r.strategyType === "wide");
+  if (typeFilter === "mid") out = out.filter((r) => r.strategyType === "mid");
   if (typeFilter === "nugget") out = out.filter((r) => r.strategyType === "nugget");
   return out;
 }
 
-export function officeStrategyTypeCounts(rows: readonly OfficeBookRow[]): { wide: number; nugget: number } {
+export function officeStrategyTypeCounts(
+  rows: readonly OfficeBookRow[],
+): { wide: number; mid: number; nugget: number } {
   let wide = 0;
+  let mid = 0;
   let nugget = 0;
   for (const row of rows) {
     if (row.strategyType === "wide") wide += 1;
+    else if (row.strategyType === "mid") mid += 1;
     else nugget += 1;
   }
-  return { wide, nugget };
+  return { wide, mid, nugget };
+}
+
+/** Armed skin type from plant invent_scale — defaults to wide. */
+export function officeArmedStrategyType(recipe: Recipe): OfficeStrategyType {
+  const scale = recipe.inventScale;
+  if (scale === "mid" || scale === "nugget") return scale;
+  return "wide";
+}
+
+/** Tape spice slice — mid when only odds band; nugget when course / card / going axes exist. */
+export function officeSliceStrategyType(slice: {
+  oddsBand?: string;
+  course?: string;
+  raceType?: string;
+  going?: string;
+}): OfficeStrategyType {
+  if (slice.course?.trim() || slice.raceType?.trim() || slice.going?.trim()) return "nugget";
+  if (slice.oddsBand) return "mid";
+  return "nugget";
 }
 
 export function officeHoleLabel(recipe: Recipe): string {
@@ -277,6 +305,9 @@ function emptyPnl(): Pick<
   | "paperPnlTone"
   | "paperCounts"
   | "paperTodayCounts"
+  | "todayWlN"
+  | "todayPnl"
+  | "todayPnlTone"
   | "productionPnl"
   | "productionPnlTone"
   | "productionCounts"
@@ -288,6 +319,9 @@ function emptyPnl(): Pick<
     paperPnlTone: "empty",
     paperCounts: EMPTY,
     paperTodayCounts: EMPTY,
+    todayWlN: EMPTY,
+    todayPnl: EMPTY,
+    todayPnlTone: "empty",
     productionPnl: EMPTY,
     productionPnlTone: "empty",
     productionCounts: EMPTY,
@@ -305,7 +339,17 @@ function paperPnlCell(
   totals: ReadonlyMap<string, number>,
   counts: ReadonlyMap<string, SettledTradeCounts | null>,
   todayCounts: ReadonlyMap<string, SettledTradeCounts | null>,
-): Pick<OfficeBookRow, "paperPnl" | "paperPnlTone" | "paperCounts" | "paperTodayCounts"> {
+  todayTotals: ReadonlyMap<string, number>,
+): Pick<
+  OfficeBookRow,
+  | "paperPnl"
+  | "paperPnlTone"
+  | "paperCounts"
+  | "paperTodayCounts"
+  | "todayWlN"
+  | "todayPnl"
+  | "todayPnlTone"
+> {
   const u = totals.get(recipe.id);
   if (u == null) {
     return {
@@ -313,16 +357,27 @@ function paperPnlCell(
       paperPnlTone: "empty",
       paperCounts: EMPTY,
       paperTodayCounts: EMPTY,
+      todayWlN: EMPTY,
+      todayPnl: EMPTY,
+      todayPnlTone: "empty",
     };
   }
   const cumulative = counts.get(recipe.id) ?? null;
   const today = todayCounts.get(recipe.id) ?? null;
+  const todayU = todayTotals.get(recipe.id);
   const todayLine = today ? `today ${fmtSettledWlN(today)}` : EMPTY;
+  const todayPnl =
+    todayU != null && today != null ? fmtPnlU(todayU) : today ? EMPTY : EMPTY;
+  const todayPnlTone: OfficePnlTone =
+    todayU != null ? scoreTone(todayU) : today ? "neutral" : "empty";
   return {
     paperPnl: fmtPnlU(u),
     paperPnlTone: scoreTone(u),
     paperCounts: cumulative ? "since armed" : EMPTY,
     paperTodayCounts: todayLine,
+    todayWlN: today ? fmtSettledWlN(today) : EMPTY,
+    todayPnl,
+    todayPnlTone,
   };
 }
 
@@ -376,6 +431,12 @@ export function officePaperTodayCounts(input: OfficeBookInput): Map<string, Sett
   return rollFillsToOfficeRows(officePaperTodayRollupFills(input), rowByRecipe).counts;
 }
 
+/** Today's paper u per Office row. */
+export function officePaperTodayTotals(input: OfficeBookInput): Map<string, number> {
+  const rowByRecipe = officeRowByRecipeId(input.recipes);
+  return rollFillsToOfficeRows(officePaperTodayRollupFills(input), rowByRecipe).totals;
+}
+
 function officeProductionCounts(input: OfficeBookInput): Map<string, SettledTradeCounts | null> {
   const fills = tradesSettledTapeFills(fillsOnDay(input.trades ?? [], input.day), input.recipes).filter(
     (f) => f.book === "production",
@@ -393,6 +454,9 @@ function officePnlCells(
   | "paperPnlTone"
   | "paperCounts"
   | "paperTodayCounts"
+  | "todayWlN"
+  | "todayPnl"
+  | "todayPnlTone"
   | "productionPnl"
   | "productionPnlTone"
   | "productionCounts"
@@ -402,8 +466,9 @@ function officePnlCells(
   const paperTotals = input.paperTotals ?? officePaperTotals(input);
   const paperCountMap = input.paperCounts ?? officePaperCounts(input);
   const todayCountMap = input.paperTodayCounts ?? officePaperTodayCounts(input);
+  const todayTotalMap = officePaperTodayTotals(input);
   const productionCountMap = input.productionCounts ?? officeProductionCounts(input);
-  const paper = paperPnlCell(recipe, paperTotals, paperCountMap, todayCountMap);
+  const paper = paperPnlCell(recipe, paperTotals, paperCountMap, todayCountMap, todayTotalMap);
   const prodCountRaw = productionCountMap.get(recipe.id) ?? null;
   const nKeep = input.n_keep ?? 0;
   const periods = bookPeriods(recipe);
@@ -495,7 +560,7 @@ export function officeBookRows(input: OfficeBookInput): OfficeBookRow[] {
     const run = eholeRunSuffix(recipe.id);
     return {
       id: recipe.id,
-      strategyType: "wide",
+      strategyType: officeArmedStrategyType(recipe),
       paperU,
       hole: officeCompactHoleLabel(recipe),
       strategy: officeStrategyLabel(recipe),

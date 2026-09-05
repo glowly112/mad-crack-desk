@@ -15,7 +15,7 @@ export function Office() {
       <header>
         <h1 className="text-2xl">Office</h1>
         <p className="mt-1 text-sm text-muted">
-          Strategies — wide hole skins and spice nuggets in one list. Paper P&L since armed or first seen.
+          Strategies — wide, mid, and nugget rows in one list. Paper P&L since armed or first seen; Today is settled tape for the desk day.
         </p>
         <div className="mt-3">
           <OracleStampLine
