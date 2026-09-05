@@ -6,16 +6,17 @@ import { useStamp } from "@/components/plant-context";
 import { countArmed } from "@/lib/lab/board-reset";
 import { EMPTY } from "@/lib/lab/desk";
 import {
-  filterOfficeRows,
+  filterOfficeStrategyRows,
   officeBookCounts,
   officeBookRecipes,
-  officeBookRows,
   officeProductionHeroValue,
+  officeStrategyTypeCounts,
   type OfficeBookRow,
   type OfficeFilter,
   type OfficePnlTone,
+  type OfficeTypeFilter,
 } from "@/lib/lab/office-display";
-import { officeNuggetRows } from "@/lib/lab/office-nuggets";
+import { officeStrategyRows } from "@/lib/lab/office-nuggets";
 import { cn } from "@/lib/utils";
 
 const FILTERS: { key: OfficeFilter; label: string }[] = [
@@ -25,11 +26,10 @@ const FILTERS: { key: OfficeFilter; label: string }[] = [
   { key: "killed", label: "Killed" },
 ];
 
-type StrategiesSection = "wide" | "nuggets";
-
-const SECTIONS: { key: StrategiesSection; label: string; hint: string }[] = [
-  { key: "wide", label: "Wide", hint: "Armed skins — one row per hole book" },
-  { key: "nuggets", label: "Nuggets", hint: "Spice slices from settled tape" },
+const TYPE_FILTERS: { key: OfficeTypeFilter; label: string }[] = [
+  { key: "all", label: "All types" },
+  { key: "wide", label: "Wide" },
+  { key: "nugget", label: "Nugget" },
 ];
 
 /** Top strip — strategies, KEEP, production, live (Empty while fuse off). */
@@ -48,8 +48,9 @@ function useOfficeDesk() {
   const trend = stamp.trends.find((t) => t.day === stamp.day);
   return useMemo(() => {
     const input = officeInput(stamp);
-    const wideRows = officeBookRows(input);
-    const nuggetRows = officeNuggetRows(input);
+    const rows = officeStrategyRows(input);
+    const typeCounts = officeStrategyTypeCounts(rows);
+    const wideRows = rows.filter((r) => r.strategyType === "wide");
     const counts = officeBookCounts(wideRows, stamp.fuse_on, stamp.pipe.scaling);
     const armed = countArmed({
       recipes: stamp.recipes,
@@ -58,7 +59,7 @@ function useOfficeDesk() {
       n_armed: (stamp as { n_armed?: number }).n_armed,
     });
     const recipeCount = officeBookRecipes(stamp.recipes).length;
-    return { wideRows, nuggetRows, counts, armed, recipeCount };
+    return { rows, typeCounts, counts, armed, recipeCount };
   }, [
     stamp.generated,
     stamp.day,
@@ -99,7 +100,8 @@ export function OfficeCounts() {
   );
 }
 
-const WIDE_HEADERS = [
+const HEADERS = [
+  "Type",
   "Strategy / hole",
   "State",
   "Paper P&L",
@@ -110,8 +112,6 @@ const WIDE_HEADERS = [
   "Production",
   "Later-race",
 ] as const;
-
-const NUGGET_HEADERS = ["Slice", "State", "Paper P&L", "n / W–L", "Production", "Later-race"] as const;
 
 function pnlClass(tone: OfficePnlTone): string {
   return cn(
@@ -147,9 +147,25 @@ function PnlCell({
   );
 }
 
-const OfficeWideTableRow = memo(function OfficeWideTableRow({ row }: { row: OfficeBookRow }) {
+function TypeBadge({ type }: { type: OfficeBookRow["strategyType"] }) {
+  return (
+    <span
+      className={cn(
+        "inline-block rounded-sm px-1.5 py-0.5 text-[10px] font-medium",
+        type === "wide" ? "bg-elev text-fg" : "border border-border bg-surface text-subtle",
+      )}
+    >
+      {type === "wide" ? "Wide" : "Nugget"}
+    </span>
+  );
+}
+
+const OfficeStrategyTableRow = memo(function OfficeStrategyTableRow({ row }: { row: OfficeBookRow }) {
   return (
     <tr className="border-b border-border">
+      <td className="px-2 py-2.5">
+        <TypeBadge type={row.strategyType} />
+      </td>
       <td className="px-2 py-2.5 text-sm">
         <Link
           to="/holdings/$id"
@@ -180,36 +196,15 @@ const OfficeWideTableRow = memo(function OfficeWideTableRow({ row }: { row: Offi
   );
 });
 
-const OfficeNuggetTableRow = memo(function OfficeNuggetTableRow({ row }: { row: OfficeBookRow }) {
-  return (
-    <tr className="border-b border-border">
-      <td className="px-2 py-2.5 text-sm">
-        <Link
-          to="/holdings/$id"
-          params={{ id: row.holdingId }}
-          className="transition-colors hover:text-fg"
-        >
-          <div>{row.strategy}</div>
-          <div className="mt-0.5 text-[10px] text-muted">{row.hole}</div>
-        </Link>
-      </td>
-      <td className="px-2 py-2.5 text-xs text-muted">{row.stateLabel}</td>
-      <PnlCell pnl={row.paperPnl} tone={row.paperPnlTone} counts={row.paperCounts} />
-      <td className="px-2 py-2.5 font-mono text-xs tabular-nums text-subtle">{row.wlN}</td>
-      <PnlCell pnl={row.productionPnl} tone={row.productionPnlTone} counts={row.productionCounts} />
-      <td className={pnlClass(row.laterRacePnlTone)}>{row.laterRacePnl}</td>
-    </tr>
-  );
-});
-
-/** Wide armed skins + Nuggets spice slices from settled tape. */
+/** Wide hole skins + spice nuggets in one Strategies table. */
 export function OfficeBooksTable() {
-  const { wideRows, nuggetRows, armed } = useOfficeDesk();
-  const [section, setSection] = useState<StrategiesSection>("wide");
+  const { rows, typeCounts, armed } = useOfficeDesk();
   const [filter, setFilter] = useState<OfficeFilter>("all");
-  const rows = section === "wide" ? wideRows : nuggetRows;
-  const filtered = useMemo(() => filterOfficeRows(rows, filter), [rows, filter, section]);
-  const sectionMeta = SECTIONS.find((s) => s.key === section)!;
+  const [typeFilter, setTypeFilter] = useState<OfficeTypeFilter>("all");
+  const filtered = useMemo(
+    () => filterOfficeStrategyRows(rows, filter, typeFilter),
+    [rows, filter, typeFilter],
+  );
 
   return (
     <section>
@@ -217,29 +212,26 @@ export function OfficeBooksTable() {
         <div>
           <h2 className="text-sm font-medium">Strategies</h2>
           <p className="text-xs text-subtle">
-            {wideRows.length} wide
-            {" · "}
-            {nuggetRows.length} nuggets
+            {rows.length} rows · {typeCounts.wide} wide · {typeCounts.nugget} nuggets
             {armed > 0 ? ` · ${armed} armed on mill` : ""}
-            {" · "}
-            {sectionMeta.hint}
+            {" · "}Paper P&L since armed or first seen
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex flex-wrap gap-1 rounded-sm border border-border p-0.5">
-            {SECTIONS.map((s) => (
+            {TYPE_FILTERS.map((f) => (
               <button
-                key={s.key}
+                key={f.key}
                 type="button"
-                onClick={() => setSection(s.key)}
+                onClick={() => setTypeFilter(f.key)}
                 className={cn(
                   "rounded-sm px-2.5 py-1 text-xs transition-colors",
-                  section === s.key
+                  typeFilter === f.key
                     ? "bg-elev text-fg"
                     : "text-muted hover:bg-elev/60 hover:text-fg",
                 )}
               >
-                {s.label}
+                {f.label}
               </button>
             ))}
           </div>
@@ -264,10 +256,11 @@ export function OfficeBooksTable() {
       </header>
       {filtered.length === 0 ? (
         <EmptyState copy={EMPTY} />
-      ) : section === "wide" ? (
+      ) : (
         <DeskScroll axis="y" className="min-w-0 max-h-[min(70vh,42rem)]">
-          <table className="w-full min-w-[56rem] table-fixed border-collapse text-left">
+          <table className="w-full min-w-[58rem] table-fixed border-collapse text-left">
             <colgroup>
+              <col className="w-16" />
               <col className="w-[20%]" />
               <col className="w-20" />
               <col className="w-[4.5rem]" />
@@ -280,7 +273,7 @@ export function OfficeBooksTable() {
             </colgroup>
             <thead className="sticky top-0 z-[1] bg-bg">
               <tr className="border-b border-border">
-                {WIDE_HEADERS.map((h) => (
+                {HEADERS.map((h) => (
                   <th
                     key={h}
                     scope="col"
@@ -296,41 +289,7 @@ export function OfficeBooksTable() {
             </thead>
             <tbody>
               {filtered.map((row) => (
-                <OfficeWideTableRow key={row.id} row={row} />
-              ))}
-            </tbody>
-          </table>
-        </DeskScroll>
-      ) : (
-        <DeskScroll axis="y" className="min-w-0 max-h-[min(70vh,42rem)]">
-          <table className="w-full min-w-[44rem] table-fixed border-collapse text-left">
-            <colgroup>
-              <col className="w-[34%]" />
-              <col className="w-20" />
-              <col className="w-[4.5rem]" />
-              <col className="w-20" />
-              <col className="w-[4.5rem]" />
-              <col className="w-[4.5rem]" />
-            </colgroup>
-            <thead className="sticky top-0 z-[1] bg-bg">
-              <tr className="border-b border-border">
-                {NUGGET_HEADERS.map((h) => (
-                  <th
-                    key={h}
-                    scope="col"
-                    className={cn(
-                      "px-2 py-2 text-[10px] font-normal tracking-wide text-subtle",
-                      (h === "Paper P&L" || h === "Production" || h === "Later-race") && "text-right",
-                    )}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((row) => (
-                <OfficeNuggetTableRow key={row.id} row={row} />
+                <OfficeStrategyTableRow key={row.id} row={row} />
               ))}
             </tbody>
           </table>

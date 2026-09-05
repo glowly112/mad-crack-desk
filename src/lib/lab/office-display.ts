@@ -25,8 +25,14 @@ export type OfficePnlTone = "empty" | "neutral" | "up" | "down";
 
 export type OfficeFilter = "all" | "measuring" | "keep" | "killed";
 
+export type OfficeTypeFilter = "all" | "wide" | "nugget";
+
+export type OfficeStrategyType = "wide" | "nugget";
+
 export type OfficeBookRow = {
   id: string;
+  strategyType: OfficeStrategyType;
+  paperU: number | null;
   hole: string;
   strategy: string;
   strategySub?: string;
@@ -101,6 +107,27 @@ export function filterOfficeRows(rows: readonly OfficeBookRow[], filter: OfficeF
     return rows.filter((r) => r.state === "KEEP" || r.state === "production");
   }
   return rows.filter((r) => r.state === "killed");
+}
+
+export function filterOfficeStrategyRows(
+  rows: readonly OfficeBookRow[],
+  filter: OfficeFilter,
+  typeFilter: OfficeTypeFilter = "all",
+): OfficeBookRow[] {
+  let out = filterOfficeRows(rows, filter);
+  if (typeFilter === "wide") out = out.filter((r) => r.strategyType === "wide");
+  if (typeFilter === "nugget") out = out.filter((r) => r.strategyType === "nugget");
+  return out;
+}
+
+export function officeStrategyTypeCounts(rows: readonly OfficeBookRow[]): { wide: number; nugget: number } {
+  let wide = 0;
+  let nugget = 0;
+  for (const row of rows) {
+    if (row.strategyType === "wide") wide += 1;
+    else nugget += 1;
+  }
+  return { wide, nugget };
 }
 
 export function officeHoleLabel(recipe: Recipe): string {
@@ -386,8 +413,11 @@ export function officeBookRows(input: OfficeBookInput): OfficeBookRow[] {
     const pnl = officePnlCells(recipe, state, withRollups);
     const cumulative = paperCounts.get(recipe.id) ?? null;
     const onTape = recipe.chip === "On tape today" || Boolean(todayCounts.get(recipe.id));
+    const paperU = paperTotals.get(recipe.id) ?? null;
     return {
       id: recipe.id,
+      strategyType: "wide",
+      paperU,
       hole: officeHoleLabel(recipe),
       strategy: officeStrategyLabel(recipe),
       strategySub: officeStrategySub(recipe),

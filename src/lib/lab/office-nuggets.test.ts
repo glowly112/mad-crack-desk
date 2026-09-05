@@ -6,9 +6,10 @@ import {
   nuggetOddsBand,
   officeNuggetGroups,
   officeNuggetRows,
+  officeStrategyRows,
 } from "./office-nuggets.ts";
 import type { Fill } from "./trades.ts";
-import { filterOfficeRows } from "./office-display.ts";
+import { filterOfficeRows, filterOfficeStrategyRows, officeStrategyTypeCounts } from "./office-display.ts";
 
 function fill(overrides: Partial<Fill> & Pick<Fill, "id" | "recipeId">): Fill {
   return {
@@ -103,6 +104,7 @@ test("nugget rows include rare slices with n=1", () => {
   assert.equal(rows.length, 2);
   const rare = rows.find((r) => r.strategy.includes("13+"));
   assert.ok(rare);
+  assert.equal(rare?.strategyType, "nugget");
   assert.equal(rare?.stateLabel, "Measuring");
   assert.equal(rare?.productionPnl, "Empty");
   assert.equal(rare?.laterRacePnl, "Empty");
@@ -165,4 +167,35 @@ test("nuggets sort by absolute u then n", () => {
   const groups = officeNuggetGroups({ recipes: [], day: "2026-09-03", trades });
   assert.equal(groups[0]?.u, -5);
   assert.equal(groups[1]?.u, 4);
+});
+
+test("office strategy rows merge wide and nuggets with type tags", () => {
+  const trades = [
+    fill({ id: "n1", recipeId: "H-ehole-nz-morning-win-73508Z", odds: 15, pnl: 2, result: "won" }),
+  ];
+  const recipes = [
+    {
+      id: "H-ehole-nz-morning-win-73508Z",
+      title: "ehole_nz_morning_win",
+      region: "NZ" as const,
+      status: "MEASURING" as const,
+      badge: "Research" as const,
+      chip: null,
+      n: 0,
+      roi: 0,
+      freezePnl: 0,
+      why: "Still proving.",
+      hunterName: "Geo",
+    },
+  ];
+  const rows = officeStrategyRows({ recipes, day: "2026-09-03", trades });
+  const counts = officeStrategyTypeCounts(rows);
+  assert.equal(counts.wide, 1);
+  assert.equal(counts.nugget, 1);
+  assert.equal(rows.length, 2);
+  assert.ok(rows.some((r) => r.strategyType === "wide"));
+  assert.ok(rows.some((r) => r.strategyType === "nugget"));
+  assert.equal(filterOfficeStrategyRows(rows, "all", "wide").length, 1);
+  assert.equal(filterOfficeStrategyRows(rows, "all", "nugget").length, 1);
+  assert.equal(filterOfficeStrategyRows(rows, "measuring", "all").length, 2);
 });

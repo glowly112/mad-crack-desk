@@ -7,8 +7,8 @@ import {
 } from "./boards.ts";
 import { EMPTY } from "./desk.ts";
 import { recipeDisplayHoleKey } from "./mill-display.ts";
-import type { OfficeBookInput, OfficeBookRow, OfficeBookState, OfficePnlTone } from "./office-display.ts";
-import { filterOfficeRows } from "./office-display.ts";
+import type { OfficeBookInput, OfficeBookRow, OfficeBookState, OfficePnlTone, OfficeStrategyType } from "./office-display.ts";
+import { filterOfficeRows, officeBookRows } from "./office-display.ts";
 import type { Fill } from "./trades.ts";
 import {
   fmtSettledWlN,
@@ -170,6 +170,8 @@ export function officeNuggetRows(input: OfficeBookInput, minN = 1): OfficeBookRo
     const hasPnl = group.fills.length > 0 && counts != null;
     return {
       id: group.id,
+      strategyType: "nugget",
+      paperU: hasPnl ? group.u : null,
       hole: group.holeLabel,
       strategy: group.label,
       side: EMPTY,
@@ -197,4 +199,20 @@ export function filterOfficeNuggetRows(
   filter: import("./office-display.ts").OfficeFilter,
 ): OfficeBookRow[] {
   return filterOfficeRows(rows, filter);
+}
+
+/** Wide armed skins + Nuggets spice slices — one list, sorted by |paper u| then type then name. */
+export function officeStrategyRows(input: OfficeBookInput): OfficeBookRow[] {
+  const wide = officeBookRows(input);
+  const nuggets = officeNuggetRows(input);
+  const typeOrder: Record<OfficeStrategyType, number> = { wide: 0, nugget: 1 };
+  return [...wide, ...nuggets].sort((a, b) => {
+    const au = Math.abs(a.paperU ?? 0);
+    const bu = Math.abs(b.paperU ?? 0);
+    if (bu !== au) return bu - au;
+    const ta = typeOrder[a.strategyType];
+    const tb = typeOrder[b.strategyType];
+    if (ta !== tb) return ta - tb;
+    return a.strategy.localeCompare(b.strategy);
+  });
 }

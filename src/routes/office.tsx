@@ -15,7 +15,7 @@ export function Office() {
       <header>
         <h1 className="text-2xl">Office</h1>
         <p className="mt-1 text-sm text-muted">
-          Wide armed skins and Nuggets spice slices from settled tape. Paper P&L since armed or first seen.
+          Strategies — wide hole skins and spice nuggets in one list. Paper P&L since armed or first seen.
         </p>
         <div className="mt-3">
           <OracleStampLine
