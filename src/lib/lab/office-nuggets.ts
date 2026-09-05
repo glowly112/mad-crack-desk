@@ -36,6 +36,9 @@ export type NuggetSlice = {
   course?: string;
   raceType?: string;
   going?: string;
+  surface?: string | null;
+  fieldSize?: number | null;
+  inventScale?: import("./stamp.ts").InventScale | null;
 };
 
 export type OfficeNuggetGroup = {
@@ -69,6 +72,9 @@ function sliceFromFill(fill: Fill): NuggetSlice {
   if (spice?.course?.trim()) slice.course = spice.course.trim();
   if (spice?.race_type?.trim()) slice.raceType = spice.race_type.trim();
   if (spice?.going?.trim()) slice.going = spice.going.trim();
+  if (spice?.surface?.trim()) slice.surface = spice.surface.trim();
+  if (spice?.field_size != null) slice.fieldSize = spice.field_size;
+  if (fill.inventScale) slice.inventScale = fill.inventScale;
   return slice;
 }
 
