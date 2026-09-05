@@ -95,16 +95,21 @@ function PnlCell({
   pnl,
   tone,
   counts,
+  todayCounts,
 }: {
   pnl: string;
   tone: OfficePnlTone;
   counts: string;
+  todayCounts?: string;
 }) {
   return (
     <td className={pnlClass(tone)}>
       <div>{pnl}</div>
       {counts !== EMPTY ? (
         <div className="mt-0.5 text-[10px] text-subtle tabular-nums">{counts}</div>
+      ) : null}
+      {todayCounts && todayCounts !== EMPTY ? (
+        <div className="mt-0.5 text-[10px] text-muted tabular-nums">{todayCounts}</div>
       ) : null}
     </td>
   );
@@ -126,7 +131,12 @@ const OfficeBookTableRow = memo(function OfficeBookTableRow({ row }: { row: Offi
       <td className="px-2 py-2.5 font-mono text-xs text-subtle">{row.side}</td>
       <td className="px-2 py-2.5 font-mono text-xs text-subtle">{row.market}</td>
       <td className="px-2 py-2.5 text-xs text-muted">{row.state}</td>
-      <PnlCell pnl={row.paperPnl} tone={row.paperPnlTone} counts={row.paperCounts} />
+      <PnlCell
+        pnl={row.paperPnl}
+        tone={row.paperPnlTone}
+        counts={row.paperCounts}
+        todayCounts={row.paperTodayCounts}
+      />
       <PnlCell pnl={row.productionPnl} tone={row.productionPnlTone} counts={row.productionCounts} />
       <td className={pnlClass(row.laterRacePnlTone)}>{row.laterRacePnl}</td>
     </tr>
@@ -141,7 +151,7 @@ export function OfficeBooksTable() {
     <section>
       <header className="mb-2 flex items-baseline justify-between gap-3 border-b border-border pb-2">
         <h2 className="text-sm font-medium">Books</h2>
-        <p className="text-xs text-subtle">One row per strategy · measuring is not income</p>
+        <p className="text-xs text-subtle">Paper P&L since armed · Floor stays today</p>
       </header>
       {rows.length === 0 ? (
         <EmptyState copy={EMPTY} />

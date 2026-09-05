@@ -15,7 +15,8 @@ import {
 } from "./mill-display.ts";
 import type { Fill, SettledTradeCounts } from "./trades.ts";
 import {
-  fmtWinLoseCounts,
+  fmtSettledWlN,
+  officeCumulativeTapeFills,
   tradesSettledTapeFills,
   fillsOnDay,
   settledTradeCountsFromFills,
@@ -36,6 +37,7 @@ export type OfficeBookRow = {
   paperPnl: string;
   paperPnlTone: OfficePnlTone;
   paperCounts: string;
+  paperTodayCounts: string;
   productionPnl: string;
   productionPnlTone: OfficePnlTone;
   productionCounts: string;
@@ -58,6 +60,7 @@ export type OfficeBookInput = {
   n_keep?: number;
   paperTotals?: ReadonlyMap<string, number>;
   paperCounts?: ReadonlyMap<string, SettledTradeCounts | null>;
+  paperTodayCounts?: ReadonlyMap<string, SettledTradeCounts | null>;
   productionCounts?: ReadonlyMap<string, SettledTradeCounts | null>;
 };
 
@@ -111,6 +114,7 @@ function emptyPnl(): Pick<
   | "paperPnl"
   | "paperPnlTone"
   | "paperCounts"
+  | "paperTodayCounts"
   | "productionPnl"
   | "productionPnlTone"
   | "productionCounts"
@@ -121,6 +125,7 @@ function emptyPnl(): Pick<
     paperPnl: EMPTY,
     paperPnlTone: "empty",
     paperCounts: EMPTY,
+    paperTodayCounts: EMPTY,
     productionPnl: EMPTY,
     productionPnlTone: "empty",
     productionCounts: EMPTY,
@@ -137,13 +142,25 @@ function paperPnlCell(
   recipe: Recipe,
   totals: ReadonlyMap<string, number>,
   counts: ReadonlyMap<string, SettledTradeCounts | null>,
-): Pick<OfficeBookRow, "paperPnl" | "paperPnlTone" | "paperCounts"> {
+  todayCounts: ReadonlyMap<string, SettledTradeCounts | null>,
+): Pick<OfficeBookRow, "paperPnl" | "paperPnlTone" | "paperCounts" | "paperTodayCounts"> {
   const u = totals.get(recipe.id);
-  if (u == null) return { paperPnl: EMPTY, paperPnlTone: "empty", paperCounts: EMPTY };
+  if (u == null) {
+    return {
+      paperPnl: EMPTY,
+      paperPnlTone: "empty",
+      paperCounts: EMPTY,
+      paperTodayCounts: EMPTY,
+    };
+  }
+  const cumulative = counts.get(recipe.id) ?? null;
+  const today = todayCounts.get(recipe.id) ?? null;
+  const todayLine = today ? `today ${fmtSettledWlN(today)}` : EMPTY;
   return {
     paperPnl: fmtPnlU(u),
     paperPnlTone: scoreTone(u),
-    paperCounts: fmtWinLoseCounts(counts.get(recipe.id) ?? null),
+    paperCounts: cumulative ? `${fmtSettledWlN(cumulative)} · since armed` : EMPTY,
+    paperTodayCounts: todayLine,
   };
 }
 
@@ -169,8 +186,13 @@ function rollFillsToOfficeRows(
   return { totals, counts };
 }
 
-/** Every signed Trades › Settled row that rolls onto an Office book. */
+/** Every signed Trades › Settled row that rolls onto an Office book — cumulative since armed. */
 function officePaperRollupFills(input: OfficeBookInput): Fill[] {
+  return officeCumulativeTapeFills(input.trades ?? [], input.recipes);
+}
+
+/** Today's settled first-book rows — optional muted secondary line on Office. */
+function officePaperTodayRollupFills(input: OfficeBookInput): Fill[] {
   return tradesSettledTapeFills(fillsOnDay(input.trades ?? [], input.day), input.recipes);
 }
 
@@ -184,6 +206,12 @@ export function officePaperTotals(input: OfficeBookInput): Map<string, number> {
 export function officePaperCounts(input: OfficeBookInput): Map<string, SettledTradeCounts | null> {
   const rowByRecipe = officeRowByRecipeId(input.recipes);
   return rollFillsToOfficeRows(officePaperRollupFills(input), rowByRecipe).counts;
+}
+
+/** Today's W–L · n per Office row — muted secondary line only. */
+export function officePaperTodayCounts(input: OfficeBookInput): Map<string, SettledTradeCounts | null> {
+  const rowByRecipe = officeRowByRecipeId(input.recipes);
+  return rollFillsToOfficeRows(officePaperTodayRollupFills(input), rowByRecipe).counts;
 }
 
 function officeProductionCounts(input: OfficeBookInput): Map<string, SettledTradeCounts | null> {
@@ -202,6 +230,7 @@ function officePnlCells(
   | "paperPnl"
   | "paperPnlTone"
   | "paperCounts"
+  | "paperTodayCounts"
   | "productionPnl"
   | "productionPnlTone"
   | "productionCounts"
@@ -210,8 +239,9 @@ function officePnlCells(
 > {
   const paperTotals = input.paperTotals ?? officePaperTotals(input);
   const paperCountMap = input.paperCounts ?? officePaperCounts(input);
+  const todayCountMap = input.paperTodayCounts ?? officePaperTodayCounts(input);
   const productionCountMap = input.productionCounts ?? officeProductionCounts(input);
-  const paper = paperPnlCell(recipe, paperTotals, paperCountMap);
+  const paper = paperPnlCell(recipe, paperTotals, paperCountMap, todayCountMap);
   const prodCountRaw = productionCountMap.get(recipe.id) ?? null;
   const nKeep = input.n_keep ?? 0;
   const periods = bookPeriods(recipe);
@@ -226,7 +256,7 @@ function officePnlCells(
     productionPnlTone = scoreTone(freeze);
   }
   if (prodCountRaw != null && nKeep > 0) {
-    productionCounts = fmtWinLoseCounts(prodCountRaw);
+    productionCounts = fmtSettledWlN(prodCountRaw);
   }
 
   let laterRacePnl = EMPTY;
@@ -285,6 +315,7 @@ export function officeBookRows(input: OfficeBookInput): OfficeBookRow[] {
   const paperRollup = rollFillsToOfficeRows(officePaperRollupFills(input), rowByRecipe);
   const paperTotals = input.paperTotals ?? paperRollup.totals;
   const paperCounts = input.paperCounts ?? paperRollup.counts;
+  const todayCounts = officePaperTodayCounts(input);
   const productionCounts =
     input.productionCounts ??
     rollFillsToOfficeRows(
@@ -295,6 +326,7 @@ export function officeBookRows(input: OfficeBookInput): OfficeBookRow[] {
     ...input,
     paperTotals,
     paperCounts,
+    paperTodayCounts: todayCounts,
     productionCounts,
   };
   return officeBookRecipes(recipes).map((recipe) => {

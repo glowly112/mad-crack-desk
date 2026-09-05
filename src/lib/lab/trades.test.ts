@@ -34,6 +34,7 @@ import {
   settledPaperDayCounts,
   settledTradeCountsFromFills,
   fmtWinLoseCounts,
+  fmtSettledWlN,
   tapePnl,
   tradeCounts,
   bookWord,
@@ -649,8 +650,10 @@ test("win · lose counts use signed P&L, not exchange labels", () => {
   const counts = settledTradeCountsFromFills(fills);
   assert.deepEqual(counts, { wins: 2, losses: 10 });
   assert.equal(fmtWinLoseCounts(counts), "2 win · 10 lose");
+  assert.equal(fmtSettledWlN(counts), "2–10 · n=12");
   assert.equal(settledTradeCountsFromFills([]), null);
   assert.equal(fmtWinLoseCounts(null), EMPTY);
+  assert.equal(fmtSettledWlN(null), EMPTY);
 });
 
 test("production-book settle counts on Floor and Office paper like Trades settled", () => {

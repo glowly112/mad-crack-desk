@@ -666,6 +666,13 @@ export function fmtWinLoseCounts(counts: SettledTradeCounts | null): string {
   return `${counts.wins} win · ${counts.losses} lose`;
 }
 
+/** W–L · n for Office — Empty when no settled trades. */
+export function fmtSettledWlN(counts: SettledTradeCounts | null): string {
+  if (!counts) return EMPTY;
+  const n = counts.wins + counts.losses;
+  return `${counts.wins}–${counts.losses} · n=${n}`;
+}
+
 /**
  * Archive mill history off the live board — focal day keeps first-book tape rows only.
  * Hyde, occupancy leftovers, and full-day book.jsonl settles stay off Trades/Floor/Office.
@@ -738,6 +745,14 @@ export function deskSettledTapeRollup(
     counts,
     countsLine: fmtWinLoseCounts(counts),
   };
+}
+
+/** All settled first-book rows on tape — Office cumulative strategy P&L (not calendar day). */
+export function officeCumulativeTapeFills(
+  trades: readonly Fill[],
+  recipes: readonly Recipe[] = [],
+): Fill[] {
+  return tradesSettledTapeFills(trades, recipes);
 }
 
 /** Floor tile win·lose/u must match Trades › Settled — throws when they diverge. */

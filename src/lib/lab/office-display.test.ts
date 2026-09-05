@@ -3,6 +3,7 @@ import { test } from "node:test";
 import type { Recipe } from "./stamp.ts";
 import { officeBookCounts, officeBookRows, officeBookRecipes, officePaperTotals, officeProductionHeroValue } from "./office-display.ts";
 import { settledPaperDayU } from "./trades.ts";
+import { EMPTY } from "./desk.ts";
 import { STAMP } from "./stamp.ts";
 
 function ehole(id: string, overrides: Partial<Recipe> = {}): Recipe {
@@ -62,12 +63,13 @@ test("measuring row shows today's paper settles — measuring is not KEEP", () =
   const rows = officeBookRows({ recipes: [recipe], day, trades });
   assert.equal(rows[0]?.paperPnl, "−1.50u");
   assert.equal(rows[0]?.paperPnlTone, "down");
-  assert.equal(rows[0]?.paperCounts, "0 win · 1 lose");
+  assert.equal(rows[0]?.paperCounts, "0–1 · n=1 · since armed");
+  assert.equal(rows[0]?.paperTodayCounts, "today 0–1 · n=1");
   assert.equal(rows[0]?.productionPnl, "Empty");
   assert.equal(rows[0]?.laterRacePnl, "Empty");
 });
 
-test("office paper u sums to Floor paper tile", () => {
+test("office paper u sums to Floor paper tile on a single day", () => {
   const r1 = ehole("H-ehole-nz-morning-win-73508Z", { region: "NZ" });
   const r2 = ehole("H-ehole-gb-nearoff-win-83959Z", { region: "GB" });
   const trades = [
@@ -116,6 +118,65 @@ test("office paper u sums to Floor paper tile", () => {
   for (const u of totals.values()) officeSum += u;
   assert.equal(floorU, -0.71);
   assert.equal(officeSum, floorU);
+});
+
+test("office paper survives day roll — prior-day settles stay cumulative", () => {
+  const priorDay = "2026-09-03";
+  const deskDay = "2026-09-04";
+  const nz = ehole("H-ehole-nz-nearoff-win-73508Z", { region: "NZ" });
+  const gb = ehole("H-ehole-gb-morning-win-83959Z", { region: "GB" });
+  const priorSettled = {
+    id: "nz-prior",
+    ts: "2026-09-03T10:00:00Z",
+    t: "11:00",
+    day: priorDay,
+    recipe: nz.title,
+    recipeId: nz.id,
+    market: "WIN 3",
+    book: "paper" as const,
+    side: "BACK",
+    odds: 3,
+    stake: 1,
+    result: "won" as const,
+    flight: null,
+    liquidity: null,
+    pnl: 2.5,
+    horse: null,
+  };
+  const todaySettled = {
+    id: "gb-today",
+    ts: "2026-09-04T10:00:00Z",
+    t: "11:00",
+    day: deskDay,
+    recipe: gb.title,
+    recipeId: gb.id,
+    market: "WIN 4",
+    book: "paper" as const,
+    side: "BACK",
+    odds: 4,
+    stake: 1,
+    result: "lost" as const,
+    flight: null,
+    liquidity: null,
+    pnl: -1,
+    horse: null,
+  };
+  const recipes = [nz, gb];
+  const trades = [priorSettled, todaySettled];
+  const rows = officeBookRows({ recipes, day: deskDay, trades });
+  const nzRow = rows.find((r) => r.id === nz.id);
+  const gbRow = rows.find((r) => r.id === gb.id);
+  assert.equal(nzRow?.paperPnl, "+2.50u");
+  assert.equal(nzRow?.paperCounts, "1–0 · n=1 · since armed");
+  assert.equal(nzRow?.paperTodayCounts, EMPTY);
+  assert.equal(gbRow?.paperPnl, "−1.00u");
+  assert.equal(gbRow?.paperCounts, "0–1 · n=1 · since armed");
+  assert.equal(gbRow?.paperTodayCounts, "today 0–1 · n=1");
+  const floorU = settledPaperDayU(trades, deskDay, recipes);
+  assert.equal(floorU, -1);
+  const totals = officePaperTotals({ recipes, day: deskDay, trades });
+  assert.equal(totals.get(nz.id), 2.5);
+  assert.equal(totals.get(gb.id), -1);
 });
 
 test("KEEP later-race Empty until holdout same-bets exist", () => {
@@ -187,7 +248,7 @@ test("office production hero Empty while KEEP is 0", () => {
   assert.equal(officeProductionHeroValue(0, counts.production), "Empty");
 });
 
-test("office paper totals sum to Floor settled tape u", () => {
+test("office paper totals sum to Floor settled tape u on a single day", () => {
   const day = "2026-09-03";
   const r1 = ehole("H-ehole-us-nearoff-win-73506Z", { region: "US" });
   const r2 = ehole("H-ehole-us-latepre-win-73644Z", { region: "US" });
