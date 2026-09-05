@@ -1,26 +1,21 @@
+import { STAFF_MARKS } from "@/components/marks";
 import { cn } from "@/lib/utils";
 
-const HAS_FACE = new Set([
-  "igor",
-  "bauron",
-  "hyde",
-  "virchow",
-  "mercator",
-  "clerk",
-  "foreman",
-  "curator",
-]);
-
 const OWNER_TO_ID: Record<string, string> = {
-  Hyde: "hyde",
-  Igor: "igor",
-  Mercator: "mercator",
-  Clerk: "clerk",
-  Bauron: "bauron",
-  Virchow: "virchow",
-  Foreman: "foreman",
-  Curator: "curator",
-  Grok: "bauron",
+  Invent: "invent",
+  Holdout: "holdout",
+  Auditor: "auditor",
+  Night: "night",
+  Wiki: "wiki",
+  Clerk: "holdout",
+  Foreman: "night",
+  Igor: "night",
+  Bauron: "invent",
+  Mercator: "invent",
+  Hyde: "auditor",
+  Virchow: "auditor",
+  Curator: "wiki",
+  Grok: "invent",
 };
 
 export function ownerId(owner: string): string | null {
@@ -37,28 +32,30 @@ export function Portrait({
   size?: "sm" | "md" | "lg";
 }) {
   const box = size === "sm" ? "size-8" : size === "lg" ? "size-14" : "size-11";
-  if (!HAS_FACE.has(id)) {
+  const iconBox = size === "sm" ? "size-4" : size === "lg" ? "size-7" : "size-5";
+  const Mark = STAFF_MARKS[id as keyof typeof STAFF_MARKS];
+  if (Mark) {
     return (
       <span
         className={cn(
-          "inline-flex shrink-0 items-center justify-center rounded-sm bg-elev font-mono text-xs text-muted",
+          "inline-flex shrink-0 items-center justify-center rounded-sm bg-elev text-muted",
           box,
         )}
         aria-hidden="true"
       >
-        {name.slice(0, 1)}
+        <Mark className={cn(iconBox, "text-fg")} />
       </span>
     );
   }
   return (
-    <img
-      src={`/portraits/${id}.jpg`}
-      alt=""
-      width={size === "lg" ? 56 : size === "sm" ? 32 : 44}
-      height={size === "lg" ? 56 : size === "sm" ? 32 : 44}
-      loading={size === "sm" ? "eager" : "lazy"}
-      decoding="async"
-      className={cn("shrink-0 rounded-sm object-cover", box)}
-    />
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center justify-center rounded-sm bg-elev font-mono text-xs text-muted",
+        box,
+      )}
+      aria-hidden="true"
+    >
+      {name.slice(0, 1)}
+    </span>
   );
 }

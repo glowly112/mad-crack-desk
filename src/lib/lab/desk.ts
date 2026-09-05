@@ -79,7 +79,7 @@ export function productionTicks(domain: [number, number]): number[] {
   return dailyTicks(domain);
 }
 
-export type FloorFactId = "holes" | "paper" | "production" | "live";
+export type FloorFactId = "paper" | "production" | "live";
 
 export type FloorFact = {
   id: FloorFactId;
@@ -208,7 +208,6 @@ export function ensurePostResetTrendDays(
 export function floorFacts(
   stamp: FloorStamp,
   scope: { day: string; lookingBack: boolean },
-  emptyHoles: number,
 ): FloorFact[] {
   const trend = stamp.trends.find((t) => t.day === scope.day);
   const rollup =
@@ -239,13 +238,6 @@ export function floorFacts(
     nKeep <= 0 ? "KEEP 0 · no later-race score" : `${dayHint} · later-race KEEP`;
 
   return [
-    {
-      id: "holes",
-      label: "Empty holes",
-      hint: "on the square",
-      value: emptyHoles,
-      kind: "count",
-    },
     {
       id: "paper",
       label: "Paper",
@@ -312,7 +304,7 @@ export function productionSegments(
 }
 
 export function floorSeats<T extends { id: string }>(seats: readonly T[]): T[] {
-  const order = ["clerk", "foreman", "igor"];
+  const order = ["invent", "holdout", "night"];
   return order
     .map((id) => seats.find((s) => s.id === id))
     .filter((s): s is T => Boolean(s));
@@ -515,6 +507,8 @@ export type DeskRow = {
   book: string;
   result: string;
   pnl: number | null;
+  /** Muted ehole run tag beside strategy name on Trades. */
+  nameTag?: string | null;
   holdingId?: string;
   selected?: boolean;
   onPick?: () => void;

@@ -26,7 +26,7 @@ export function StaffDesk({ selectedId }: { selectedId?: string }) {
   const desktop = useDesktop();
   const [tick, setTick] = useState(0);
   const peopleHops = staffPeopleHops(stamp);
-  const openId = selectedId || (desktop ? "clerk" : stamp.seats[0]?.id);
+  const openId = selectedId || (desktop ? "invent" : stamp.seats[0]?.id);
   const seat = stamp.seats.find((s) => s.id === openId) ?? null;
 
   useEffect(() => {

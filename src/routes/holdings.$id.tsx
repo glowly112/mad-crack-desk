@@ -2,9 +2,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { DetailShell } from "@/components/detail-shell";
 import { useStamp } from "@/components/plant-context";
 import { BookStageLine } from "@/components/book-stages";
-import { bookStages, recipeStatus } from "@/lib/lab/boards";
-import { EMPTY, recipeBookName } from "@/lib/lab/desk";
-import { cn, fmtU } from "@/lib/utils";
+import { recipeStatus } from "@/lib/lab/boards";
+import { EMPTY } from "@/lib/lab/desk";
+import { bookStagesForHolding, holdingHoleTitle, holdingStageValue } from "@/lib/lab/holding-book";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/holdings/$id")({ component: Holding });
 
@@ -19,29 +20,24 @@ function Holding() {
       </DetailShell>
     );
   }
-  const stages = bookStages(r);
+  const holding = { recipes: stamp.recipes, day: stamp.day, trades: stamp.trades };
+  const stages = bookStagesForHolding(r, holding);
+  const hunter = r.hunterName?.trim();
   return (
     <DetailShell backTo="/" backLabel="Floor">
-      <h1 className="text-2xl">{recipeBookName(r)}</h1>
+      <h1 className="flex flex-wrap items-baseline gap-x-2 text-2xl">
+        <span>{holdingHoleTitle(r)}</span>
+        {hunter ? (
+          <span className="font-mono text-base font-normal text-subtle">{hunter}</span>
+        ) : null}
+      </h1>
       <p className="mt-2 text-xs text-subtle">One book</p>
-      <BookStageLine recipe={r} />
+      <BookStageLine recipe={r} holding={holding} />
       <dl className="mt-4 divide-y divide-border border-y border-border text-sm">
         <Row k="Region" v={r.region} />
         <Row k="Status" v={recipeStatus(r)} />
         {stages.map((s) => (
-          <Row
-            key={s.key}
-            k={s.label}
-            v={
-              s.kind === "empty"
-                ? EMPTY
-                : s.kind === "split"
-                  ? s.mark
-                  : s.n != null
-                    ? `n=${s.n} · ${s.key === "paper" ? fmtU(s.u) : EMPTY}`
-                    : s.mark
-            }
-          />
+          <Row key={s.key} k={s.label} v={holdingStageValue(s)} />
         ))}
       </dl>
     </DetailShell>

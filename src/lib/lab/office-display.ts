@@ -84,7 +84,7 @@ function officeBookState(recipe: Recipe): OfficeBookState | null {
   return null;
 }
 
-function officeHoleLabel(recipe: Recipe): string {
+export function officeHoleLabel(recipe: Recipe): string {
   const parsed = squareHoleKeyAndSide(recipe.id, recipe.title, recipe.region);
   if (!parsed) return EMPTY;
   const [region, window] = parsed.id.split("|");

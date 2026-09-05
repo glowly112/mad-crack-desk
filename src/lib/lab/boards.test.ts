@@ -513,38 +513,38 @@ test("Staff watching lines are same-bets, not bios", () => {
     assert.ok(seat);
     return seatWatching(seat, STAMP);
   };
-  assert.match(line("bauron"), /this cell/);
-  assert.match(line("bauron"), /South Africa · morning · winner/);
-  assert.match(line("bauron"), /densify cousin is a new book/);
-  assert.match(line("bauron"), /Britain · near-off · winner/);
-  assert.match(line("igor"), /same freeze bets/);
-  assert.match(line("igor"), /Britain · near-off · winner/);
-  assert.match(line("hyde"), /KEEP is the original/);
-  assert.match(line("hyde"), /No Hyde SHARPEN cousin/);
-  assert.match(line("clerk"), /same pick set/);
-  assert.match(line("clerk"), /fill-adj killed/);
-  assert.match(line("clerk"), /Australia · near-off · place/);
-  assert.match(line("clerk"), /Hyde cousin is not it/);
-  assert.equal(/real betting is off/i.test(line("clerk")), false);
-  assert.match(line("foreman"), /Tape KEEP is Britain · near-off · winner/);
-  assert.match(line("foreman"), /on trial, not the tape/);
-  assert.match(line("foreman"), /not treat a Hyde cousin as a restore/);
-  assert.match(line("virchow"), /Australia · near-off · place is dead/);
-  assert.match(line("virchow"), /not a twin of a dead school/);
-  assert.match(line("mercator"), /Next hole is South Africa · morning · winner/);
-  assert.match(line("mercator"), /not a new product type/);
-  assert.match(line("curator"), /Freeze fuel for Britain · near-off · winner/);
+  assert.match(line("invent"), /this cell/);
+  assert.match(line("invent"), /South Africa · morning · winner/);
+  assert.match(line("invent"), /densify cousin is a new book/);
+  assert.match(line("invent"), /Britain · near-off · winner/);
+  assert.match(line("night"), /same freeze bets/);
+  assert.match(line("night"), /Britain · near-off · winner/);
+  assert.match(line("auditor"), /KEEP is the original/);
+  assert.match(line("auditor"), /No Hyde SHARPEN cousin/);
+  assert.match(line("holdout"), /same pick set/);
+  assert.match(line("holdout"), /fill-adj killed/);
+  assert.match(line("holdout"), /Australia · near-off · place/);
+  assert.match(line("holdout"), /Hyde cousin is not it/);
+  assert.equal(/real betting is off/i.test(line("holdout")), false);
+  assert.match(line("night"), /Tape KEEP is Britain · near-off · winner/);
+  assert.match(line("night"), /on trial, not the tape/);
+  assert.match(line("night"), /not treat a Hyde cousin as a restore/);
+  assert.match(line("auditor"), /Australia · near-off · place is dead/);
+  assert.match(line("auditor"), /not a twin of a dead school/);
+  assert.match(line("invent"), /Next hole is South Africa · morning · winner/);
+  assert.match(line("invent"), /not a new product type/);
+  assert.match(line("wiki"), /Freeze fuel for Britain · near-off · winner/);
   for (const s of STAMP.seats) {
     const text = seatWatching(s, STAMP);
     assert.equal(/keep_hold_paper|n_schools|n_applied|Measuring n=/.test(text), false);
   }
 });
 
-test("Hyde names a SHARPEN cousin when the stamp does", () => {
-  const hyde = STAMP.seats.find((s) => s.id === "hyde");
-  assert.ok(hyde);
+test("Auditor names a SHARPEN cousin when the stamp does", () => {
+  const auditor = STAMP.seats.find((s) => s.id === "auditor");
+  assert.ok(auditor);
   const text = seatWatching(
-    { ...hyde, now: "trial H-hyde-gb-nearoff-win-cousin" },
+    { ...auditor, now: "trial H-hyde-gb-nearoff-win-cousin" },
     {
       ...STAMP,
       recipes: [
@@ -564,11 +564,11 @@ test("Hyde names a SHARPEN cousin when the stamp does", () => {
   assert.match(text, /not the Britain · near-off · winner KEEP/);
 });
 
-test("Clerk names a hold book in English, not a bare country", () => {
-  const clerk = STAMP.seats.find((s) => s.id === "clerk");
-  assert.ok(clerk);
+test("Holdout names a hold book in English, not a bare country", () => {
+  const holdout = STAMP.seats.find((s) => s.id === "holdout");
+  assert.ok(holdout);
   const text = seatWatching(
-    { ...clerk, now: "keep_hold_paper first: Britain_near_off_WIN_steam_fade_residual_one_pick" },
+    { ...holdout, now: "keep_hold_paper first: Britain_near_off_WIN_steam_fade_residual_one_pick" },
     { ...STAMP, solids: [], recipes: STAMP.recipes.filter((r) => r.badge !== "Solid") },
   );
   assert.match(text, /near-off · winner/);
@@ -577,11 +577,11 @@ test("Clerk names a hold book in English, not a bare country", () => {
 });
 
 test("Staff seat with nothing is Empty", () => {
-  const curator = STAMP.seats.find((s) => s.id === "curator");
-  assert.ok(curator);
+  const wiki = STAMP.seats.find((s) => s.id === "wiki");
+  assert.ok(wiki);
   assert.equal(
     seatWatching(
-      { ...curator, now: "" },
+      { ...wiki, now: "" },
       { recipes: [], solids: [], moves: [], office: { invent: false, inventWhy: "" }, hunters: [] },
     ),
     EMPTY,
@@ -591,7 +591,7 @@ test("Staff seat with nothing is Empty", () => {
 test("Staff watching lines drop plant tokens", () => {
   assert.match(staffLine("Measuring n=33"), /Watching 33 still being tested/);
   assert.match(staffLine("next hole: ZA|morning|WIN"), /South Africa\. morning\. winner/);
-  assert.ok(!staffLine(STAMP.seats.find((s) => s.id === "clerk")?.now ?? "").includes("keep_hold_paper"));
+  assert.ok(!staffLine(STAMP.seats.find((s) => s.id === "holdout")?.now ?? "").includes("keep_hold_paper"));
   assert.ok(!staffLine("invent on · densify · hunter Geo · proving=21").includes("densify"));
   const liveClerk =
     "keep_hold_paper: KEEP on hold (n=1) — scoreboard KEEP(s) not LIVE_CANDIDATE this tick, first: H-20260828T020000Z-nz-morning-win-one-pick-band-2-5-4-49";

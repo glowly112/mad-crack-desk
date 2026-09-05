@@ -258,6 +258,51 @@ export const PLANT_MARKS = {
   live: MarkLive,
 } as const;
 
+export function MarkWiki({ className }: MarkProps) {
+  return (
+    <Svg className={className}>
+      <path d="M6 4h12v16H6z" />
+      <path d="M9 8h6M9 11h6M9 14h4" />
+      <path d="M8 4V2.5h8V4" />
+    </Svg>
+  );
+}
+
+export function MarkAuditor({ className }: MarkProps) {
+  return (
+    <Svg className={className}>
+      <circle cx="12" cy="12" r="7.5" />
+      <path d="M12 8v4.5" />
+      <path d="M12 16h.01" />
+    </Svg>
+  );
+}
+
+export function MarkHoldout({ className }: MarkProps) {
+  return (
+    <Svg className={className}>
+      <path d="M8 4h8v4l3 8a5 5 0 0 1-14 0l3-8V4z" />
+      <path d="M10 14h4" />
+    </Svg>
+  );
+}
+
+export function MarkNight({ className }: MarkProps) {
+  return (
+    <Svg className={className}>
+      <path d="M14.5 4.5A7.5 7.5 0 1 0 19.5 14 6.5 6.5 0 0 1 14.5 4.5z" />
+    </Svg>
+  );
+}
+
+export const STAFF_MARKS = {
+  invent: MarkInvent,
+  holdout: MarkHoldout,
+  auditor: MarkAuditor,
+  night: MarkNight,
+  wiki: MarkWiki,
+} as const;
+
 export const HUNTER_MARKS = {
   card: MarkCard,
   steam: MarkSteam,

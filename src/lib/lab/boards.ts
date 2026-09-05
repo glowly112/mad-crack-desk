@@ -1647,29 +1647,65 @@ export function seatWatching(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchSt
   const now = seat.now?.trim() ?? "";
   const f = staffBookFacts(now, stamp);
   switch (seat.id) {
-    case "bauron": {
+    case "invent":
+    case "bauron":
+    case "mercator": {
       const cell = f.inventCell !== EMPTY ? f.inventCell : "";
-      if (!cell && !f.densify && !stamp.office?.invent) return now ? staffLine(now, stamp.recipes ?? []) : EMPTY;
+      const holeFromNow = holeName(/next hole:\s*([^\s·,]+)/i.exec(now)?.[1] ?? "");
+      const hole = cell || (holeFromNow !== EMPTY ? holeFromNow : "");
+      if (!cell && !hole && !f.densify && !stamp.office?.invent) {
+        return now ? staffLine(now, stamp.recipes ?? []) : EMPTY;
+      }
       return sentences(
         cell ? `Inventing ${cell} — this cell’s bets.` : stamp.office?.invent ? "Invent is on." : "",
         f.densify
           ? `A densify cousin is a new book${f.tapeName ? `, not ${f.tapeName}` : ""}.`
           : "",
+        hole ? `Next hole is ${hole}. A hole, not a new product type.` : "",
       );
     }
-    case "igor": {
-      if (!f.tapeName) return EMPTY;
-      return `Scoring those same freeze bets as ${f.tapeName}.`;
+    case "night":
+    case "igor":
+    case "foreman": {
+      const mill = f.tapeName ? `Scoring those same freeze bets as ${f.tapeName}.` : "";
+      if (!f.tapeName && !f.trial && !f.parked[0]) return mill || EMPTY;
+      const other =
+        f.trial && f.trial.title !== f.tapeName
+          ? `${f.trial.title} is on trial, not the tape.`
+          : f.parked[0] && f.parked[0].title !== f.tapeName
+            ? `${f.parked[0].title} is parked, not the tape.`
+            : "";
+      return sentences(
+        mill,
+        f.tapeName ? `Tape KEEP is ${f.tapeName}.` : "",
+        other,
+        "Do not treat a Hyde cousin as a restore.",
+      );
     }
-    case "hyde": {
+    case "auditor":
+    case "hyde":
+    case "virchow": {
       const cousin = f.hydeTrials[0];
-      if (cousin && f.tapeName) {
+      const trialNow = /trial|hyde|cousin/i.test(now);
+      if (cousin && trialNow) {
+        if (f.tapeName) {
+          return `The Hyde trial (${cousin.title}) is a SHARPEN cousin, not the ${f.tapeName} KEEP.`;
+        }
+        return `${cousin.title} is a SHARPEN cousin, not the KEEP.`;
+      }
+      const kill = f.fillAdjKills[0] ?? (stamp.moves ?? []).find((m) => /dead/i.test(m.to));
+      const killLine = kill
+        ? `${bookLabel(kill.recipe, f.recipes)} is dead${/fill-adj/i.test(kill.why) ? " from holdout fill-adj" : ""}. That kill is that book, not a twin of a dead school.`
+        : "";
+      const keepLine = f.tapeName ? `${f.tapeName} KEEP is the original. No Hyde SHARPEN cousin named.` : "";
+      if (cousin && f.tapeName && !killLine) {
         return `The Hyde trial (${cousin.title}) is a SHARPEN cousin, not the ${f.tapeName} KEEP.`;
       }
-      if (cousin) return `${cousin.title} is a SHARPEN cousin, not the KEEP.`;
-      if (f.tapeName) return `${f.tapeName} KEEP is the original. No Hyde SHARPEN cousin named.`;
-      return EMPTY;
+      if (cousin && !f.tapeName && !killLine) return `${cousin.title} is a SHARPEN cousin, not the KEEP.`;
+      const merged = sentences(keepLine, killLine);
+      return merged !== EMPTY ? merged : EMPTY;
     }
+    case "holdout":
     case "clerk": {
       if (!f.tapeName && !f.holdBook && f.fillAdjKills.length === 0) return EMPTY;
       const stages = f.tape ? bookStages(f.tape) : [];
@@ -1691,31 +1727,7 @@ export function seatWatching(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchSt
         "A Hyde cousin is not it.",
       );
     }
-    case "foreman": {
-      if (!f.tapeName && !f.trial && !f.parked[0]) return EMPTY;
-      const other =
-        f.trial && f.trial.title !== f.tapeName
-          ? `${f.trial.title} is on trial, not the tape.`
-          : f.parked[0] && f.parked[0].title !== f.tapeName
-            ? `${f.parked[0].title} is parked, not the tape.`
-            : "";
-      return sentences(
-        f.tapeName ? `Tape KEEP is ${f.tapeName}.` : "",
-        other,
-        "Do not treat a Hyde cousin as a restore.",
-      );
-    }
-    case "virchow": {
-      const kill = f.fillAdjKills[0] ?? (stamp.moves ?? []).find((m) => /dead/i.test(m.to));
-      if (!kill) return EMPTY;
-      const name = bookLabel(kill.recipe, f.recipes);
-      return `${name} is dead${/fill-adj/i.test(kill.why) ? " from holdout fill-adj" : ""}. That kill is that book, not a twin of a dead school.`;
-    }
-    case "mercator": {
-      const hole = f.inventCell !== EMPTY ? f.inventCell : holeName(/next hole:\s*([^\s·,]+)/i.exec(now)?.[1] ?? "");
-      if (!hole || hole === EMPTY) return EMPTY;
-      return `Next hole is ${hole}. A hole, not a new product type.`;
-    }
+    case "wiki":
     case "curator": {
       if (!f.tapeName) return EMPTY;
       return `Freeze fuel for ${f.tapeName}.`;

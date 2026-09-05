@@ -294,22 +294,24 @@ function applyEmptyBoardOverlay(stamp: LiveStamp): LiveStamp {
 
 function boardResetSeatNow(seatId: string): string {
   switch (seatId) {
+    case "holdout":
     case "clerk":
       return "empty square · paper Empty · fuse off";
+    case "night":
     case "igor":
-      return "empty square · nothing on today's tape";
-    case "hyde":
-      return "empty square · no certified tape";
     case "foreman":
-      return "empty square · new hunt";
+      return "empty square · nothing on today's tape";
+    case "auditor":
+    case "hyde":
+    case "virchow":
+      return "empty square · no certified tape";
+    case "invent":
     case "mercator":
-      return "watching empty holes on the square";
     case "bauron":
       return "invent on · empty square · new hunt";
+    case "wiki":
     case "curator":
       return "files on disk · today's board Empty";
-    case "virchow":
-      return "old kills stay in the archive · not on the board";
     default:
       return "empty square · new hunt";
   }

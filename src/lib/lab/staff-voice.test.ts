@@ -62,16 +62,16 @@ test("staff seats name live mill tickets from trades", () => {
     mill_n_armed: 56,
   };
   assert.equal(isBoardResetView(stamp), false);
-  const clerk = seatBubbles(STAMP.seats.find((s) => s.id === "clerk")!, stamp)
+  const holdout = seatBubbles(STAMP.seats.find((s) => s.id === "holdout")!, stamp)
     .map((b) => b.text)
     .join(" ");
-  assert.match(clerk, /Last book:/);
-  assert.match(clerk, /open on the mill/);
-  const igor = seatBubbles(STAMP.seats.find((s) => s.id === "igor")!, stamp)
+  assert.match(holdout, /Last book:/);
+  assert.match(holdout, /open on the mill/);
+  const night = seatBubbles(STAMP.seats.find((s) => s.id === "night")!, stamp)
     .map((b) => b.text)
     .join(" ");
-  assert.match(igor, /open tickets/);
-  assert.match(igor, /settled paper/);
+  assert.match(night, /open tickets/);
+  assert.match(night, /settled paper/);
 });
 
 test("speakBook is the short strategy mark, not a paragraph", () => {
@@ -85,7 +85,7 @@ test("speakBook is the short strategy mark, not a paragraph", () => {
 
 test("Staff bubbles speak like a person and ban jargon", () => {
   const stamp = liveTapeStamp();
-  const optionalEmpty = new Set(["virchow"]);
+  const optionalEmpty = new Set(["auditor"]);
   for (const s of stamp.seats) {
     const texts = seatBubbles(s, stamp).map((b) => b.text);
     if (!optionalEmpty.has(s.id)) assert.ok(texts.length > 0, s.id);
@@ -94,32 +94,35 @@ test("Staff bubbles speak like a person and ban jargon", () => {
       assert.match(t, /[.?!]$/);
     }
   }
-  const clerk = seatBubbles(stamp.seats.find((s) => s.id === "clerk")!, stamp)
+  const holdout = seatBubbles(stamp.seats.find((s) => s.id === "holdout")!, stamp)
     .map((b) => b.text)
     .join(" ");
-  assert.match(clerk, /Britain · near-off · winner/);
-  assert.ok(!clerk.includes("recipe that bets"));
-  assert.match(clerk, /later races/);
-  const bauron = seatBubbles(stamp.seats.find((s) => s.id === "bauron")!, stamp)
+  assert.match(holdout, /Britain · near-off · winner/);
+  assert.ok(!holdout.includes("recipe that bets"));
+  assert.match(holdout, /later races/);
+  const invent = seatBubbles(stamp.seats.find((s) => s.id === "invent")!, stamp)
     .map((b) => b.text)
     .join(" ");
-  assert.match(bauron, /South Africa · morning · winner/);
-  assert.match(bauron, /not a patch on Britain/);
-  const curator = seatBubbles(stamp.seats.find((s) => s.id === "curator")!, stamp)
+  assert.match(invent, /South Africa · morning · winner/);
+  assert.match(invent, /not a patch on Britain/);
+  const wiki = seatBubbles(stamp.seats.find((s) => s.id === "wiki")!, stamp)
     .map((b) => b.text)
     .join(" ");
-  assert.match(curator, /race files/);
-  const mercator = seatBubbles(stamp.seats.find((s) => s.id === "mercator")!, stamp)
+  assert.match(wiki, /race files/);
+  const inventQueue = seatBubbles(
+    { ...stamp.seats.find((s) => s.id === "invent")!, now: "next hole: ZA|morning|WIN" },
+    stamp,
+  )
     .map((b) => b.text)
     .join(" ");
-  assert.match(mercator, /South Africa · morning · winner/);
+  assert.match(inventQueue, /South Africa · morning · winner/);
 });
 
-test("Hyde names a different-horses tweak without saying cousin", () => {
-  const hyde = STAMP.seats.find((s) => s.id === "hyde")!;
+test("Auditor names a different-horses tweak without saying cousin", () => {
+  const auditor = STAMP.seats.find((s) => s.id === "auditor")!;
   const stamp = liveTapeStamp();
   const texts = seatBubbles(
-    { ...hyde, now: "trial H-hyde-gb-nearoff-win-cousin" },
+    { ...auditor, now: "trial H-hyde-gb-nearoff-win-cousin" },
     {
       ...stamp,
       recipes: [
@@ -142,9 +145,9 @@ test("Hyde names a different-horses tweak without saying cousin", () => {
 });
 
 test("Empty seat has no bubbles", () => {
-  const curator = STAMP.seats.find((s) => s.id === "curator")!;
+  const wiki = STAMP.seats.find((s) => s.id === "wiki")!;
   const bubbles = seatBubbles(
-    { ...curator, now: "" },
+    { ...wiki, now: "" },
     {
       ...liveTapeStamp(),
       trades: [],
@@ -166,15 +169,14 @@ test("Staff hunt bubbles use plant seat.now, not in-play square scan", () => {
     n_solid: 0,
     solids: [],
   };
-  const bauron = STAMP.seats.find((s) => s.id === "bauron")!;
-  const mercator = STAMP.seats.find((s) => s.id === "mercator")!;
-  const bText = seatBubbles({ ...bauron, now: "hunt HK|morning|WIN" }, stamp)
+  const invent = STAMP.seats.find((s) => s.id === "invent")!;
+  const bText = seatBubbles({ ...invent, now: "hunt HK|morning|WIN" }, stamp)
     .map((b) => b.text)
     .join(" ");
   assert.match(bText, /Next empty hole: Hong Kong · morning · winner/);
   assert.ok(!bText.includes("in-play"));
   const mText = seatBubbles(
-    { ...mercator, now: "HK morning/late_pre/near_off WIN empties" },
+    { ...invent, now: "HK morning/late_pre/near_off WIN empties" },
     stamp,
   )
     .map((b) => b.text)

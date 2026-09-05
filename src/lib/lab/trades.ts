@@ -19,6 +19,7 @@ import {
   deskStampedSide,
   EMPTY,
   cellName,
+  eholeRunSuffix,
   hopMoves,
   recipeBookName,
   strategyMark,
@@ -227,7 +228,7 @@ export function fillResultWord(fill: Fill): string {
 }
 
 /** Ticket as a board row. Open P&L is Empty until settled. */
-export function fillDeskRow(fill: Fill, fuseOn: boolean): DeskRow {
+export function fillDeskRow(fill: Fill, fuseOn: boolean, recipes: readonly Recipe[] = []): DeskRow {
   const tape = tapePnl(fill, fuseOn);
   const isOpen = fill.result === "waiting";
   const time = bookedClock(fill.ts, fill.t);
@@ -238,10 +239,17 @@ export function fillDeskRow(fill: Fill, fuseOn: boolean): DeskRow {
   const sideStr =
     rawSide === "BACK" || rawSide === "LAY" ? rawSide : deskStampedSide(fill.recipeId, fill.recipe);
   const pending = (value: string) => (value && value !== EMPTY ? value : isOpen ? WAITING : EMPTY);
+  const recipe = recipes.find((r) => r.id === fill.recipeId.split("|")[0]);
+  const nameTag =
+    /^H-ehole-/i.test(fill.recipeId)
+      ? eholeRunSuffix(fill.recipeId.split("|")[0] ?? fill.recipeId) ??
+        (fill.recipeId.split("|")[0] ?? "").replace(/^H-ehole-/, "")
+      : null;
   return {
     id: fill.id,
     time: pending(time),
-    name: tradeName(fill),
+    name: tradeName(fill, recipe),
+    nameTag,
     market: market !== EMPTY ? market : isOpen ? WAITING : EMPTY,
     side: sideStr !== EMPTY ? sideStr : EMPTY,
     odds: pending(oddsStr === EMPTY ? "" : oddsStr),

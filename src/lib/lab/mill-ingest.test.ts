@@ -214,7 +214,7 @@ test("sealFloorPaperFromTape ignores mill stamp paper_live and factory_day_pnl",
   assert.equal(sealed.trends.find((t) => t.day === day)?.paper_live_day_u, rollup.u);
   assert.equal(sealed.trends.find((t) => t.day === day)?.factory_day_pnl_u, null);
 
-  const facts = floorFacts(sealed, { day, lookingBack: false }, 24);
+  const facts = floorFacts(sealed, { day, lookingBack: false });
   const paper = facts.find((f) => f.id === "paper");
   assert.equal(paper?.value, rollup.u);
   assert.equal(paper?.countsLine, rollup.countsLine);
@@ -241,7 +241,7 @@ test("sealFloorPaperFromTape ignores mill stamp paper_live and factory_day_pnl",
   assert.equal(churnRollup.u, rollup.u);
   assert.equal(churnRollup.counts?.wins, 16);
   assert.equal(churnRollup.counts?.losses, 46);
-  const churnPaper = floorFacts(afterChurn, { day, lookingBack: false }, 24).find((f) => f.id === "paper");
+  const churnPaper = floorFacts(afterChurn, { day, lookingBack: false }).find((f) => f.id === "paper");
   assert.equal(churnPaper?.value, rollup.u);
 });
 
@@ -289,7 +289,7 @@ test("day roll seals Sep 4 Empty while Sep 3 opens carry and trend bar survives"
   const sep3 = sealed.trends.find((t) => t.day === priorDay);
   assert.ok(sep3);
   assert.equal(sep3?.paper_live_day_u, deskSettledTapeRollup(sealed.trades, priorDay, STAMP.recipes).u);
-  const todayPaper = floorFacts(sealed, { day: deskDay, lookingBack: false }, 24).find((f) => f.id === "paper");
+  const todayPaper = floorFacts(sealed, { day: deskDay, lookingBack: false }).find((f) => f.id === "paper");
   assert.equal(todayPaper?.value, null);
   assert.equal(todayPaper?.countsLine, null);
 });

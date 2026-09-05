@@ -16,35 +16,14 @@ import {
   type FloorFact,
   type FloorFactId,
 } from "@/lib/lab/desk";
-import { floorRacingSquare, holeSideOccupied } from "@/lib/lab/boards";
-import {
-  scrubMillVoidNamedHoles,
-  squareOpenFillsForPaint,
-} from "@/lib/lab/junk-fills.ts";
-import { millDisplayRecipes } from "@/lib/lab/mill-display.ts";
 import { cn, fmtScore } from "@/lib/utils";
 
 export function PlantPane() {
   const stamp = useStamp();
   const plant = usePlantSource();
   const scope = useDayScope();
-  const [fact, setFact] = useState<FloorFactId>("paper");
-  const open = squareOpenFillsForPaint(stamp.trades);
-  const holes = floorRacingSquare({
-    namedHoles: scrubMillVoidNamedHoles(stamp.holes, stamp.trades),
-    recipes: millDisplayRecipes(stamp.recipes),
-    openFills: open.map((f) => ({
-      id: f.id,
-      recipeId: f.recipeId,
-      recipe: f.recipe,
-      side: f.side,
-    })),
-  });
-  const authOccupied = undefined;
-  const paintedOccupied = holes.filter((h) => holeSideOccupied(h)).length;
-  const occupiedN = paintedOccupied;
-  const emptyHoles = holes.length - occupiedN;
-  const facts = floorFacts(stamp, scope, emptyHoles);
+  const [fact, setFact] = useState<FloorFactId>("production");
+  const facts = floorFacts(stamp, scope);
   const selected = facts.find((f) => f.id === fact) ?? facts[0];
   const live = plant.source === "oracle";
 
@@ -75,8 +54,16 @@ export function PlantPane() {
             {selected?.kind === "count" ? "on the square" : "u / day"}
           </p>
         </header>
-        <DayChips days={stamp.trends.map((t) => t.day)} />
-        <DailyBars fact={fact} />
+        {fact === "paper" ? <DayChips days={stamp.trends.map((t) => t.day)} /> : null}
+        {fact === "paper" ? (
+          <DailyBars fact={fact} />
+        ) : selected?.value == null ? (
+          <div className="mt-3">
+            <EmptyState copy={EMPTY} />
+          </div>
+        ) : (
+          <DailyBars fact={fact} />
+        )}
       </div>
     </section>
   );
@@ -113,10 +100,18 @@ function FactCell({
       className={cn(
         "min-w-[7rem] flex-1 border-r border-border px-3 py-3 text-left last:border-r-0",
         on && "shadow-[inset_0_-2px_0_0_var(--color-fg)]",
+        fact.id === "paper" && "max-sm:order-last opacity-75",
       )}
     >
-      <p className="text-xs text-muted">{fact.label}</p>
-      <p key={`${fact.id}-${fact.value}`} className={cn("log-in mt-1 font-mono text-2xl leading-none tracking-tight", tone)}>
+      <p className={cn("text-xs text-muted", fact.id === "paper" && "text-subtle")}>{fact.label}</p>
+      <p
+        key={`${fact.id}-${fact.value}`}
+        className={cn(
+          "log-in mt-1 font-mono leading-none tracking-tight",
+          fact.id === "paper" ? "text-base" : "text-2xl",
+          tone,
+        )}
+      >
         {display}
       </p>
       {fact.countsLine && fact.countsLine !== EMPTY ? (
@@ -151,12 +146,11 @@ function DailyBars({ fact }: { fact: FloorFactId }) {
     );
   });
   const nums = series.map((p) => floorFactDayValue(stamp, fact, p.day));
-  const vacant = fact === "holes" || nums.every((v) => v == null);
+  const vacant = nums.every((v) => v == null);
   if (vacant) {
     return (
       <div className="mt-3">
         <EmptyState copy={EMPTY} />
-        <p className="mt-1 font-mono text-[10px] text-subtle">one bar · Empty stays Empty</p>
       </div>
     );
   }
@@ -253,7 +247,6 @@ function DailyBars({ fact }: { fact: FloorFactId }) {
           );
         })}
       </svg>
-      <p className="mt-1 font-mono text-[10px] text-subtle">one bar · Empty stays Empty</p>
     </div>
   );
 }

@@ -10,6 +10,9 @@ import {
   YAxis,
 } from "recharts";
 import { useStamp } from "@/components/plant-context";
+import { EmptyState } from "@/components/empty-state";
+import { EMPTY } from "@/lib/lab/desk";
+import { productionScore } from "@/lib/lab/hero";
 import { fmtU } from "@/lib/utils";
 
 export const Route = createFileRoute("/trends")({ component: Trends });
@@ -20,7 +23,16 @@ function Trends() {
   const points = stamp.trends.map((p) => ({
     ...p,
     label: p.day.slice(5),
+    production_u:
+      p.n_solid > 0
+        ? productionScore({
+            n_solid: p.n_solid,
+            day_u: p.paper_live_day_u,
+            researchKeepGbp: 0,
+          })
+        : null,
   }));
+  const productionEmpty = !points.some((p) => p.production_u != null);
 
   return (
     <div className="space-y-10">
@@ -32,6 +44,9 @@ function Trends() {
       </header>
 
         <ChartBlock title="Today's production score" sub="Solid recipes only. Still paper. Empty until settled fills.">
+        {productionEmpty ? (
+          <EmptyState copy={EMPTY} />
+        ) : (
         <ResponsiveContainer width="100%" height={220}>
           <LineChart data={points} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <CartesianGrid stroke="var(--color-border)" vertical={false} />
@@ -47,7 +62,7 @@ function Trends() {
             />
             <Line
               type="monotone"
-              dataKey="paper_live_day_u"
+              dataKey="production_u"
               stroke="var(--color-up)"
               strokeWidth={1.8}
               dot={{ r: 3, fill: "var(--color-up)" }}
@@ -55,6 +70,7 @@ function Trends() {
             />
           </LineChart>
         </ResponsiveContainer>
+        )}
       </ChartBlock>
 
         <ChartBlock title="Conversion" sub="Keeps, proving, dropped — counts, not the score.">
