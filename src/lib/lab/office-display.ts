@@ -33,17 +33,29 @@ export type OfficeBookRow = {
   id: string;
   strategyType: OfficeStrategyType;
   paperU: number | null;
+  /** Compact hole — region · window · market. */
   hole: string;
+  /** Legacy sort key — not shown in the Strategies table. */
   strategy: string;
   strategySub?: string;
   side: string;
   market: string;
+  /** Odds band for nuggets; Empty for wide skins. */
+  oddsSlice: string;
+  courseSlice: string;
+  /** Race type / going — abbreviated. */
+  cardSlice: string;
   state: OfficeBookState;
   stateLabel: string;
   paperPnl: string;
   paperPnlTone: OfficePnlTone;
   paperCounts: string;
   paperTodayCounts: string;
+  /** Settled paper volume — rare vs high-volume at a glance. */
+  paperN: number | null;
+  /** Average paper u per settled bet — u/n. */
+  paperUnit: string;
+  paperUnitTone: OfficePnlTone;
   wlN: string;
   spices?: string;
   productionPnl: string;
@@ -138,6 +150,57 @@ export function officeHoleLabel(recipe: Recipe): string {
   return `${countryName(region)} · ${wlabel} · ${parsed.market}`;
 }
 
+/** Tight hole label for the Strategies table — region code · window · win/plc. */
+export function officeCompactHoleLabel(recipe: Recipe): string {
+  const parsed = squareHoleKeyAndSide(recipe.id, recipe.title, recipe.region);
+  if (!parsed) return EMPTY;
+  const [region, window] = parsed.id.split("|");
+  const wlabel = SQUARE_WINDOW_LABEL[window as SquareWindow] ?? window;
+  const mlabel =
+    parsed.market === "WIN" ? "win" : parsed.market === "PLACE" ? "plc" : String(parsed.market).toLowerCase();
+  return `${region} · ${wlabel} · ${mlabel}`;
+}
+
+/** Compact hole from a matrix key — GB|morning|WIN. */
+export function officeCompactHoleFromKey(holeKey: string): string {
+  const [region, window, market] = holeKey.split("|");
+  if (!region || !window || !market) return holeKey;
+  const wlabel = SQUARE_WINDOW_LABEL[window as SquareWindow] ?? window;
+  const mlabel = market === "WIN" ? "win" : market === "PLACE" ? "plc" : market.toLowerCase();
+  return `${region} · ${wlabel} · ${mlabel}`;
+}
+
+const GOING_SHORT: Record<string, string> = {
+  Good: "Gd",
+  Soft: "Sf",
+  Heavy: "Hy",
+  Firm: "Fm",
+  Yielding: "Yld",
+};
+
+/** Abbreviated race type / going for a narrow Card column. */
+export function officeCardSlice(raceType?: string | null, going?: string | null): string {
+  const parts: string[] = [];
+  if (raceType?.trim()) {
+    const rt = raceType.trim();
+    parts.push(rt.length > 8 ? rt.slice(0, 7) + "…" : rt);
+  }
+  if (going?.trim()) {
+    const g = going.trim();
+    parts.push(GOING_SHORT[g] ?? (g.length > 4 ? g.slice(0, 3) : g));
+  }
+  return parts.length ? parts.join(" · ") : EMPTY;
+}
+
+/** n · W–L for one compact volume column. */
+export function officeWlNColumn(
+  paperN: number | null,
+  counts: SettledTradeCounts | null,
+): string {
+  if (paperN == null || !counts) return EMPTY;
+  return `${paperN} · ${counts.wins}–${counts.losses}`;
+}
+
 /** Plain strategy/hole — country · window · winner|place. No Geo/Card/Steam twin tags. */
 export function officeStrategyLabel(recipe: Recipe): string {
   const parsed = squareHoleKeyAndSide(recipe.id, recipe.title, recipe.region);
@@ -169,6 +232,42 @@ function officeSpices(recipe: Recipe, onTape: boolean): string | undefined {
 function fmtWlN(counts: SettledTradeCounts | null): string {
   if (!counts) return EMPTY;
   return fmtSettledWlN(counts);
+}
+
+function fmtWlOnly(counts: SettledTradeCounts | null): string {
+  if (!counts) return EMPTY;
+  return `${counts.wins}–${counts.losses}`;
+}
+
+/** Settled count from paper tape rollup. */
+export function officePaperNFromCounts(counts: SettledTradeCounts | null): number | null {
+  if (!counts) return null;
+  const n = counts.wins + counts.losses;
+  return n > 0 ? n : null;
+}
+
+/** Paper u per settled bet — desk-scale ROI on 1u stakes. */
+export function officePaperUnitDisplay(
+  u: number | null,
+  counts: SettledTradeCounts | null,
+): { label: string; tone: OfficePnlTone } {
+  const n = officePaperNFromCounts(counts);
+  if (u == null || n == null) return { label: EMPTY, tone: "empty" };
+  const per = u / n;
+  const sign = per > 0 ? "+" : per < 0 ? "−" : "";
+  return {
+    label: `${sign}${Math.abs(per).toFixed(2)}u/n`,
+    tone: per >= 0 ? "up" : "down",
+  };
+}
+
+export function officePaperScale(
+  u: number | null,
+  counts: SettledTradeCounts | null,
+): Pick<OfficeBookRow, "paperN" | "paperUnit" | "paperUnitTone"> {
+  const paperN = officePaperNFromCounts(counts);
+  const unit = officePaperUnitDisplay(u, counts);
+  return { paperN, paperUnit: unit.label, paperUnitTone: unit.tone };
 }
 
 /** All recipe ids whose paper settles onto this Office row — per skin, no hole rollup. */
@@ -243,7 +342,7 @@ function paperPnlCell(
   return {
     paperPnl: fmtPnlU(u),
     paperPnlTone: scoreTone(u),
-    paperCounts: cumulative ? `${fmtSettledWlN(cumulative)} · since armed` : EMPTY,
+    paperCounts: cumulative ? "since armed" : EMPTY,
     paperTodayCounts: todayLine,
   };
 }
@@ -412,22 +511,26 @@ export function officeBookRows(input: OfficeBookInput): OfficeBookRow[] {
     const state = officeBookState(recipe)!;
     const pnl = officePnlCells(recipe, state, withRollups);
     const cumulative = paperCounts.get(recipe.id) ?? null;
-    const onTape = recipe.chip === "On tape today" || Boolean(todayCounts.get(recipe.id));
     const paperU = paperTotals.get(recipe.id) ?? null;
+    const scale = officePaperScale(paperU, cumulative);
+    const run = eholeRunSuffix(recipe.id);
     return {
       id: recipe.id,
       strategyType: "wide",
       paperU,
-      hole: officeHoleLabel(recipe),
+      hole: officeCompactHoleLabel(recipe),
       strategy: officeStrategyLabel(recipe),
       strategySub: officeStrategySub(recipe),
       side: officeSide(recipe),
       market: officeMarket(recipe),
+      oddsSlice: EMPTY,
+      courseSlice: recipe.hunterName?.trim() ? recipe.hunterName.trim() : EMPTY,
+      cardSlice: run ? run : EMPTY,
       state,
       stateLabel: officeStateLabel(recipe, state),
       ...pnl,
-      wlN: fmtWlN(cumulative),
-      spices: officeSpices(recipe, onTape),
+      ...scale,
+      wlN: officeWlNColumn(scale.paperN, cumulative),
       holdingId: recipe.id,
     };
   });

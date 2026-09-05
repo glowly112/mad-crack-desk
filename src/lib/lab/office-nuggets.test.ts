@@ -4,6 +4,7 @@ import {
   nuggetKeyFromFill,
   nuggetLabel,
   nuggetOddsBand,
+  nuggetOddsBandShort,
   officeNuggetGroups,
   officeNuggetRows,
   officeStrategyRows,
@@ -51,6 +52,11 @@ test("nugget odds bands match plant-style slices", () => {
   assert.equal(nuggetOddsBand(6), "4.5–7.99");
   assert.equal(nuggetOddsBand(10), "8.0–12.99");
   assert.equal(nuggetOddsBand(20), "13+");
+});
+
+test("nugget odds band short labels fit narrow column", () => {
+  assert.equal(nuggetOddsBandShort("4.5–7.99"), "4.5–8");
+  assert.equal(nuggetOddsBandShort("13+"), "13+");
 });
 
 test("nugget key groups hole with odds band course race_type going", () => {
@@ -102,7 +108,7 @@ test("nugget rows include rare slices with n=1", () => {
   ];
   const rows = officeNuggetRows({ recipes: [], day: "2026-09-03", trades });
   assert.equal(rows.length, 2);
-  const rare = rows.find((r) => r.strategy.includes("13+"));
+  const rare = rows.find((r) => r.oddsSlice === "13+");
   assert.ok(rare);
   assert.equal(rare?.strategyType, "nugget");
   assert.equal(rare?.stateLabel, "Measuring");

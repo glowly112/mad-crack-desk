@@ -8,7 +8,7 @@ import {
 import { EMPTY } from "./desk.ts";
 import { recipeDisplayHoleKey } from "./mill-display.ts";
 import type { OfficeBookInput, OfficeBookRow, OfficeBookState, OfficePnlTone, OfficeStrategyType } from "./office-display.ts";
-import { filterOfficeRows, officeBookRows } from "./office-display.ts";
+import { filterOfficeRows, officeBookRows, officeCardSlice, officeCompactHoleFromKey, officePaperScale, officeWlNColumn } from "./office-display.ts";
 import type { Fill } from "./trades.ts";
 import {
   fmtSettledWlN,
@@ -44,6 +44,20 @@ export function nuggetOddsBand(odds: number | null | undefined): string | null {
   if (odds < 8) return "4.5–7.99";
   if (odds < 13) return "8.0–12.99";
   return "13+";
+}
+
+/** Short odds band for a narrow table column. */
+export function nuggetOddsBandShort(band: string | undefined): string {
+  if (!band) return EMPTY;
+  const map: Record<string, string> = {
+    "under 2": "<2",
+    "2.0–2.49": "2–2.5",
+    "2.5–4.49": "2.5–4.5",
+    "4.5–7.99": "4.5–8",
+    "8.0–12.99": "8–13",
+    "13+": "13+",
+  };
+  return map[band] ?? band;
 }
 
 function holeLabelFromKey(holeKey: string): string {
@@ -166,23 +180,31 @@ export function officeNuggetRows(input: OfficeBookInput, minN = 1): OfficeBookRo
   return groups.map((group) => {
     const { state, stateLabel } = nuggetState(group, input.recipes);
     const counts = group.counts;
-    const wlN = counts ? fmtSettledWlN(counts) : EMPTY;
     const hasPnl = group.fills.length > 0 && counts != null;
+    const scale = officePaperScale(hasPnl ? group.u : null, counts);
+    const slice = group.slice;
+    const course = slice.course?.trim() ?? "";
+    const courseSlice =
+      course.length > 12 ? `${course.slice(0, 11)}…` : course || EMPTY;
     return {
       id: group.id,
       strategyType: "nugget",
       paperU: hasPnl ? group.u : null,
-      hole: group.holeLabel,
+      hole: officeCompactHoleFromKey(group.holeKey),
       strategy: group.label,
       side: EMPTY,
       market: EMPTY,
+      oddsSlice: nuggetOddsBandShort(slice.oddsBand),
+      courseSlice,
+      cardSlice: officeCardSlice(slice.raceType, slice.going),
       state,
       stateLabel,
       paperPnl: hasPnl ? fmtPnlU(group.u) : EMPTY,
       paperPnlTone: hasPnl ? scoreTone(group.u) : "empty",
-      paperCounts: counts ? `${wlN} · since first seen` : EMPTY,
+      paperCounts: counts ? "since first seen" : EMPTY,
       paperTodayCounts: EMPTY,
-      wlN,
+      ...scale,
+      wlN: officeWlNColumn(scale.paperN, counts),
       spices: undefined,
       productionPnl: EMPTY,
       productionPnlTone: "empty",
@@ -213,6 +235,6 @@ export function officeStrategyRows(input: OfficeBookInput): OfficeBookRow[] {
     const ta = typeOrder[a.strategyType];
     const tb = typeOrder[b.strategyType];
     if (ta !== tb) return ta - tb;
-    return a.strategy.localeCompare(b.strategy);
+    return a.hole.localeCompare(b.hole);
   });
 }

@@ -31,11 +31,12 @@ test("office book rows include hole, strategy, side, market, state", () => {
     day,
   });
   assert.equal(rows.length, 1);
-  assert.match(rows[0]!.hole, /New Zealand/);
-  assert.match(rows[0]!.hole, /WIN/);
+  assert.match(rows[0]!.hole, /NZ · morning · win/);
   assert.equal(rows[0]!.state, "measuring");
   assert.equal(rows[0]!.paperPnl, "Empty");
-  assert.equal(rows[0]!.paperCounts, "Empty");
+  assert.equal(rows[0]?.paperCounts, EMPTY);
+  assert.equal(rows[0]?.oddsSlice, EMPTY);
+  assert.equal(rows[0]?.strategyType, "wide");
 });
 
 test("measuring row shows today's paper settles — measuring is not KEEP", () => {
@@ -63,7 +64,9 @@ test("measuring row shows today's paper settles — measuring is not KEEP", () =
   const rows = officeBookRows({ recipes: [recipe], day, trades });
   assert.equal(rows[0]?.paperPnl, "−1.50u");
   assert.equal(rows[0]?.paperPnlTone, "down");
-  assert.equal(rows[0]?.paperCounts, "0–1 · n=1 · since armed");
+  assert.equal(rows[0]?.paperCounts, "since armed");
+  assert.equal(rows[0]?.wlN, "1 · 0–1");
+  assert.equal(rows[0]?.paperUnit, "−1.50u/n");
   assert.equal(rows[0]?.paperTodayCounts, "today 0–1 · n=1");
   assert.equal(rows[0]?.productionPnl, "Empty");
   assert.equal(rows[0]?.laterRacePnl, "Empty");
@@ -167,10 +170,12 @@ test("office paper survives day roll — prior-day settles stay cumulative", () 
   const nzRow = rows.find((r) => r.id === nz.id);
   const gbRow = rows.find((r) => r.id === gb.id);
   assert.equal(nzRow?.paperPnl, "+2.50u");
-  assert.equal(nzRow?.paperCounts, "1–0 · n=1 · since armed");
+  assert.equal(nzRow?.paperCounts, "since armed");
+  assert.equal(nzRow?.wlN, "1 · 1–0");
   assert.equal(nzRow?.paperTodayCounts, EMPTY);
   assert.equal(gbRow?.paperPnl, "−1.00u");
-  assert.equal(gbRow?.paperCounts, "0–1 · n=1 · since armed");
+  assert.equal(gbRow?.paperCounts, "since armed");
+  assert.equal(gbRow?.wlN, "1 · 0–1");
   assert.equal(gbRow?.paperTodayCounts, "today 0–1 · n=1");
   const floorU = settledPaperDayU(trades, deskDay, recipes);
   assert.equal(floorU, -1);

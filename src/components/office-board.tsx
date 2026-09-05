@@ -32,7 +32,20 @@ const TYPE_FILTERS: { key: OfficeTypeFilter; label: string }[] = [
   { key: "nugget", label: "Nugget" },
 ];
 
-/** Top strip — strategies, KEEP, production, live (Empty while fuse off). */
+const HEADERS = [
+  { key: "type", label: "Type", align: "left" },
+  { key: "hole", label: "Hole", align: "left" },
+  { key: "odds", label: "Odds", align: "left" },
+  { key: "course", label: "Course", align: "left" },
+  { key: "card", label: "Card", align: "left" },
+  { key: "state", label: "State", align: "left" },
+  { key: "n", label: "n / W–L", align: "right" },
+  { key: "pnl", label: "Paper P&L", align: "right" },
+  { key: "unit", label: "u/n", align: "right" },
+  { key: "prod", label: "Prd", align: "right" },
+  { key: "later", label: "Later", align: "right" },
+] as const;
+
 function officeInput(stamp: ReturnType<typeof useStamp>) {
   const trend = stamp.trends.find((t) => t.day === stamp.day);
   return {
@@ -100,50 +113,22 @@ export function OfficeCounts() {
   );
 }
 
-const HEADERS = [
-  "Type",
-  "Strategy / hole",
-  "State",
-  "Paper P&L",
-  "n / W–L",
-  "Side",
-  "Market",
-  "Spices",
-  "Production",
-  "Later-race",
-] as const;
-
-function pnlClass(tone: OfficePnlTone): string {
+function pnlClass(tone: OfficePnlTone, muted = false): string {
   return cn(
-    "px-2 py-2.5 text-right font-mono text-xs tabular-nums",
-    tone === "empty" && "text-muted",
-    tone === "neutral" && "text-muted",
-    tone === "up" && "text-up",
-    tone === "down" && "text-bad",
+    "px-1.5 py-2 font-mono text-[11px] tabular-nums",
+    muted && "text-muted",
+    !muted && tone === "empty" && "text-muted",
+    !muted && tone === "neutral" && "text-muted",
+    !muted && tone === "up" && "text-up",
+    !muted && tone === "down" && "text-bad",
   );
 }
 
-function PnlCell({
-  pnl,
-  tone,
-  counts,
-  todayCounts,
-}: {
-  pnl: string;
-  tone: OfficePnlTone;
-  counts: string;
-  todayCounts?: string;
-}) {
+function cellText(value: string, className?: string) {
   return (
-    <td className={pnlClass(tone)}>
-      <div>{pnl}</div>
-      {counts !== EMPTY ? (
-        <div className="mt-0.5 text-[10px] text-subtle tabular-nums">{counts}</div>
-      ) : null}
-      {todayCounts && todayCounts !== EMPTY ? (
-        <div className="mt-0.5 text-[10px] text-muted tabular-nums">{todayCounts}</div>
-      ) : null}
-    </td>
+    <span className={cn("block truncate text-[11px]", value === EMPTY && "text-muted", className)}>
+      {value}
+    </span>
   );
 }
 
@@ -151,11 +136,11 @@ function TypeBadge({ type }: { type: OfficeBookRow["strategyType"] }) {
   return (
     <span
       className={cn(
-        "inline-block rounded-sm px-1.5 py-0.5 text-[10px] font-medium",
+        "inline-block rounded-sm px-1 py-0.5 text-[9px] font-medium leading-none",
         type === "wide" ? "bg-elev text-fg" : "border border-border bg-surface text-subtle",
       )}
     >
-      {type === "wide" ? "Wide" : "Nugget"}
+      {type === "wide" ? "Wide" : "Nug"}
     </span>
   );
 }
@@ -163,40 +148,42 @@ function TypeBadge({ type }: { type: OfficeBookRow["strategyType"] }) {
 const OfficeStrategyTableRow = memo(function OfficeStrategyTableRow({ row }: { row: OfficeBookRow }) {
   return (
     <tr className="border-b border-border">
-      <td className="px-2 py-2.5">
+      <td className="px-1.5 py-2">
         <TypeBadge type={row.strategyType} />
       </td>
-      <td className="px-2 py-2.5 text-sm">
+      <td className="max-w-[7.5rem] px-1.5 py-2">
         <Link
           to="/holdings/$id"
           params={{ id: row.holdingId }}
-          className="transition-colors hover:text-fg"
+          className="block truncate text-[11px] transition-colors hover:text-fg"
+          title={row.hole}
         >
-          <div>{row.strategy}</div>
-          {row.strategySub ? (
-            <div className="mt-0.5 font-mono text-[10px] leading-snug text-subtle">{row.strategySub}</div>
-          ) : null}
-          <div className="mt-0.5 text-[10px] text-muted">{row.hole}</div>
+          {row.hole}
         </Link>
       </td>
-      <td className="px-2 py-2.5 text-xs text-muted">{row.stateLabel}</td>
-      <PnlCell
-        pnl={row.paperPnl}
-        tone={row.paperPnlTone}
-        counts={row.paperCounts}
-        todayCounts={row.paperTodayCounts}
-      />
-      <td className="px-2 py-2.5 font-mono text-xs tabular-nums text-subtle">{row.wlN}</td>
-      <td className="px-2 py-2.5 font-mono text-xs text-subtle">{row.side}</td>
-      <td className="px-2 py-2.5 font-mono text-xs text-subtle">{row.market}</td>
-      <td className="px-2 py-2.5 text-[10px] text-muted">{row.spices ?? EMPTY}</td>
-      <PnlCell pnl={row.productionPnl} tone={row.productionPnlTone} counts={row.productionCounts} />
-      <td className={pnlClass(row.laterRacePnlTone)}>{row.laterRacePnl}</td>
+      <td className="max-w-[3.5rem] px-1.5 py-2 font-mono text-[10px] tabular-nums text-subtle">
+        {cellText(row.oddsSlice)}
+      </td>
+      <td className="max-w-[5rem] px-1.5 py-2">{cellText(row.courseSlice, "text-subtle")}</td>
+      <td className="max-w-[4.5rem] px-1.5 py-2">{cellText(row.cardSlice, "text-muted")}</td>
+      <td className="px-1.5 py-2 text-[10px] text-muted">{row.stateLabel}</td>
+      <td className={pnlClass("empty")}>{cellText(row.wlN, "text-right font-mono tabular-nums text-subtle")}</td>
+      <td className={pnlClass(row.paperPnlTone)}>
+        <div>{row.paperPnl}</div>
+        {row.paperTodayCounts && row.paperTodayCounts !== EMPTY ? (
+          <div className="mt-0.5 truncate text-[9px] text-muted">{row.paperTodayCounts}</div>
+        ) : null}
+      </td>
+      <td className={pnlClass(row.paperUnitTone)}>{row.paperUnit}</td>
+      <td className={pnlClass(row.productionPnlTone, row.productionPnl === EMPTY)}>
+        {row.productionPnl}
+      </td>
+      <td className={pnlClass(row.laterRacePnlTone, row.laterRacePnl === EMPTY)}>{row.laterRacePnl}</td>
     </tr>
   );
 });
 
-/** Wide hole skins + spice nuggets in one Strategies table. */
+/** Wide hole skins + spice nuggets — one compact Strategies table. */
 export function OfficeBooksTable() {
   const { rows, typeCounts, armed } = useOfficeDesk();
   const [filter, setFilter] = useState<OfficeFilter>("all");
@@ -214,7 +201,6 @@ export function OfficeBooksTable() {
           <p className="text-xs text-subtle">
             {rows.length} rows · {typeCounts.wide} wide · {typeCounts.nugget} nuggets
             {armed > 0 ? ` · ${armed} armed on mill` : ""}
-            {" · "}Paper P&L since armed or first seen
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -225,7 +211,7 @@ export function OfficeBooksTable() {
                 type="button"
                 onClick={() => setTypeFilter(f.key)}
                 className={cn(
-                  "rounded-sm px-2.5 py-1 text-xs transition-colors",
+                  "rounded-sm px-2 py-1 text-xs transition-colors",
                   typeFilter === f.key
                     ? "bg-elev text-fg"
                     : "text-muted hover:bg-elev/60 hover:text-fg",
@@ -242,7 +228,7 @@ export function OfficeBooksTable() {
                 type="button"
                 onClick={() => setFilter(f.key)}
                 className={cn(
-                  "rounded-sm px-2.5 py-1 text-xs transition-colors",
+                  "rounded-sm px-2 py-1 text-xs transition-colors",
                   filter === f.key
                     ? "bg-elev text-fg"
                     : "text-muted hover:bg-elev/60 hover:text-fg",
@@ -258,31 +244,32 @@ export function OfficeBooksTable() {
         <EmptyState copy={EMPTY} />
       ) : (
         <DeskScroll axis="y" className="min-w-0 max-h-[min(70vh,42rem)]">
-          <table className="w-full min-w-[58rem] table-fixed border-collapse text-left">
+          <table className="w-full min-w-[44rem] table-fixed border-collapse text-left">
             <colgroup>
-              <col className="w-16" />
-              <col className="w-[20%]" />
-              <col className="w-20" />
-              <col className="w-[4.5rem]" />
-              <col className="w-20" />
+              <col className="w-11" />
+              <col className="w-[7.5rem]" />
               <col className="w-12" />
+              <col className="w-16" />
               <col className="w-14" />
-              <col className="w-[14%]" />
-              <col className="w-[4.5rem]" />
-              <col className="w-[4.5rem]" />
+              <col className="w-16" />
+              <col className="w-14" />
+              <col className="w-14" />
+              <col className="w-12" />
+              <col className="w-11" />
+              <col className="w-11" />
             </colgroup>
             <thead className="sticky top-0 z-[1] bg-bg">
               <tr className="border-b border-border">
                 {HEADERS.map((h) => (
                   <th
-                    key={h}
+                    key={h.key}
                     scope="col"
                     className={cn(
-                      "px-2 py-2 text-[10px] font-normal tracking-wide text-subtle",
-                      (h === "Paper P&L" || h === "Production" || h === "Later-race") && "text-right",
+                      "px-1.5 py-1.5 text-[9px] font-normal tracking-wide text-subtle",
+                      h.align === "right" && "text-right",
                     )}
                   >
-                    {h}
+                    {h.label}
                   </th>
                 ))}
               </tr>
