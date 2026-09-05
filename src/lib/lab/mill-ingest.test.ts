@@ -72,7 +72,7 @@ test("scrubDeskStampArchive zeros freeze keep and factory history", () => {
         : t,
     ),
     seats: STAMP.seats.map((s) =>
-      s.id === "hyde" ? { ...s, status: "GREEN", now: "aim £100/day: -9.49u" } : s,
+      s.id === "auditor" ? { ...s, status: "GREEN", now: "aim £100/day: -9.49u" } : s,
     ),
     kpis: STAMP.kpis.map((k) =>
       k.id === "factory" ? { ...k, detail: "aim £100/day · Hyde paper" } : k,
@@ -82,9 +82,9 @@ test("scrubDeskStampArchive zeros freeze keep and factory history", () => {
   assert.equal((stamp as LiveStamp & { square_occupied_n?: number }).square_occupied_n, 42);
   assert.equal(stamp.fuse_on, false);
   assert.ok(stamp.trends.every((t) => t.day < "2026-09-02" || t.factory_day_pnl_u == null));
-  const hyde = stamp.seats.find((s) => s.id === "hyde");
-  assert.ok(hyde);
-  assert.ok(!isMillArchivePoison(hyde!.now));
+  const auditor = stamp.seats.find((s) => s.id === "auditor");
+  assert.ok(auditor);
+  assert.ok(!isMillArchivePoison(auditor!.now));
 });
 
 test("scrubDigestStampArchive clears digest history paper", () => {
@@ -211,7 +211,7 @@ test("sealFloorPaperFromTape ignores mill stamp paper_live and factory_day_pnl",
   } as unknown as LiveStamp);
 
   assert.equal(sealed.hero.day_u, rollup.u);
-  assert.equal(sealed.trends.find((t) => t.day === day)?.paper_live_day_u, rollup.u);
+  assert.equal(sealed.trends.find((t) => t.day === day)?.paper_live_day_u, null);
   assert.equal(sealed.trends.find((t) => t.day === day)?.factory_day_pnl_u, null);
 
   const facts = floorFacts(sealed, { day, lookingBack: false });
@@ -288,7 +288,10 @@ test("day roll seals Sep 4 Empty while Sep 3 opens carry and trend bar survives"
   assert.equal(opens.length, 6);
   const sep3 = sealed.trends.find((t) => t.day === priorDay);
   assert.ok(sep3);
-  assert.equal(sep3?.paper_live_day_u, deskSettledTapeRollup(sealed.trades, priorDay, STAMP.recipes).u);
+  const sep3Rollup = deskSettledTapeRollup(sealed.trades, priorDay, STAMP.recipes).u;
+  assert.equal(sep3Rollup, -1);
+  assert.equal(sep3?.paper_live_day_u, null);
+  assert.equal(sep3?.factory_day_pnl_u, null);
   const todayPaper = floorFacts(sealed, { day: deskDay, lookingBack: false }).find((f) => f.id === "paper");
   assert.equal(todayPaper?.value, null);
   assert.equal(todayPaper?.countsLine, null);

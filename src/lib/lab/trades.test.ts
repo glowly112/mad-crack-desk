@@ -41,8 +41,6 @@ import {
   fillDeskRow,
   fillResultWord,
   tradeName,
-  tradeTapeName,
-  eholeSkinLabel,
   waitDeskRow,
   measuringEholeWaitChips,
   dedupeWaitChipsByHole,
@@ -340,7 +338,7 @@ test("measuring recipe desk row names hunter and run, not hole alone", () => {
   assert.match(row.name, /New Zealand · late-pre · place · Geo · 01741Z/);
 });
 
-test("tradeTapeName shows strategy hole and ehole skin secondary", () => {
+test("fillDeskRow shows strategy hole and ehole run tag", () => {
   const settled = fillFromRow({
     pick_id: "harb-34829",
     date: "2026-09-03",
@@ -358,9 +356,7 @@ test("tradeTapeName shows strategy hole and ehole skin secondary", () => {
   assert.match(row.name, /Britain · late-pre · winner · Harb/);
   assert.equal(row.market, "WIN");
   assert.equal(row.side, "BACK");
-  assert.equal(row.nameSub, "ehole · 34829Z");
-  const tape = tradeTapeName(settled);
-  assert.match(tape.name, /Britain · late-pre · winner/);
+  assert.equal(row.nameTag, "34829Z");
 });
 
 test("open ticket shows real side/odds/stake; unsettled P&L stays Empty", () => {

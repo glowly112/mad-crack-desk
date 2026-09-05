@@ -27,7 +27,7 @@ export function floorEmptyFromStamp(
 /** Law 1: Floor Paper tile value must equal today's settled tape roll-up. */
 export function floorPaperFromStamp(stamp: LiveStamp): number | null {
   const rollup = deskSettledTapeRollup(stamp.trades ?? [], stamp.day, stamp.recipes ?? []);
-  const facts = floorFacts(stamp, { day: stamp.day, lookingBack: false }, 0);
+  const facts = floorFacts(stamp, { day: stamp.day, lookingBack: false });
   const paper = facts.find((f) => f.id === "paper");
   return paper?.value ?? null;
 }

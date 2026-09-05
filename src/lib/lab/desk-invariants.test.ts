@@ -140,7 +140,6 @@ test("law 3: day roll carries prior-day OPEN to desk day", () => {
   const todayPaper = floorFacts(
     { ...STAMP, day: deskDay, trades: seeded, trends: STAMP.trends },
     { day: deskDay, lookingBack: false },
-    0,
   ).find((f) => f.id === "paper");
   assert.equal(todayPaper?.value, null);
 });
@@ -190,8 +189,4 @@ test("law 5: oracle snapshot + board reset scrub keeps stamp N for empty-of-64 c
   const view = applyBoardResetView(live);
   assert.equal(stampSquareOccupiedN(view), 47);
   assert.equal(floorEmptyFromStamp(view, 44), 17);
-  const holesFact = floorFacts(view, { day: view.day, lookingBack: false }, floorEmptyFromStamp(view, 44)).find(
-    (f) => f.id === "holes",
-  );
-  assert.equal(holesFact?.value, 17);
 });

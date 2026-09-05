@@ -106,7 +106,7 @@ export function scrubDeskStampArchive(stamp: LiveStamp): LiveStamp {
     const now = scrubMillWatchingLine(seat.now ?? "");
     const poison = isMillArchivePoison(seat.now ?? "");
     const status =
-      poison && seat.id === "hyde"
+      poison && (seat.id === "hyde" || seat.id === "auditor")
         ? ("AMBER" as const)
         : poison && (seat.id === "clerk" || seat.id === "foreman")
           ? seat.status
@@ -152,6 +152,7 @@ export function scrubDeskStampArchive(stamp: LiveStamp): LiveStamp {
 function boardResetSeatHint(seatId: string): string {
   switch (seatId) {
     case "hyde":
+    case "auditor":
       return "nothing certified on today's tape";
     case "clerk":
       return "paper from today's settled tape only";
