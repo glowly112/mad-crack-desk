@@ -80,7 +80,12 @@ source "$APP/desk.env"
 set +a
 nohup "$HOME/opt/node/bin/node" .output/server/index.mjs >>"$ROOT/logs/mcl_desk.log" 2>&1 &
 echo $! >"$APP/desk.pid"
-sleep 8
+deadline=$((SECONDS + 30))
+while [ "$SECONDS" -lt "$deadline" ]; do
+  code=$(curl -sS -m 3 -o /dev/null -w "%{http_code}" http://127.0.0.1:8791/desk/ping 2>/dev/null || echo 000)
+  if [ "$code" = "200" ]; then break; fi
+  sleep 1
+done
 CSS=$(ls .output/public/assets/styles-*.css 2>/dev/null | head -1)
 JS=$(ls .output/public/assets/index-*.js 2>/dev/null | head -1)
 curl -sS -m 25 -o /dev/null -w "desk:%{http_code}\n" http://127.0.0.1:8791/desk/
@@ -99,7 +104,14 @@ print(\"square\", \"The square\" in words)
 stamps=sorted(set(re.findall(r\"20\d{6}T\d{6}Z\", t)))
 print(\"stamp\", stamps[-1] if stamps else \"none\")
 print(\"live\", words.count(\"live oracle\"))
-"'
+"
+ping_code=$(curl -sS -m 5 -o /dev/null -w "%{http_code}" http://127.0.0.1:8791/desk/ping 2>/dev/null || echo 000)
+if [ "$ping_code" != "200" ]; then
+  echo "deploy: /desk/ping not healthy (got $ping_code)" >&2
+  tail -30 "$ROOT/logs/mcl_desk.log" >&2 || true
+  exit 1
+fi
+'
 chmod +x "$APP/mcl-desk-health.sh" 2>/dev/null || chmod +x "$HOME/mcl-desk/mcl-desk-health.sh" 2>/dev/null || true
 chmod +x "$APP/mcl-desk-keepalive.sh" 2>/dev/null || true
 chmod +x "$HOME/bbb/deploy/mcl-desk-keepalive.sh" 2>/dev/null || true
