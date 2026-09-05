@@ -3,17 +3,18 @@ import { createFileRoute } from "@tanstack/react-router";
 import { DayChips } from "@/components/day-chips";
 import { useDayScope } from "@/components/day-scope";
 import { DeskTable } from "@/components/desk-table";
-import { LiveDot } from "@/components/live-dot";
+import { OracleStampLine } from "@/components/oracle-stamp-line";
 import { usePlantSource, useStamp } from "@/components/plant-context";
 import { axisDay, EMPTY, type DeskGroup } from "@/lib/lab/desk";
 import {
   dayTapePnl,
+  deskSettledTapeRollup,
   fillDeskRow,
   fillsOnDay,
-  openFills,
-  settledFills,
+  tradesMillOpenFills,
+  tradesSettledVoidFills,
   waitDeskRow,
-  waitOpenChips,
+  tradesWaitChips,
 } from "@/lib/lab/trades";
 import { fmtU } from "@/lib/utils";
 
@@ -24,9 +25,11 @@ export function Trades() {
   const plant = usePlantSource();
   const scope = useDayScope();
   const dayFills = fillsOnDay(stamp.trades, scope.day);
-  const open = openFills(dayFills);
-  const settled = settledFills(dayFills);
-  const chips = scope.lookingBack ? [] : waitOpenChips(stamp.wait_open ?? [], open);
+  const rollup = deskSettledTapeRollup(stamp.trades, scope.day, stamp.recipes);
+  const open = tradesMillOpenFills(stamp.trades, scope.day, stamp.recipes);
+  const settled = rollup.fills;
+  const voided = tradesSettledVoidFills(dayFills, stamp.recipes);
+  const chips = scope.lookingBack ? [] : tradesWaitChips(stamp.recipes, stamp.wait_open ?? [], open);
   const tape = dayTapePnl(settled, stamp.fuse_on);
   const live = plant.source === "oracle";
   const days = stamp.trends.map((t) => t.day);
@@ -66,6 +69,20 @@ export function Trades() {
         onPick: pick(fill.id),
       })),
     },
+    ...(voided.length
+      ? [
+          {
+            id: "void",
+            label: "Void",
+            hint: "0u · not a win or lose",
+            rows: voided.map((fill) => ({
+              ...fillDeskRow(fill, stamp.fuse_on),
+              selected: selected === fill.id,
+              onPick: pick(fill.id),
+            })),
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -80,12 +97,12 @@ export function Trades() {
       <DayChips days={days} />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="inline-flex items-center gap-2 font-mono text-xs text-subtle">
-          <LiveDot tone={live ? "ok" : "warn"} tick={stamp.generated} />
-          <span key={stamp.generated} className="stamp-tick">
-            {live ? `${stamp.generated} · live oracle` : plant.detail}
-          </span>
-        </p>
+        <OracleStampLine
+          generated={stamp.generated}
+          live={live}
+          detail={plant.detail}
+          tone={live ? "ok" : "warn"}
+        />
         <p className="font-mono text-xs text-subtle">
           paper {tape.paper == null ? "Empty" : fmtU(tape.paper)} · production{" "}
           {tape.production == null ? "Empty" : fmtU(tape.production)} · live{" "}

@@ -53,6 +53,9 @@ function injectHeadStreaming(response: Response, host: string): Response {
   );
   const headers = new Headers(response.headers);
   headers.delete("content-length");
+  headers.set("cache-control", "no-store, no-cache, must-revalidate");
+  headers.set("pragma", "no-cache");
+  headers.set("expires", "0");
   return new Response(transformed, {
     status: response.status,
     statusText: response.statusText,
@@ -99,13 +102,25 @@ export default async function grokPwaMiddleware(
   if (!isDocumentPath(path)) return next();
 
   const result = await next();
-  if (
-    result instanceof Response &&
-    result.body &&
-    String(result.headers.get("content-type") ?? "").includes("text/html") &&
-    !result.headers.get("content-encoding")
-  ) {
-    return injectHeadStreaming(result, requestHost(event));
+  if (result instanceof Response) {
+    const ctype = String(result.headers.get("content-type") ?? "");
+    if (ctype.includes("text/html")) {
+      if (
+        result.body &&
+        !result.headers.get("content-encoding")
+      ) {
+        return injectHeadStreaming(result, requestHost(event));
+      }
+      const headers = new Headers(result.headers);
+      headers.set("cache-control", "no-store, no-cache, must-revalidate");
+      headers.set("pragma", "no-cache");
+      headers.set("expires", "0");
+      return new Response(result.body, {
+        status: result.status,
+        statusText: result.statusText,
+        headers,
+      });
+    }
   }
   return result;
 }

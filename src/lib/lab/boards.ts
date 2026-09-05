@@ -1,9 +1,11 @@
 /** Display English for Office, Pipe, Health, Issues. Never invents counts. */
 
-import { EMPTY, cellName, recipePack, strategyMark } from "./desk.ts";
+import { EMPTY, cellName, recipePack, recipeBookName, bookDisplayName, strategyMark } from "./desk.ts";
+import { isSprayClassInPlayEholeFirstBook, millDisplayRecipes } from "./mill-display.ts";
+import { isPostEpochEholeRecipe } from "./board-reset.ts";
 import type { Move, Recipe, Seat } from "./stamp.ts";
 
-const REGIONS = ["AU", "GB", "IE", "US", "NZ", "ZA", "HK", "FR"] as const;
+export const REGIONS = ["AU", "GB", "IE", "US", "NZ", "ZA", "HK", "FR"] as const;
 
 export const COUNTRY: Record<string, string> = {
   AU: "Australia",
@@ -44,6 +46,66 @@ export function inventHole(why: string): string {
   const m = why.match(/(?:next hole|queue)\s+([A-Za-z0-9_|-]+)/i);
   if (!m) return EMPTY;
   return holeName(m[1]);
+}
+
+const HOLE_PIPE_KEY =
+  /\b(AU|GB|IE|US|NZ|ZA|HK|FR)\|[a-z_]+\|(WIN|PLACE|LAY)\b/gi;
+
+function isInPlayHoleKey(key: string): boolean {
+  return /in[\s_-]*play|in_play/i.test(key);
+}
+
+/** Parse Mercator-style lists: HK morning/late_pre/near_off WIN empties. */
+function mercatorEmptyLook(seatNow: string): string {
+  const slash =
+    /\b(AU|GB|IE|US|NZ|ZA|HK|FR)\b[\s·-]*((?:morning|late_pre|late-pre|near_off|near-off)(?:\/(?:morning|late_pre|late-pre|near_off|near-off))*)\s*(WIN|PLACE)\b/i.exec(
+      seatNow,
+    );
+  if (!slash) return EMPTY;
+  const region = slash[1].toUpperCase();
+  const windows = slash[2]
+    .split("/")
+    .map((w) => parseWindow(w.replace(/-/g, "_")))
+    .filter((w): w is SquareWindow => Boolean(w && w !== "in_play"));
+  if (!windows.length) return EMPTY;
+  const market = slash[3].toUpperCase() === "PLACE" ? "place" : "winner";
+  const wlabel = windows.map((w) => SQUARE_WINDOW_LABEL[w]).join(", ");
+  return `${countryName(region)} · ${wlabel} · ${market}`;
+}
+
+/**
+ * Live plant invent queue — seat.now and invent queue first.
+ * Never nominates in-play as a first empty hole.
+ */
+export function plantInventQueue(
+  seatNow: string,
+  inventWhy: string,
+  hunters: readonly { note: string }[] = [],
+): string {
+  const sources = [seatNow, inventWhy, ...hunters.map((h) => h.note)];
+  for (const src of sources) {
+    if (!src?.trim()) continue;
+    const merc = mercatorEmptyLook(src);
+    if (merc !== EMPTY) return merc;
+    for (const m of src.matchAll(
+      /(?:next hole|queue|hunt(?:ing)?)\s*:?\s*([A-Za-z0-9_|-]+)/gi,
+    )) {
+      const key = m[1];
+      if (!key.includes("|")) continue;
+      if (isInPlayHoleKey(key)) continue;
+      const named = holeName(key);
+      if (named !== EMPTY) return named;
+    }
+    const loose = inventHole(src);
+    if (loose !== EMPTY && !isInPlayHoleKey(src)) return loose;
+    for (const m of src.matchAll(HOLE_PIPE_KEY)) {
+      const key = m[0];
+      if (isInPlayHoleKey(key)) continue;
+      const named = holeName(key);
+      if (named !== EMPTY) return named;
+    }
+  }
+  return EMPTY;
 }
 
 /** `1 parked, 5 still being tested`. Both empty → Empty. */
@@ -175,7 +237,11 @@ export const SQUARE_WINDOW_LABEL: Record<SquareWindow, string> = {
   in_play: "in-play",
 };
 
-export type SquareMarket = "WIN" | "PLACE" | "LAY";
+export type SquareMarket = "WIN" | "PLACE";
+export type SquareSide = "BACK" | "LAY";
+
+/** Floor grid is always WIN beside PLACE — never a third LAY column. */
+export const SQUARE_GRID_MARKETS: SquareMarket[] = ["WIN", "PLACE"];
 
 export type HoleCell = {
   id: string;
@@ -184,6 +250,10 @@ export type HoleCell = {
   window: SquareWindow;
   market: SquareMarket;
   tone: MarketTone;
+  /** BACK side of this WIN/PLACE hole. */
+  backTone?: MarketTone;
+  /** LAY side of the same hole — not a separate square. */
+  layTone?: MarketTone;
 };
 
 const TONE_RANK: Record<MarketTone, number> = {
@@ -202,13 +272,74 @@ const WINDOW_PARSE: [RegExp, SquareWindow][] = [
   [/morning/, "morning"],
 ];
 
-/** WIN beside PLACE. LAY only when the plant already names it. */
+/** WIN beside PLACE on the square. LAY is a side mark inside the cell, not a column. */
 export function plantMarkets(texts: readonly string[]): SquareMarket[] {
-  const blob = texts.join(" ");
-  if (/(?:^|[^A-Za-z])LAY(?:[^A-Za-z]|$)/.test(blob) && !/display/i.test(blob)) {
-    return ["WIN", "PLACE", "LAY"];
+  return [...SQUARE_GRID_MARKETS];
+}
+
+export function squareGridMarkets(): SquareMarket[] {
+  return [...SQUARE_GRID_MARKETS];
+}
+
+/** Whether either side of a WIN/PLACE cell is occupied. */
+export function holeSideOccupied(cell: HoleCell): boolean {
+  const back = cell.backTone ?? (cell.tone !== "empty" ? cell.tone : "empty");
+  const lay = cell.layTone ?? "empty";
+  return back !== "empty" || lay !== "empty";
+}
+
+/** LAY keys and lay ehole ids map to the same WIN/PLACE hole with a side. */
+export function normalizeSquareHoleKey(
+  region: string,
+  window: SquareWindow,
+  market: string,
+): { id: string; market: SquareMarket; side?: SquareSide } | null {
+  const m = market.toUpperCase();
+  if (m === "LAY") return { id: `${region}|${window}|WIN`, market: "WIN", side: "LAY" };
+  if (m === "WIN" || m === "PLACE") return { id: `${region}|${window}|${m}`, market: m };
+  return null;
+}
+
+/** Country × window × WIN/PLACE and which side (BACK from win/place arms, LAY from lay arms). */
+export function squareHoleKeyAndSide(
+  id: string,
+  title: string,
+  region?: string,
+): { id: string; market: SquareMarket; side: SquareSide } | null {
+  const ehole = /^H-ehole-([a-z]{2})-([a-z]+)-(win|place|lay)/i.exec(id.trim());
+  if (ehole) {
+    const regionCode = ehole[1].toUpperCase();
+    const window = parseWindow(ehole[2]);
+    if (!window) return null;
+    const seg = ehole[3].toLowerCase();
+    if (seg === "lay") {
+      return { id: `${regionCode}|${window}|WIN`, market: "WIN", side: "LAY" };
+    }
+    const market: SquareMarket = seg === "place" ? "PLACE" : "WIN";
+    return { id: `${regionCode}|${window}|${market}`, market, side: "BACK" };
   }
-  return ["WIN", "PLACE"];
+  const hole = parseHole(`${region ?? ""} ${title} ${id}`);
+  if (!hole) return null;
+  if (hole.market === "LAY") {
+    return { id: `${hole.region}|${hole.window}|WIN`, market: "WIN", side: "LAY" };
+  }
+  const market: SquareMarket = hole.market === "PLACE" ? "PLACE" : "WIN";
+  return { id: `${hole.region}|${hole.window}|${market}`, market, side: "BACK" };
+}
+
+export type SquareOpenFill = {
+  id: string;
+  recipeId: string;
+  recipe: string;
+  side: string | null;
+};
+
+export function squareHoleFromOpenFill(fill: SquareOpenFill): { id: string; side: SquareSide } | null {
+  const parsed = squareHoleKeyAndSide(fill.recipeId, fill.recipe);
+  if (!parsed) return null;
+  const ticketSide = (fill.side ?? "").toUpperCase();
+  const side: SquareSide = ticketSide === "LAY" ? "LAY" : ticketSide === "BACK" ? "BACK" : parsed.side;
+  return { id: parsed.id, side };
 }
 
 export function parseWindow(text: string): SquareWindow | null {
@@ -219,7 +350,9 @@ export function parseWindow(text: string): SquareWindow | null {
   return null;
 }
 
-export function parseMarket(text: string): SquareMarket | null {
+export type ParsedSquareMarket = SquareMarket | "LAY";
+
+export function parseMarket(text: string): ParsedSquareMarket | null {
   const t = text.toUpperCase().replace(/_/g, " ");
   if (/(?:^|[^A-Z])LAY(?:[^A-Z]|$)/.test(t)) return "LAY";
   if (/\bPLACE\b/.test(t)) return "PLACE";
@@ -228,7 +361,7 @@ export function parseMarket(text: string): SquareMarket | null {
 }
 
 /** Country × window × market. All three or nothing — never invent a missing axis. */
-export function parseHole(text: string): { region: string; window: SquareWindow; market: SquareMarket } | null {
+export function parseHole(text: string): { region: string; window: SquareWindow; market: ParsedSquareMarket } | null {
   const region = regionFromText(text);
   const window = parseWindow(text);
   const market = parseMarket(text);
@@ -237,6 +370,7 @@ export function parseHole(text: string): { region: string; window: SquareWindow;
 }
 
 function asHoleTone(t?: string): MarketTone | null {
+  if (t === "killed" || t === "kill" || t === "dead") return "loss";
   if (t === "empty" || t === "hunt" || t === "idea" || t === "win" || t === "loss" || t === "parked") return t;
   return null;
 }
@@ -249,38 +383,139 @@ function occupy(
   const id = `${hole.region}|${hole.window}|${hole.market}`;
   const cur = map.get(id);
   if (!cur || TONE_RANK[tone] >= TONE_RANK[cur.tone]) {
-    map.set(id, { id, region: hole.region, name: countryName(hole.region), window: hole.window, market: hole.market, tone });
+    map.set(id, {
+      id,
+      region: hole.region,
+      name: countryName(hole.region),
+      window: hole.window,
+      market: hole.market,
+      tone,
+      backTone: tone,
+    });
   }
+}
+
+function occupySide(
+  map: Map<string, HoleCell>,
+  holeId: string,
+  side: SquareSide,
+  tone: MarketTone,
+) {
+  const parts = holeId.split("|");
+  if (parts.length !== 3) return;
+  const region = parts[0];
+  const window =
+    parseWindow(parts[1]) ??
+    (SQUARE_WINDOWS.includes(parts[1] as SquareWindow) ? (parts[1] as SquareWindow) : null);
+  if (!window) return;
+  const norm = normalizeSquareHoleKey(region, window, parts[2]);
+  if (!norm) return;
+  const id = norm.id;
+  let cell = map.get(id);
+  if (!cell) {
+    cell = {
+      id,
+      region,
+      name: countryName(region),
+      window,
+      market: norm.market,
+      tone: "empty",
+      backTone: "empty",
+      layTone: "empty",
+    };
+    map.set(id, cell);
+  }
+  const slot = side === "LAY" ? "layTone" : "backTone";
+  const cur = cell[slot] ?? "empty";
+  if (TONE_RANK[tone] >= TONE_RANK[cur]) {
+    cell[slot] = tone;
+  }
+  const back = cell.backTone ?? "empty";
+  const lay = cell.layTone ?? "empty";
+  cell.tone =
+    TONE_RANK[back] >= TONE_RANK[lay]
+      ? back !== "empty"
+        ? back
+        : lay
+      : lay !== "empty"
+        ? lay
+        : "empty";
+}
+
+function syncHoleSideTones(cell: HoleCell): void {
+  if (cell.backTone == null && cell.tone !== "empty") cell.backTone = cell.tone;
+  if (cell.layTone == null) cell.layTone = "empty";
+  if (cell.backTone == null) cell.backTone = "empty";
+  const back = cell.backTone ?? "empty";
+  const lay = cell.layTone ?? "empty";
+  cell.tone =
+    TONE_RANK[back] >= TONE_RANK[lay]
+      ? back !== "empty"
+        ? back
+        : lay
+      : lay !== "empty"
+        ? lay
+        : "empty";
+}
+
+type RacingSquareInput = {
+  recipes: readonly Recipe[];
+  coverage?: readonly { region: string; keep: number; measuring: number; note?: string }[];
+  moves?: readonly { recipe: string; to: string }[];
+  floorLog?: readonly { kind?: string; line: string }[];
+  huntNotes?: readonly string[];
+  namedHoles?: readonly { region: string; window: string; market: string; tone?: string; side?: string }[];
+  openFills?: readonly SquareOpenFill[];
+  /** Floor morning board: hunt queue + named holes only — no legacy recipe roll-up. */
+  floorOnly?: boolean;
+};
+
+/**
+ * Morning Floor square. All holes Empty unless the plant names a new-hunt cell.
+ * Legacy KEEP / measuring / certified books never paint the Floor grid.
+ */
+export function floorRacingSquare(input: {
+  namedHoles?: readonly { region: string; window: string; market: string; tone?: string; side?: string }[];
+  recipes?: readonly Recipe[];
+  openFills?: readonly SquareOpenFill[];
+}): HoleCell[] {
+  return stripFloorWholeCellKills(
+    racingSquare({
+      recipes: input.recipes ?? [],
+      namedHoles: input.namedHoles ?? [],
+      openFills: input.openFills ?? [],
+      floorOnly: true,
+    }),
+  );
+}
+
+/** Floor morning board: legacy recipe roll-up kills are stripped upstream; oracle named holes keep KILL. */
+export function stripFloorWholeCellKills(cells: readonly HoleCell[]): HoleCell[] {
+  return cells.map((cell) => ({ ...cell }));
 }
 
 /**
  * Whole racing square. Empty holes are real squares. Occupied only when the
  * mill names that country × window × market. Never paints 126 kills across countries.
  */
-export function racingSquare(input: {
-  recipes: readonly Recipe[];
-  coverage?: readonly { region: string; keep: number; measuring: number; note?: string }[];
-  moves?: readonly { recipe: string; to: string }[];
-  floorLog?: readonly { kind?: string; line: string }[];
-  huntNotes?: readonly string[];
-  namedHoles?: readonly { region: string; window: string; market: string; tone?: string }[];
-}): HoleCell[] {
-  const texts = [
-    ...input.recipes.map((r) => `${r.id} ${r.title} ${r.why}`),
-    ...(input.moves ?? []).map((m) => m.recipe),
-    ...(input.floorLog ?? []).map((r) => r.line),
-    ...(input.huntNotes ?? []),
-    ...(input.coverage ?? []).map((c) => c.note ?? ""),
-    ...(input.namedHoles ?? []).map((h) => h.market),
-  ];
-  const markets = plantMarkets(texts);
+export function racingSquare(input: RacingSquareInput): HoleCell[] {
+  const markets = squareGridMarkets();
   const occ = new Map<string, HoleCell>();
   const grid: HoleCell[] = [];
   for (const region of REGIONS) {
     for (const window of SQUARE_WINDOWS) {
       for (const market of markets) {
         const id = `${region}|${window}|${market}`;
-        const cell: HoleCell = { id, region, name: countryName(region), window, market, tone: "empty" };
+        const cell: HoleCell = {
+          id,
+          region,
+          name: countryName(region),
+          window,
+          market,
+          tone: "empty",
+          backTone: "empty",
+          layTone: "empty",
+        };
         grid.push(cell);
         occ.set(id, cell);
       }
@@ -288,46 +523,128 @@ export function racingSquare(input: {
   }
 
   const named = input.namedHoles ?? [];
-  if (named.length) {
+  if (input.floorOnly || named.length) {
     for (const h of named) {
-      const window = parseWindow(h.window) ?? (SQUARE_WINDOWS.includes(h.window as SquareWindow) ? (h.window as SquareWindow) : null);
-      const market = parseMarket(h.market);
+      const window =
+        parseWindow(h.window) ??
+        (SQUARE_WINDOWS.includes(h.window as SquareWindow) ? (h.window as SquareWindow) : null);
       const region = REGIONS.includes(h.region as (typeof REGIONS)[number]) ? h.region : regionFromText(h.region);
-      if (!region || !window || !market || !markets.includes(market)) continue;
-      occupy(occ, { region, window, market }, asHoleTone(h.tone) ?? "idea");
+      if (!region || !window) continue;
+      const norm = normalizeSquareHoleKey(region, window, h.market);
+      if (!norm) continue;
+      const tone = asHoleTone(h.tone) ?? "idea";
+      const side = (h.side ?? "").toUpperCase() === "LAY" ? "LAY" : "BACK";
+      occupySide(occ, norm.id, side, tone);
+    }
+    if (!input.floorOnly) {
+      const displayRecipes = millDisplayRecipes(input.recipes ?? []);
+      for (const r of displayRecipes) {
+        if (isSprayClassInPlayEholeFirstBook(r)) continue;
+        const parsed = squareHoleKeyAndSide(r.id, r.title, r.region);
+        if (!parsed) continue;
+        occupySide(occ, parsed.id, parsed.side, recipeTone(r));
+      }
+    } else {
+      const displayRecipes = millDisplayRecipes(
+        (input.recipes ?? []).filter((r) => isPostEpochEholeRecipe(r)),
+      );
+      for (const r of displayRecipes) {
+        if (isSprayClassInPlayEholeFirstBook(r)) continue;
+        const parsed = squareHoleKeyAndSide(r.id, r.title, r.region);
+        if (!parsed) continue;
+        occupySide(occ, parsed.id, parsed.side, recipeTone(r));
+      }
+    }
+    for (const f of input.openFills ?? []) {
+      const hit = squareHoleFromOpenFill(f);
+      if (!hit) continue;
+      occupySide(occ, hit.id, hit.side, "idea");
     }
   } else {
-    const regionsWithBook = new Set<string>();
-    for (const r of input.recipes) {
+    const displayRecipes = millDisplayRecipes(input.recipes);
+    for (const r of displayRecipes) {
+      if (isSprayClassInPlayEholeFirstBook(r)) continue;
+      const parsed = squareHoleKeyAndSide(r.id, r.title, r.region);
+      if (parsed) {
+        occupySide(occ, parsed.id, parsed.side, recipeTone(r));
+        continue;
+      }
       const hole = parseHole(`${r.region} ${r.title} ${r.id}`);
-      if (!hole) continue;
-      regionsWithBook.add(r.region);
-      occupy(occ, hole, recipeTone(r));
+      if (!hole || hole.market === "LAY") continue;
+      const market: SquareMarket = hole.market === "PLACE" ? "PLACE" : "WIN";
+      occupySide(occ, `${hole.region}|${hole.window}|${market}`, "BACK", recipeTone(r));
     }
     for (const m of input.moves ?? []) {
       if (m.to !== "Dead") continue;
       const hole = parseHole(m.recipe);
-      if (hole) occupy(occ, hole, "loss");
+      if (!hole || hole.market === "LAY") continue;
+      const market: SquareMarket = hole.market === "PLACE" ? "PLACE" : "WIN";
+      occupySide(occ, `${hole.region}|${hole.window}|${market}`, "BACK", "loss");
     }
     for (const row of input.floorLog ?? []) {
       if (row.kind !== "kill" && !/→\s*Dead/i.test(row.line)) continue;
       const hole = parseHole(row.line);
-      if (hole) occupy(occ, hole, "loss");
+      if (!hole || hole.market === "LAY") continue;
+      const market: SquareMarket = hole.market === "PLACE" ? "PLACE" : "WIN";
+      occupySide(occ, `${hole.region}|${hole.window}|${market}`, "BACK", "loss");
     }
     for (const note of input.huntNotes ?? []) {
       const hole = parseHole(note);
-      if (hole) occupy(occ, hole, "hunt");
+      if (!hole || hole.market === "LAY") continue;
+      const market: SquareMarket = hole.market === "PLACE" ? "PLACE" : "WIN";
+      occupySide(occ, `${hole.region}|${hole.window}|${market}`, "BACK", "hunt");
     }
+    const regionsWithBook = new Set(displayRecipes.map((r) => r.region));
     for (const c of input.coverage ?? []) {
-      if (regionsWithBook.has(c.region)) continue;
+      if (regionsWithBook.has(c.region as Recipe["region"])) continue;
       if (c.keep + c.measuring === 0) continue;
       const hole = parseHole(`${c.region} ${c.note ?? ""}`);
-      if (!hole) continue;
-      occupy(occ, hole, c.keep > 0 ? "parked" : "idea");
+      if (!hole || hole.market === "LAY") continue;
+      const market: SquareMarket = hole.market === "PLACE" ? "PLACE" : "WIN";
+      occupySide(occ, `${hole.region}|${hole.window}|${market}`, "BACK", c.keep > 0 ? "parked" : "idea");
+    }
+    for (const f of input.openFills ?? []) {
+      const hit = squareHoleFromOpenFill(f);
+      if (!hit) continue;
+      occupySide(occ, hit.id, hit.side, "idea");
     }
   }
 
-  return grid.map((cell) => occ.get(cell.id) ?? cell);
+  return grid.map((cell) => {
+    const painted = occ.get(cell.id) ?? cell;
+    syncHoleSideTones(painted);
+    return painted;
+  });
+}
+
+/** Stamp fields needed to paint the racing square for empty-hole hunt. */
+export type SquareStampSlice = {
+  recipes: readonly Recipe[];
+  coverage?: readonly { region: string; keep: number; measuring: number; note?: string }[];
+  moves?: readonly Move[];
+  floorLog?: readonly { kind?: string; line: string }[];
+  holes?: readonly { region: string; window: string; market: string; tone?: string; side?: string }[];
+  office?: { invent?: boolean; inventWhy?: string };
+  hunters?: readonly { id: string; note: string }[];
+};
+
+export function racingSquareInputFromStamp(stamp: SquareStampSlice): RacingSquareInput {
+  const huntNotes = [stamp.office?.inventWhy ?? "", ...(stamp.hunters ?? []).map((h) => h.note)];
+  return {
+    recipes: stamp.recipes,
+    coverage: stamp.coverage,
+    moves: stamp.moves,
+    floorLog: stamp.floorLog,
+    huntNotes,
+    namedHoles: stamp.holes,
+  };
+}
+
+/** First truly Empty cell on the square — not hunt / measuring / parked. Skips in-play. */
+export function nextEmptySquareHole(stamp: SquareStampSlice): string {
+  const holes = racingSquare(racingSquareInputFromStamp(stamp));
+  const pick = holes.find((h) => h.tone === "empty" && h.window !== "in_play");
+  return pick ? holeName(`${pick.region}|${pick.window}|${pick.market}`) : EMPTY;
 }
 
 export type BookPeriods = {
@@ -352,7 +669,7 @@ export type BookStage = {
 
 const SPLIT_MARK = "Hyde cousin, not the same picks";
 
-function isSplitBook(recipe: Recipe): boolean {
+export function isSplitBook(recipe: Recipe): boolean {
   return /cousin|not the same pick|different pick|\btwin\b/i.test(`${recipe.why} ${recipe.title}`);
 }
 
@@ -425,6 +742,21 @@ export function officeIssues(
   return issues.filter((iss) => !isLawNotIssue(iss)).map(issueBoard);
 }
 
+/** Hide stale KEEP/Hyde issues on a new-run hunt board with no certified books. */
+export function officeIssuesForBoard(
+  issues: readonly { id: string; owner: string; title: string; detail: string; fix: string }[],
+  stamp: { n_solid?: number; mill_n_armed?: number; n_armed?: number },
+): IssueRow[] {
+  const armed = stamp.mill_n_armed ?? stamp.n_armed ?? 0;
+  const onHuntBoard = (stamp.n_solid ?? 0) === 0 && armed > 0;
+  const filtered = onHuntBoard
+    ? issues.filter(
+        (i) => !isLawNotIssue(i) && i.id !== "keep-hold-paper" && i.id !== "keep-not-solid",
+      )
+    : issues.filter((i) => !isLawNotIssue(i));
+  return filtered.map(issueBoard);
+}
+
 /** Paper and holdout as two periods of one book. Never recomputes P&L. */
 export function bookPeriods(recipe: Recipe): BookPeriods {
   const paperN = Number.isFinite(recipe.n) ? recipe.n : 0;
@@ -453,6 +785,47 @@ export function bookPeriods(recipe: Recipe): BookPeriods {
   };
 }
 
+/** Mill hunt caption — fast-arm when armed; mill parked when mill_mode is parked. */
+export function millHuntCaption(
+  why: string,
+  opts?: { mill_mode?: string; mill_n_armed?: number; n_armed?: number },
+): string {
+  const raw = why?.trim() ?? "";
+  if (!raw) return EMPTY;
+  const armed = opts?.mill_n_armed ?? opts?.n_armed ?? 0;
+  const mode = String(opts?.mill_mode ?? "").toLowerCase().replace(/_/g, "-");
+  const hunt = /empty-hole hunt|invent_empty/i.test(raw);
+  if (!hunt) return raw;
+
+  const parkedMode =
+    mode === "parked" ||
+    mode === "mill-not-densify" ||
+    /mill-not-densify/.test(mode) ||
+    /\bmill parked\b/i.test(raw);
+
+  let line = raw
+    .replace(/\s*·\s*invent\s*\(densify\)/gi, "")
+    .replace(/\binvent\s*\(densify\)\s*·\s*/gi, "")
+    .replace(/\bdensify\b/gi, "")
+    .replace(/\s*·\s*·/g, " · ")
+    .trim();
+
+  const fastArm =
+    /fast-arm|fastarm/i.test(line) ||
+    /fast-arm|fastarm|empty-hole-fast-arm/.test(mode) ||
+    armed > 0;
+
+  if (fastArm && !/fast-arm|fastarm/i.test(line)) {
+    line = line.replace(/empty-hole hunt on/gi, "empty-hole fast-arm hunt on");
+  }
+
+  if (parkedMode && !/\bmill parked\b/i.test(line)) {
+    line = line ? `${line} · mill parked` : "mill parked";
+  }
+
+  return line.replace(/\s*·\s*·/g, " · ").trim();
+}
+
 export function rejectEnglish(raw: string): string {
   const t = raw.trim();
   if (!t) return EMPTY;
@@ -473,8 +846,21 @@ export function inventWhatHappened(input: {
   pitched: number;
   hunters: readonly { id: string; note: string }[];
   rejects?: readonly string[];
+  mill_mode?: string;
+  mill_n_armed?: number;
+  n_armed?: number;
 }): string {
-  const notes = [input.inventWhy, ...input.hunters.map((h) => h.note), ...(input.rejects ?? [])];
+  const why = millHuntCaption(input.inventWhy ?? "", {
+    mill_mode: input.mill_mode,
+    mill_n_armed: input.mill_n_armed,
+    n_armed: input.n_armed,
+  });
+  const emptyHoleHunt = /empty-hole hunt|invent_empty/i.test(why);
+  if (emptyHoleHunt) {
+    return why || (input.invent ? "empty-hole fast-arm hunt on · invent_empty_holes" : EMPTY);
+  }
+
+  const notes = [why, ...input.hunters.map((h) => h.note), ...(input.rejects ?? [])];
   const bits: string[] = [];
   if (input.invent) bits.push("Invent is on.");
   if (input.pitched > 0) bits.push(`${input.pitched} new ideas in the queue.`);
@@ -543,6 +929,39 @@ export function capitalisingLine(counts: {
   const bits = [`${counts.certified} solid of ${counts.cells} cells`];
   if (counts.kill > 0) bits.push(`${counts.kill} killed`);
   return `${bits.join(". ")}.`;
+}
+
+export const SQUARE_HOLE_COUNT = REGIONS.length * SQUARE_WINDOWS.length * 2;
+
+/** Morning square occupancy — 64 holes, not legacy mill cell roll-up. */
+export function squareGlanceLine(input: {
+  occupied: number;
+  total?: number;
+  n_solid?: number;
+  kill?: number;
+}): string {
+  const total = input.total ?? SQUARE_HOLE_COUNT;
+  const occupied = Math.max(0, Math.min(input.occupied, total));
+  const empty = Math.max(0, total - occupied);
+  const solid = input.n_solid ?? 0;
+  const bits = [`${solid} solid`, `${occupied} armed of ${total} holes`, `${empty} empty`];
+  if (input.kill != null && input.kill > 0) bits.push(`${input.kill} killed on the square`);
+  return `${bits.join(". ")}.`;
+}
+
+/** One recipe row per country × window × WIN/PLACE. */
+export function dedupeRecipesByHole(recipes: readonly Recipe[]): Recipe[] {
+  const seen = new Set<string>();
+  const out: Recipe[] = [];
+  for (const r of recipes) {
+    const w = parseWindow(r.title);
+    const m = parseMarket(r.title);
+    const key = w && m ? `${r.region}|${w}|${m}` : r.id;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(r);
+  }
+  return out;
 }
 
 export function marketGlance(
@@ -791,9 +1210,13 @@ export function hunterName(id: string): string {
 }
 
 /** What a hunter is doing, in English. FLOWING / pitched= / conv% never reach the surface. */
-export function hunterWork(note: string): string {
+export function hunterWork(note: string, opts?: { huntBoard?: boolean }): string {
   const raw = note ?? "";
   if (!raw.trim() || /no open deals/i.test(raw)) return EMPTY;
+  if (opts?.huntBoard && /\bFLOWING\b/i.test(raw)) {
+    if (/watching empty square/i.test(raw)) return "Watching the empty square.";
+    return "Hunting empty holes on the square.";
+  }
   const queue = /queue\s+([^·]+)/i.exec(raw);
   if (queue) {
     const named = holeName(queue[1].trim());
@@ -829,9 +1252,15 @@ export type WorkerRow = { id: string; name: string; work: string };
 export function officeWorkers(
   hunters: readonly { id: string; note: string }[],
   activeId?: string | null,
+  inventWhy?: string,
 ): WorkerRow[] {
+  const huntBoard = isEmptyHoleHuntBoard(inventWhy ?? "");
   const rows = hunters
-    .map((h) => ({ id: h.id, name: hunterName(h.id), work: hunterWork(h.note) }))
+    .map((h) => ({
+      id: h.id,
+      name: hunterName(h.id),
+      work: hunterWork(h.note, { huntBoard }),
+    }))
     .filter((h) => h.work !== EMPTY);
   if (!activeId) return rows;
   return [...rows].sort((a, b) => Number(b.id === activeId) - Number(a.id === activeId));
@@ -850,10 +1279,49 @@ export type PipeBoard = {
   stuck: string;
 };
 
+export function isEmptyHoleHuntBoard(inventWhy: string): boolean {
+  return /empty-hole hunt|invent_empty|mill parked/i.test(inventWhy);
+}
+
+export type SquarePipeCounts = {
+  armed: number;
+  empty: number;
+  solid: number;
+};
+
 export function pipeBoard(
   pipe: { pitched: number; proving: number; closed: number; certified: number; scaling: number },
   fuseOn: boolean,
+  opts?: { inventWhy?: string; square?: SquarePipeCounts },
 ): PipeBoard {
+  const hunt = isEmptyHoleHuntBoard(opts?.inventWhy ?? "") && opts?.square;
+  if (hunt) {
+    const square = opts!.square!;
+    const { armed, empty, solid } = square;
+    const live = fuseOn ? pipe.scaling : 0;
+    const stages: PipeStage[] = [
+      { key: "empty", label: "Empty holes", count: empty, hint: "on the square", stuck: false },
+      { key: "armed", label: "Armed on mill", count: armed, hint: "", stuck: false },
+      { key: "certified", label: "Solid", count: solid, hint: "the score", stuck: false },
+      {
+        key: "live",
+        label: "Live",
+        count: live,
+        hint: fuseOn ? "" : "off while the fuse is off",
+        stuck: false,
+      },
+    ];
+    let stuckKey: string | null = !fuseOn ? "live" : null;
+    if (armed > 0 && solid === 0) stuckKey = "armed";
+    const marked = stages.map((s) => ({ ...s, stuck: s.key === stuckKey }));
+    const bits: string[] = [];
+    if (armed > 0) bits.push(`${armed} armed on the mill`);
+    if (empty > 0) bits.push(`${empty} empty on the square`);
+    if (solid > 0) bits.push(`${solid} solid`);
+    if (!fuseOn) bits.push("Live is off");
+    return { stages: marked, stuck: bits.length ? `${bits.join(". ")}.` : EMPTY };
+  }
+
   const live = fuseOn ? pipe.scaling : 0;
   const stages: PipeStage[] = [
     { key: "pitched", label: "New ideas", count: pipe.pitched, hint: "", stuck: false },
@@ -920,15 +1388,22 @@ function groupOf(status: string): HealthGroup {
   return "fine";
 }
 
-function healthKnown(k: { id: string; label: string; detail: string; status: string }): HealthRow | null {
+function healthKnown(
+  k: { id: string; label: string; detail: string; status: string },
+  opts?: { hunters?: readonly { id: string; note: string }[]; inventWhy?: string },
+): HealthRow | null {
   const d = k.detail ?? "";
+  const huntBoard = isEmptyHoleHuntBoard(opts?.inventWhy ?? "");
+  const hunterNote = (id: string) => opts?.hunters?.find((h) => h.id === id)?.note ?? "";
   switch (k.id) {
     case "invent":
       return {
         id: k.id,
         group: groupOf(k.status),
-        sentence: /on|densify/i.test(d) ? "Invent is running." : "Invent is paused.",
-        why: "New ideas are still being found.",
+        sentence: /on|empty-hole hunt|invent_empty/i.test(d) ? "Invent is running." : "Invent is paused.",
+        why: /empty-hole hunt|invent_empty/i.test(d)
+          ? "Empty-hole hunt is on the mill."
+          : "New ideas are still being found.",
       };
     case "doer":
       return {
@@ -962,6 +1437,15 @@ function healthKnown(k: { id: string; label: string; detail: string; status: str
         why: "A keep is parked, not certified for today.",
       };
     case "residual": {
+      const note = hunterNote("residual");
+      if (/\bFLOWING\b/i.test(note)) {
+        return {
+          id: k.id,
+          group: "fine",
+          sentence: huntBoard ? "Hunting empty holes on the square." : "The hunter is live.",
+          why: "FLOWING — not lagging behind.",
+        };
+      }
       const m = /Lag\s+(\d+)\s*d/i.exec(d);
       const n = m?.[1];
       return {
@@ -972,6 +1456,15 @@ function healthKnown(k: { id: string; label: string; detail: string; status: str
       };
     }
     case "card": {
+      const note = hunterNote("card");
+      if (/\bFLOWING\b/i.test(note)) {
+        return {
+          id: k.id,
+          group: "fine",
+          sentence: huntBoard ? "Hunting empty holes on the square." : "The hunter is live.",
+          why: "FLOWING — joins still landing.",
+        };
+      }
       const m = /ok=(\d+)/i.exec(d);
       return {
         id: k.id,
@@ -992,9 +1485,12 @@ function healthKnown(k: { id: string; label: string; detail: string; status: str
   }
 }
 
-export function healthRow(k: { id: string; label: string; detail: string; status: string }): HealthRow {
+export function healthRow(
+  k: { id: string; label: string; detail: string; status: string },
+  opts?: { hunters?: readonly { id: string; note: string }[]; inventWhy?: string },
+): HealthRow {
   return (
-    healthKnown(k) ?? {
+    healthKnown(k, opts) ?? {
       id: k.id,
       group: groupOf(k.status),
       sentence: k.label.replace(/\.$/, "") + ".",
@@ -1003,8 +1499,11 @@ export function healthRow(k: { id: string; label: string; detail: string; status
   );
 }
 
-export function healthBoard(kpis: readonly { id: string; label: string; detail: string; status: string }[]) {
-  const rows = kpis.map(healthRow);
+export function healthBoard(
+  kpis: readonly { id: string; label: string; detail: string; status: string }[],
+  opts?: { hunters?: readonly { id: string; note: string }[]; inventWhy?: string },
+) {
+  const rows = kpis.map((k) => healthRow(k, opts));
   return {
     broken: rows.filter((r) => r.group === "broken"),
     watching: rows.filter((r) => r.group === "watching"),
@@ -1058,27 +1557,24 @@ export function issueBoard(iss: { id: string; owner: string; title: string; deta
   };
 }
 
-export type StaffWatchStamp = {
-  recipes: readonly Recipe[];
+export type StaffWatchStamp = SquareStampSlice & {
   solids?: readonly Recipe[];
-  moves?: readonly Move[];
-  office?: { invent?: boolean; inventWhy?: string };
-  hunters?: readonly { id: string; note: string }[];
   issues?: readonly { id: string; title?: string; owner?: string }[];
+  trades?: readonly import("./trades.ts").Fill[];
+  day?: string;
 };
 
 export function bookLabel(raw: string, recipes: readonly Recipe[] = []): string {
   const id = /H-[A-Za-z0-9-]+/.exec(raw)?.[0];
   if (id) {
     const hit = recipes.find((r) => r.id === id);
-    if (hit) return strategyMark(hit.title, hit.id);
-    const named = strategyMark(id);
-    if (named && named !== EMPTY && named.length > 2) return named;
+    if (hit) return recipeBookName(hit);
+    return bookDisplayName({ id, title: id });
   }
   const slug = raw.replace(/_/g, " ");
   const titled = recipes.find((r) => r.title === raw || r.id === raw || r.title === slug);
-  if (titled) return strategyMark(titled.title, titled.id);
-  const mark = strategyMark(slug);
+  if (titled) return recipeBookName(titled);
+  const mark = bookDisplayName({ title: slug, id: slug });
   if (mark && mark !== EMPTY && mark.length > 2) return mark;
   const hole = holeName(slug);
   return hole !== EMPTY && hole.length > 2 ? hole : "";
@@ -1090,7 +1586,9 @@ function firstRecipeId(text: string): string {
 
 export function staffBookFacts(seatNow: string, stamp: StaffWatchStamp) {
   const blob = [seatNow, stamp.office?.inventWhy ?? "", ...(stamp.hunters ?? []).map((h) => h.note)].join(" ");
-  const recipes = stamp.recipes ?? [];
+  const recipes = millDisplayRecipes(stamp.recipes ?? []);
+  const inventWhy = stamp.office?.inventWhy ?? "";
+  const onHunt = isEmptyHoleHuntBoard(inventWhy);
   const solids = (stamp.solids?.length ? stamp.solids : recipes.filter((r) => r.badge === "Solid")) ?? [];
   const tape = solids[0] ?? recipes.find((r) => r.badge === "Solid") ?? null;
   const parked = recipes.filter((r) => r.badge === "Parked" || (r.status === "KEEP" && r.badge !== "Solid"));
@@ -1113,19 +1611,29 @@ export function staffBookFacts(seatNow: string, stamp: StaffWatchStamp) {
     }
   }
   const fillAdjKills = (stamp.moves ?? []).filter((m) => /fill-adj/i.test(m.why) && /dead/i.test(m.to));
-  const inventCell =
-    inventHole(stamp.office?.inventWhy ?? "") !== EMPTY
-      ? inventHole(stamp.office?.inventWhy ?? "")
+  const plantQueue = plantInventQueue(seatNow, inventWhy, stamp.hunters ?? []);
+  const inventCell = onHunt
+    ? plantQueue !== EMPTY
+      ? plantQueue
+      : inventHole(inventWhy) !== EMPTY
+        ? inventHole(inventWhy)
+        : (() => {
+            const q = /(?:next hole|queue)\s+([A-Za-z0-9_|-]+)/i.exec(blob);
+            return q && !isInPlayHoleKey(q[1]) ? holeName(q[1]) : EMPTY;
+          })()
+    : inventHole(inventWhy) !== EMPTY
+      ? inventHole(inventWhy)
       : inventHole(seatNow) !== EMPTY
         ? inventHole(seatNow)
         : (() => {
             const q = /(?:next hole|queue)\s+([A-Za-z0-9_|-]+)/i.exec(blob);
             return q ? holeName(q[1]) : EMPTY;
           })();
-  const densify = /\bdensify\b/i.test(blob);
+  const densify =
+    /\bdensify\b/i.test(inventWhy) && !/empty-hole hunt|invent_empty/i.test(inventWhy);
   const holdId = firstRecipeId(seatNow);
   const holdBook = holdId ? bookLabel(holdId, recipes) : "";
-  const tapeName = tape ? strategyMark(tape.title, tape.id) : "";
+  const tapeName = tape ? recipeBookName(tape) : "";
   return { recipes, tape, tapeName, parked, trial, hydeTrials, fillAdjKills, inventCell, densify, holdBook };
 }
 
@@ -1141,7 +1649,7 @@ export function seatWatching(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchSt
   switch (seat.id) {
     case "bauron": {
       const cell = f.inventCell !== EMPTY ? f.inventCell : "";
-      if (!cell && !f.densify && !stamp.office?.invent) return now ? staffLine(now) : EMPTY;
+      if (!cell && !f.densify && !stamp.office?.invent) return now ? staffLine(now, stamp.recipes ?? []) : EMPTY;
       return sentences(
         cell ? `Inventing ${cell} — this cell’s bets.` : stamp.office?.invent ? "Invent is on." : "",
         f.densify
@@ -1213,17 +1721,17 @@ export function seatWatching(seat: Pick<Seat, "id" | "now">, stamp: StaffWatchSt
       return `Freeze fuel for ${f.tapeName}.`;
     }
     default:
-      return now ? staffLine(now) : EMPTY;
+      return now ? staffLine(now, stamp.recipes ?? []) : EMPTY;
   }
 }
 
 /** Staff watching line in English. Layout stays; plant tokens do not. */
-export function staffLine(now: string): string {
+export function staffLine(now: string, recipes: readonly Recipe[] = []): string {
   if (!now?.trim()) return EMPTY;
   let s = now;
   s = s.replace(/next hole:\s*([^\s·,]+)/gi, (_, hole) => `Next gap: ${holeName(hole)}`);
-  s = s.replace(/first:\s*(H-[A-Za-z0-9-]+)/gi, (_, id) => holeName(id));
-  s = s.replace(/H-[A-Za-z0-9-]+/g, (id) => holeName(id));
+  s = s.replace(/first:\s*(H-[A-Za-z0-9-]+)/gi, (_, id) => bookLabel(id, recipes) || holeName(id));
+  s = s.replace(/H-[A-Za-z0-9-]+/g, (id) => bookLabel(id, recipes) || holeName(id));
   s = s.replace(/Measuring n=(\d+)/gi, "Watching $1 still being tested");
   s = s.replace(/proving=(\d+)/gi, "$1 still being tested");
   s = s.replace(/pitched=(\d+)/gi, "$1 new ideas");
@@ -1240,6 +1748,9 @@ export function staffLine(now: string): string {
   s = s.replace(/PAPER_ONLY/gi, "Paper only");
   s = s.replace(/fuse off/gi, "Fuse off");
   s = s.replace(/invent on/gi, "Invent is on");
+  s = s.replace(/empty-hole hunt on/gi, "Empty-hole hunt is on");
+  s = s.replace(/invent_empty_holes/gi, "empty-hole hunt");
+  s = s.replace(/mill parked/gi, "mill parked");
   s = s.replace(/invent\s*\([^)]*\)/gi, "");
   s = s.replace(/\bdensify\b/gi, "");
   s = s.replace(/hunter\s+(\w+)/gi, (_, n) => hunterName(String(n).toLowerCase()));

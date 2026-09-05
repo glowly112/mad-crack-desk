@@ -1,9 +1,12 @@
 /** Display grouping for the desk. Never sums cells or invents a score. */
 
 import type { Move, Recipe, TrendPoint } from "./stamp.ts";
-import { productionScore } from "./hero.ts";
+import { BOARD_RESET_DAY } from "./board-reset.ts";
+import { deskSettledTapeRollup } from "./trades.ts";
 
 export const EMPTY = "Empty";
+/** Open or armed but not finished — not the same as unused. */
+export const WAITING = "Waiting";
 export const SOLID_EMPTY = "No solid recipes on the day tape.";
 
 export function recipePack(recipes: readonly Recipe[]) {
@@ -84,13 +87,17 @@ export type FloorFact = {
   hint: string;
   value: number | null;
   kind: "u" | "count";
+  /** Win · lose line from settled first-book tape (paper tile only). */
+  countsLine?: string | null;
 };
 
 export type FloorStamp = {
+  day: string;
   n_solid: number;
   fuse_on: boolean;
   hero: { day_u: number | null };
   recipes: readonly Recipe[];
+  trades?: readonly import("./trades.ts").Fill[];
   wait_open?: readonly { id: string }[];
   trends: readonly TrendPoint[];
   researchKeepGbp: number;
@@ -130,6 +137,73 @@ export function floorDayValue(id: FloorFactId, point: TrendPoint | undefined): n
   return null;
 }
 
+/** Paper u for one day — post-reset from tape roll-up only, never hero or mill stamp. */
+export function floorPaperForDay(
+  stamp: Pick<FloorStamp, "trades" | "recipes" | "trends">,
+  day: string,
+): number | null {
+  if (day >= BOARD_RESET_DAY) {
+    return deskSettledTapeRollup(stamp.trades ?? [], day, stamp.recipes).u;
+  }
+  const trend = stamp.trends.find((t) => t.day === day);
+  return trend?.paper_live_day_u ?? null;
+}
+
+export function floorFactDayValue(
+  stamp: FloorStamp,
+  fact: FloorFactId,
+  day: string,
+): number | null {
+  if (fact === "paper") return floorPaperForDay(stamp, day);
+  const point = stamp.trends.find((t) => t.day === day);
+  return floorDayValue(fact, point);
+}
+
+/** Post-reset trend rows — paper from tape roll-up; mill factory_day_pnl never paints Floor. */
+export function scrubPostResetTrendPaper(
+  trends: readonly TrendPoint[],
+  trades: readonly import("./trades.ts").Fill[],
+  recipes: readonly Recipe[],
+): TrendPoint[] {
+  return trends.map((t) => {
+    if (t.day < BOARD_RESET_DAY) return t;
+    return {
+      ...t,
+      paper_live_day_u: deskSettledTapeRollup(trades, t.day, recipes).u,
+      factory_day_pnl_u: null,
+    };
+  });
+}
+
+/** Keep every post-reset day on the chart when the tape has settled rows (cheap roll-up per day). */
+export function ensurePostResetTrendDays(
+  trends: readonly TrendPoint[],
+  trades: readonly import("./trades.ts").Fill[],
+  recipes: readonly Recipe[],
+  deskDay: string,
+): TrendPoint[] {
+  const byDay = new Map(trends.map((t) => [t.day, t]));
+  const days = new Set<string>([deskDay]);
+  for (const f of trades) {
+    if (f.day >= BOARD_RESET_DAY) days.add(f.day);
+  }
+  for (const d of days) {
+    if (!byDay.has(d)) {
+      byDay.set(d, {
+        day: d,
+        paper_live_day_u: null,
+        factory_day_pnl_u: null,
+        n_solid: 0,
+        n_keep: 0,
+        n_measuring: 0,
+        n_dropped: 0,
+      });
+    }
+  }
+  const merged = [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day));
+  return scrubPostResetTrendPaper(merged, trades, recipes);
+}
+
 /** Independent Floor facts. No aim, mill, or quota language. */
 export function floorFacts(
   stamp: FloorStamp,
@@ -137,15 +211,33 @@ export function floorFacts(
   emptyHoles: number,
 ): FloorFact[] {
   const trend = stamp.trends.find((t) => t.day === scope.day);
-  const paper = scope.lookingBack
-    ? (trend?.paper_live_day_u ?? null)
-    : productionScore({
-        n_solid: stamp.n_solid,
-        day_u: stamp.hero.day_u,
-        researchKeepGbp: stamp.researchKeepGbp,
-      });
-  const production = trend?.factory_day_pnl_u ?? null;
-  const dayHint = scope.lookingBack ? axisDay(scope.day) : "today";
+  const rollup =
+    scope.day >= BOARD_RESET_DAY
+      ? deskSettledTapeRollup(stamp.trades ?? [], scope.day, stamp.recipes)
+      : null;
+  const tapePaper = rollup?.u ?? null;
+  const paperCountsLine =
+    rollup?.counts != null ? rollup.countsLine : null;
+  const dayHint = axisDay(scope.day);
+  const nKeep = trend?.n_keep ?? 0;
+
+  let paper: number | null;
+  let paperHint: string;
+  if (scope.lookingBack) {
+    paper = floorPaperForDay(stamp, scope.day);
+    paperHint = paper != null ? `${dayHint} · paper` : dayHint;
+  } else if (tapePaper != null) {
+    paper = tapePaper;
+    paperHint = `${dayHint} · paper settles · not KEEP`;
+  } else {
+    paper = null;
+    paperHint = `${dayHint} · paper`;
+  }
+
+  const production = null;
+  const productionHint =
+    nKeep <= 0 ? "KEEP 0 · no later-race score" : `${dayHint} · later-race KEEP`;
+
   return [
     {
       id: "holes",
@@ -154,8 +246,15 @@ export function floorFacts(
       value: emptyHoles,
       kind: "count",
     },
-    { id: "paper", label: "Paper", hint: dayHint, value: paper, kind: "u" },
-    { id: "production", label: "Production", hint: dayHint, value: production, kind: "u" },
+    {
+      id: "paper",
+      label: "Paper",
+      hint: paperHint,
+      value: paper,
+      kind: "u",
+      countsLine: paperCountsLine,
+    },
+    { id: "production", label: "Production", hint: productionHint, value: production, kind: "u" },
     {
       id: "live",
       label: "Live",
@@ -317,18 +416,99 @@ export function strategyMark(...parts: string[]): string {
   return fallback && fallback !== EMPTY ? fallback : EMPTY;
 }
 
+/** Run tag on post-epoch ehole ids — not a horse, not invented. */
+export function eholeRunSuffix(id: string): string | null {
+  const m = /^H-ehole-[a-z]{2}-[a-z]+-(?:win|place|lay)-([A-Za-z0-9]+)$/i.exec(id.trim());
+  return m?.[1] ?? null;
+}
+
+/** Hole title only: country · window · place|winner — no recipe bits. */
+export function isHoleOnlyMark(mark: string): boolean {
+  if (!mark || mark === EMPTY) return false;
+  const segs = mark.split(" · ");
+  if (segs.length !== 3) return false;
+  const m = segs[2].toLowerCase();
+  return m === "place" || m === "winner" || m === "lay";
+}
+
+export type BookNameParts = {
+  title?: string;
+  id?: string;
+  horse?: string | null;
+  odds?: number | null;
+  side?: string | null;
+  hunterName?: string | null;
+  /** Open ticket waiting for result — append odds + side when no horse. */
+  openTicket?: boolean;
+};
+
+/** Book / trade / tape name: recipe bits + horse, else hunter + run + odds + side. Never hole alone. */
+export function bookDisplayName(parts: BookNameParts): string {
+  const mark = strategyMark(parts.title ?? "", parts.id ?? "");
+  if (parts.horse && parts.horse !== EMPTY) return `${mark} · ${parts.horse}`;
+
+  const tail: string[] = [];
+  const hunter = parts.hunterName?.trim();
+  if (hunter && !mark.toLowerCase().includes(hunter.toLowerCase())) tail.push(hunter);
+
+  const id = parts.id ?? "";
+  if (/^H-ehole-/i.test(id)) {
+    const run = eholeRunSuffix(id);
+    if (run && !mark.includes(run)) tail.push(run);
+  } else if (isHoleOnlyMark(mark) && id && !mark.includes(id)) {
+    const short = /H-[A-Za-z0-9-]+/.exec(id)?.[0];
+    if (short && short !== id) {
+      const run = eholeRunSuffix(short) ?? short.replace(/^H-/, "");
+      if (run && !mark.includes(run)) tail.push(run);
+    }
+  }
+
+  const ticket: string[] = [];
+  if (parts.openTicket) {
+    if (parts.odds != null && Number.isFinite(parts.odds)) {
+      ticket.push(Number.isInteger(parts.odds) ? String(parts.odds) : String(parts.odds));
+    }
+    if (parts.side && parts.side !== EMPTY) ticket.push(parts.side);
+  }
+
+  const bits: string[] = [];
+  if (tail.length) bits.push(tail.join(" · "));
+  if (ticket.length) bits.push(ticket.join(" "));
+  if (bits.length) return `${mark} · ${bits.join(" · ")}`;
+  return mark;
+}
+
+export function recipeBookName(recipe: Pick<Recipe, "id" | "title" | "hunterName">): string {
+  return bookDisplayName({
+    title: recipe.title,
+    id: recipe.id,
+    hunterName: recipe.hunterName,
+  });
+}
+
 /** @deprecated use cellName — kept for existing imports */
 export function prettyTitle(title: string): string {
   return cellName(title);
 }
 
-/** One board: Time · Name · Side · Odds · Stake · Book · Result · P&L */
-export const DESK_HEADERS = ["Time", "Name", "Side", "Odds", "Stake", "Book", "Result", "P&L"] as const;
+/** One board: Time · Name · Market · Side · Odds · Stake · Book · Result · P&L */
+export const DESK_HEADERS = [
+  "Time",
+  "Name",
+  "Market",
+  "Side",
+  "Odds",
+  "Stake",
+  "Book",
+  "Result",
+  "P&L",
+] as const;
 
 export type DeskRow = {
   id: string;
   time: string;
   name: string;
+  market: string;
   side: string;
   odds: string;
   stake: string;
@@ -339,6 +519,33 @@ export type DeskRow = {
   selected?: boolean;
   onPick?: () => void;
 };
+
+/** Desk Market column — WIN or PLACE only. LAY lives in Side. */
+export function deskMarketFromParts(...parts: string[]): string {
+  const id = parts[0] ?? "";
+  const blob = parts.join(" ");
+  const ehole = /^H-ehole-[a-z]{2}-[a-z]+-(win|place|lay)/i.exec(id.trim());
+  if (ehole) {
+    const seg = (ehole[1] ?? "").toLowerCase();
+    if (seg === "place") return "PLACE";
+    return "WIN";
+  }
+  const upper = blob.toUpperCase().replace(/_/g, " ");
+  if (/\bPLACE\b/.test(upper)) return "PLACE";
+  if (/\bWIN\b/.test(upper)) return "WIN";
+  return EMPTY;
+}
+
+/** Stamped side on a recipe row — BACK/LAY from id, not market type. */
+export function deskStampedSide(...parts: string[]): string {
+  const id = parts[0] ?? "";
+  const ehole = /^H-ehole-[a-z]{2}-[a-z]+-(win|place|lay)/i.exec(id.trim());
+  if (ehole?.[1]?.toLowerCase() === "lay") return "LAY";
+  const blob = parts.join(" ").toUpperCase().replace(/_/g, " ");
+  if (/(?:^|[^A-Z])LAY(?:[^A-Z]|$)/.test(blob) && /-lay-/i.test(id)) return "LAY";
+  if (/\bBACK\b/.test(blob) && /\bBACK\b/.test(id)) return "BACK";
+  return EMPTY;
+}
 
 export type DeskGroup = {
   id: string;
@@ -356,16 +563,23 @@ export function recipeResult(recipe: Recipe): string {
   return EMPTY;
 }
 
-/** Recipe as a board row. Missing ticket facts stay Empty. Never freeze P&L as income. */
+/** Recipe as a board row. Open-but-not-finished uses Waiting; unused stays Empty. */
 export function recipeDeskRow(recipe: Recipe): DeskRow {
+  const open =
+    recipe.chip === "Waiting for races" ||
+    recipe.status === "MEASURING" ||
+    recipe.badge === "Research";
+  const market = deskMarketFromParts(recipe.id, recipe.title, recipe.region);
+  const stamped = deskStampedSide(recipe.id, recipe.title);
   return {
     id: recipe.id,
-    time: EMPTY,
-    name: strategyMark(recipe.title, recipe.id),
-    side: EMPTY,
-    odds: EMPTY,
-    stake: EMPTY,
-    book: EMPTY,
+    time: open ? WAITING : EMPTY,
+    name: recipeBookName(recipe),
+    market: market !== EMPTY ? market : open ? WAITING : EMPTY,
+    side: stamped !== EMPTY ? stamped : EMPTY,
+    odds: open ? WAITING : EMPTY,
+    stake: open ? WAITING : EMPTY,
+    book: open ? "paper" : EMPTY,
     result: recipeResult(recipe),
     pnl: null,
     holdingId: recipe.id,
@@ -373,15 +587,24 @@ export function recipeDeskRow(recipe: Recipe): DeskRow {
 }
 
 
-/** Last `size` days ending at `selected`. */
+/** Last `size` days ending at `selected`. Oracle today may run ahead of the trends tail. */
 export function dayWindow(days: readonly string[], selected: string, size = 8): string[] {
   const i = days.indexOf(selected);
-  const end = i < 0 ? days.length : i + 1;
-  const start = Math.max(0, end - size);
-  return days.slice(start, end);
+  if (i >= 0) {
+    const start = Math.max(0, i + 1 - size);
+    return days.slice(start, i + 1);
+  }
+  if (!days.length) return selected ? [selected] : [];
+  const last = days[days.length - 1]!;
+  if (selected > last) {
+    const tail = days.slice(Math.max(0, days.length - (size - 1)));
+    return [...tail, selected];
+  }
+  const end = days.length;
+  return days.slice(Math.max(0, end - size), end);
 }
 
-/** Window ending at `selected`. Stretch back only when the trailing days are Empty. */
+/** Window ending at `selected`. Stretch back only when trailing has production — else anchor on selected. */
 export function seriesWindow(
   days: readonly string[],
   selected: string,
@@ -390,7 +613,11 @@ export function seriesWindow(
   max = 15,
 ): string[] {
   const trailing = dayWindow(days, selected, size);
-  if (trailing.some((d) => valueOf(d) != null)) return trailing;
+  if (trailing.some((d) => valueOf(d) != null)) {
+    return ensureWindowEndsOn(selected, trailing, size);
+  }
+  const lastDay = days[days.length - 1];
+  if (lastDay && selected > lastDay) return ensureWindowEndsOn(selected, trailing, size);
   let lastProd = -1;
   const end = days.indexOf(selected);
   const endI = end < 0 ? days.length - 1 : end;
@@ -400,9 +627,18 @@ export function seriesWindow(
       break;
     }
   }
-  if (lastProd < 0) return trailing;
+  if (lastProd < 0) return ensureWindowEndsOn(selected, trailing, size);
   const start = Math.max(0, Math.min(lastProd - (size - 1), endI + 1 - max));
-  return days.slice(start, endI + 1);
+  return ensureWindowEndsOn(selected, days.slice(start, endI + 1), size);
+}
+
+/** Rightmost chart slot is always the oracle / selected day. */
+export function ensureWindowEndsOn(selected: string, win: readonly string[], size = 8): string[] {
+  if (!selected) return [...win];
+  const base = win.includes(selected) ? [...win] : [...win, selected].sort();
+  const anchored =
+    base.at(-1) === selected ? base : [...base.filter((d) => d !== selected), selected];
+  return anchored.slice(-size);
 }
 
 /**

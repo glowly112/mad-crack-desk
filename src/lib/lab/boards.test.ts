@@ -11,15 +11,21 @@ import {
   hunterWork,
   issueBoard,
   marketGlance,
+  nextEmptySquareHole,
   officeCountries,
   officeWorkers,
   factorySquares,
+  floorRacingSquare,
+  holeSideOccupied,
   inventHole,
   inventWhatHappened,
+  millHuntCaption,
+  plantInventQueue,
   bookPeriods,
   bookStageLine,
   bookStages,
   officeIssues,
+  officeIssuesForBoard,
   pipeBoard,
   plantMarkets,
   racingSquare,
@@ -28,10 +34,12 @@ import {
   recipeStatus,
   sizeMarket,
   sizePackBoxes,
+  squareGlanceLine,
   seatWatching,
   staffLine,
   waffleCols,
 } from "./boards.ts";
+import { scrubMillVoidNamedHoles } from "./junk-fills.ts";
 import { EMPTY } from "./desk.ts";
 import { STAMP } from "./stamp.ts";
 
@@ -130,6 +138,119 @@ test("the plant waffle is stamp cells: unused leftover, hunting, kill, then the 
   assert.equal(inventHole("invent off"), EMPTY);
 });
 
+test("square cells show BACK and LAY on the same WIN/PLACE hole", () => {
+  const holes = floorRacingSquare({
+    namedHoles: [
+      { region: "GB", window: "near_off", market: "WIN", tone: "hunt" },
+      { region: "AU", window: "morning", market: "WIN", tone: "idea", side: "LAY" },
+    ],
+    recipes: [
+      {
+        id: "H-ehole-nz-latepre-place-01741Z",
+        title: "ehole_nz_late_pre_place",
+        region: "NZ",
+        status: "MEASURING",
+        badge: "Research",
+        chip: null,
+        n: 0,
+        roi: 0,
+        freezePnl: 0,
+        why: "",
+      },
+    ],
+    openFills: [
+      {
+        id: "open-1",
+        recipeId: "H-ehole-gb-nearoff-win-83959Z",
+        recipe: "GB near-off WIN",
+        side: "BACK",
+      },
+    ],
+  });
+  assert.equal(holes.length, 64);
+  const gbWin = holes.find((h) => h.id === "GB|near_off|WIN");
+  assert.ok(gbWin);
+  assert.equal(gbWin!.backTone, "idea");
+  assert.equal(gbWin!.layTone, "empty");
+  const auWin = holes.find((h) => h.id === "AU|morning|WIN");
+  assert.ok(auWin);
+  assert.equal(auWin!.layTone, "idea");
+  const nzPlace = holes.find((h) => h.id === "NZ|late_pre|PLACE");
+  assert.ok(nzPlace);
+  assert.equal(nzPlace!.backTone, "idea");
+  assert.ok(holeSideOccupied(gbWin!));
+});
+
+test("floor morning board strips whole-cell kills — voids stay Empty", () => {
+  const voidFills = [
+    {
+      id: "za-void",
+      ts: "2026-09-03T10:00:00Z",
+      t: "10:00",
+      day: "2026-09-03",
+      recipe: "ZA morning WIN",
+      recipeId: "H-ehole-za-morning-win-73506Z",
+      market: "WIN",
+      book: "paper",
+      side: "BACK",
+      odds: 2,
+      stake: 1,
+      result: "void",
+      flight: null,
+      liquidity: null,
+      pnl: 0,
+      horse: null,
+    },
+    {
+      id: "gb-void",
+      ts: "2026-09-03T10:05:00Z",
+      t: "10:05",
+      day: "2026-09-03",
+      recipe: "GB late-pre WIN",
+      recipeId: "H-ehole-gb-latepre-win-34829Z",
+      market: "WIN",
+      book: "paper",
+      side: "BACK",
+      odds: 2,
+      stake: 1,
+      result: "void",
+      flight: null,
+      liquidity: null,
+      pnl: 0,
+      horse: null,
+    },
+  ] as const;
+  const named = scrubMillVoidNamedHoles(
+    [
+      { region: "ZA", window: "morning", market: "WIN", tone: "loss" },
+      { region: "GB", window: "late_pre", market: "WIN", tone: "kill" },
+    ],
+    voidFills,
+  );
+  const holes = floorRacingSquare({
+    namedHoles: named,
+    recipes: [
+      {
+        id: "H-killed-book",
+        title: "GB morning WIN",
+        region: "GB",
+        status: "KILL",
+        badge: "Dead",
+        chip: null,
+        n: 0,
+        roi: 0,
+        freezePnl: -5,
+        why: "killed",
+      },
+    ],
+  });
+  const za = holes.find((h) => h.id === "ZA|morning|WIN");
+  const gb = holes.find((h) => h.id === "GB|morning|WIN");
+  assert.equal(za?.tone, "empty");
+  assert.equal(gb?.tone, "empty");
+  assert.equal(holes.filter((h) => h.tone === "loss").length, 0);
+});
+
 test("the racing square is the finite mill grid; Empty holes are real area", () => {
   const holes = racingSquare({
     recipes: STAMP.recipes,
@@ -194,6 +315,49 @@ test("fuse off is the law, not a thing to fix", () => {
   assert.ok(rows.some((r) => r.id === "keep-hold-paper"));
 });
 
+test("office issues hide stale KEEP rows on empty hunt board", () => {
+  const rows = officeIssuesForBoard(STAMP.issues, { n_solid: 0, mill_n_armed: 52 });
+  assert.ok(!rows.some((r) => r.id === "keep-hold-paper"));
+  assert.ok(!rows.some((r) => r.id === "keep-not-solid"));
+});
+
+test("next empty square hole skips occupied hunt cells and in-play", () => {
+  const hole = nextEmptySquareHole({
+    recipes: [{ ...STAMP.recipes[0], region: "ZA", title: "ZA morning WIN", status: "MEASURING" }],
+    office: { inventWhy: "empty-hole hunt on · mill parked" },
+    hunters: [{ id: "geo", note: "FLOWING · queue ZA|morning|WIN" }],
+  });
+  assert.ok(hole !== EMPTY);
+  assert.ok(!/South Africa · morning · winner/i.test(hole));
+  assert.ok(!/in-play/i.test(hole));
+});
+
+test("plant invent queue prefers live seat.now and skips in-play", () => {
+  assert.equal(
+    plantInventQueue("hunt HK|morning|WIN · empty-hole fast-arm", "empty-hole hunt on · invent_empty_holes", []),
+    "Hong Kong · morning · winner",
+  );
+  assert.equal(
+    plantInventQueue(
+      "HK morning/late_pre/near_off WIN empties",
+      "empty-hole hunt on · invent_empty_holes",
+      [],
+    ),
+    "Hong Kong · morning, late-pre, near-off · winner",
+  );
+  assert.equal(plantInventQueue("next hole: AU|in_play|PLACE", "empty-hole hunt on", []), EMPTY);
+  assert.ok(
+    !plantInventQueue("", "empty-hole hunt on", [{ note: "queue AU|in_play|WIN" }]).includes("in-play"),
+  );
+});
+
+test("square glance is 64-hole occupancy, not mill cells", () => {
+  assert.match(
+    squareGlanceLine({ occupied: 55, n_solid: 0, kill: 0 }),
+    /0 solid\. 55 armed of 64 holes\. 9 empty/,
+  );
+});
+
 test("paper and holdout are two periods of one book", () => {
   const solid = STAMP.recipes.find((r) => r.badge === "Solid");
   const proving = STAMP.recipes.find((r) => r.status === "MEASURING");
@@ -207,6 +371,25 @@ test("paper and holdout are two periods of one book", () => {
   assert.match(open.line, /does not prove/);
 });
 
+test("mill hunt caption keeps mill parked when mill_mode is parked", () => {
+  const line = millHuntCaption("empty-hole hunt on · invent_empty_holes · mill parked", {
+    mill_mode: "parked",
+    n_armed: 40,
+  });
+  assert.match(line, /empty-hole fast-arm hunt/);
+  assert.match(line, /mill parked/);
+  assert.ok(!/densify/i.test(line));
+});
+
+test("mill hunt caption appends mill parked from parked mode even when armed", () => {
+  const line = millHuntCaption("empty-hole hunt on · invent_empty_holes", {
+    mill_mode: "parked",
+    mill_n_armed: 40,
+  });
+  assert.match(line, /empty-hole fast-arm hunt/);
+  assert.match(line, /mill parked/);
+});
+
 test("invent what happened names the queue and a known reject", () => {
   const line = inventWhatHappened({
     invent: true,
@@ -217,6 +400,16 @@ test("invent what happened names the queue and a known reject", () => {
   assert.match(line, /12 new ideas/);
   assert.match(line, /South Africa · morning · winner/);
   assert.match(line, /not stalled/);
+  const hunt = inventWhatHappened({
+    invent: true,
+    inventWhy: "empty-hole hunt on · invent_empty_holes · mill parked",
+    pitched: 12,
+    hunters: [],
+    mill_n_armed: 52,
+  });
+  assert.match(hunt, /empty-hole fast-arm hunt/);
+  assert.match(hunt, /mill parked/);
+  assert.ok(!hunt.includes("12 new ideas"));
   const rejected = inventWhatHappened({
     invent: true,
     inventWhy: STAMP.office.inventWhy,
@@ -238,10 +431,25 @@ test("recipe status drops holdout_n_too_small", () => {
 });
 
 test("hunter work drops FLOWING, pitched=, and conv%", () => {
+  assert.equal(
+    hunterWork("FLOWING · pitched=3 · proving=6 · conv 0.0%", { huntBoard: true }),
+    "Hunting empty holes on the square.",
+  );
   assert.equal(hunterWork("FLOWING · pitched=3 · proving=6 · conv 0.0%"), "Working 3 new ideas, 6 still being tested");
   assert.equal(hunterWork("FLOWING · no open deals"), EMPTY);
   assert.equal(hunterWork("FLOWING · queue ZA|morning|WIN"), "Looking at South Africa · morning · winner");
   assert.ok(officeWorkers(STAMP.hunters, "geo")[0]?.id === "geo");
+});
+
+test("health residual uses live hunter note when FLOWING on hunt board", () => {
+  const board = healthBoard(STAMP.kpis, {
+    hunters: STAMP.hunters,
+    inventWhy: "empty-hole hunt on · invent_empty_holes · mill parked",
+  });
+  const residual = board.fine.find((r) => r.id === "residual");
+  assert.ok(residual);
+  assert.match(residual!.sentence, /Hunting empty holes/);
+  assert.ok(!residual!.sentence.includes("behind"));
 });
 
 test("Pipe stages are the factory line; Live is 0 while fuse is off", () => {
@@ -262,6 +470,23 @@ test("Pipe stages are the factory line; Live is 0 while fuse is off", () => {
   assert.equal(squares.filter((s) => s.key === "certified").length, 1);
   assert.equal(squares.filter((s) => s.key === "live").length, 0);
   assert.equal(squares.length, 12 + 21 + 1 + 1);
+});
+
+test("empty-hole hunt factory line uses square occupancy, not invent queue", () => {
+  const board = pipeBoard(STAMP.pipe, false, {
+    inventWhy: "empty-hole hunt on · invent_empty_holes · mill parked",
+    square: { armed: 52, empty: 9, solid: 0 },
+  });
+  assert.deepEqual(
+    board.stages.map((s) => s.label),
+    ["Empty holes", "Armed on mill", "Solid", "Live"],
+  );
+  assert.equal(board.stages.find((s) => s.key === "empty")?.count, 9);
+  assert.equal(board.stages.find((s) => s.key === "armed")?.count, 52);
+  assert.ok(!board.stuck.includes("new ideas"));
+  assert.ok(!board.stuck.includes("still being tested"));
+  assert.match(board.stuck, /52 armed on the mill/);
+  assert.match(board.stuck, /9 empty on the square/);
 });
 
 test("Health rows are sentences, not RED/AMBER/GREEN", () => {

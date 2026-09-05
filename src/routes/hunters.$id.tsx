@@ -19,7 +19,9 @@ function Hunter() {
     );
   }
   const Icon = HUNTER_MARKS[h.id as keyof typeof HUNTER_MARKS];
-  const work = hunterWork(h.note);
+  const work = hunterWork(h.note, {
+    huntBoard: /empty-hole hunt|invent_empty|mill parked/i.test(stamp.office.inventWhy),
+  });
   return (
     <DetailShell backTo="/office" backLabel="Office">
       <div className="flex items-center gap-3">

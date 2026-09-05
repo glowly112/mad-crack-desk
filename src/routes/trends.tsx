@@ -31,7 +31,7 @@ function Trends() {
         </p>
       </header>
 
-        <ChartBlock title="Today's production score" sub="Solid recipes only. Still paper. Aim 100u/day.">
+        <ChartBlock title="Today's production score" sub="Solid recipes only. Still paper. Empty until settled fills.">
         <ResponsiveContainer width="100%" height={220}>
           <LineChart data={points} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <CartesianGrid stroke="var(--color-border)" vertical={false} />
@@ -77,10 +77,22 @@ function Trends() {
           </LineChart>
         </ResponsiveContainer>
         <ul className="mt-3 flex flex-wrap gap-4 font-mono text-xs text-muted">
-          <li>Keep</li>
-          <li>Measuring</li>
-          <li className="text-bad">Dropped</li>
-          <li className="text-up">Solid</li>
+          <li className="inline-flex items-center gap-1.5">
+            <span className="inline-block h-0.5 w-3 bg-fg" aria-hidden />
+            Keep
+          </li>
+          <li className="inline-flex items-center gap-1.5">
+            <span className="inline-block h-0.5 w-3 bg-muted" aria-hidden />
+            Measuring
+          </li>
+          <li className="inline-flex items-center gap-1.5 text-bad">
+            <span className="inline-block h-0.5 w-3 bg-bad" aria-hidden />
+            Dropped
+          </li>
+          <li className="inline-flex items-center gap-1.5 text-up">
+            <span className="inline-block h-0.5 w-3 bg-up" aria-hidden />
+            Solid
+          </li>
         </ul>
       </ChartBlock>
 
