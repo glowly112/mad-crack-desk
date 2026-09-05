@@ -57,6 +57,7 @@ PATH=$HOME/opt/node/bin:/usr/bin:/bin
 ORACLE_PLANT_CACHE_MS=3000
 ORACLE_HOLLOW_CACHE_MS=5000
 ORACLE_PLANT_LOAD_TIMEOUT_MS=12000
+MCL_DESK_PING_URL=http://127.0.0.1:8791/desk/ping
 EOF
 kill_stale_desk() {
   if [ -f "$APP/desk.pid" ]; then kill "$(cat "$APP/desk.pid")" 2>/dev/null || true; fi
@@ -83,6 +84,7 @@ sleep 8
 CSS=$(ls .output/public/assets/styles-*.css 2>/dev/null | head -1)
 JS=$(ls .output/public/assets/index-*.js 2>/dev/null | head -1)
 curl -sS -m 25 -o /dev/null -w "desk:%{http_code}\n" http://127.0.0.1:8791/desk/
+curl -sS -m 5 -o /dev/null -w "ping:%{http_code}\n" http://127.0.0.1:8791/desk/ping
 curl -sS -m 25 -o /dev/null -w "css:%{http_code}\n" "http://127.0.0.1:8791/desk/assets/$(basename "$CSS")"
 curl -sS -m 25 -o /dev/null -w "js:%{http_code}\n" "http://127.0.0.1:8791/desk/assets/$(basename "$JS")"
 curl -sS -m 25 -L http://127.0.0.1:8791/desk/ | python3 -c "
