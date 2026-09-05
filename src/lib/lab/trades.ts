@@ -26,6 +26,14 @@ import {
   WAITING,
   type DeskRow,
 } from "./desk.ts";
+import {
+  cardSliceFromSpice,
+  compactHoleFromParts,
+  deskHorseName,
+  nuggetOddsBand,
+  oddsBandShort,
+  truncateCourse,
+} from "./strategy-columns.ts";
 import { fieldSprayFillIds, junkFillIds } from "./junk-fills.ts";
 import { hopVoice } from "./staff-voice.ts";
 import { ukClock, ukHopAt } from "./uk-time.ts";
@@ -357,49 +365,43 @@ export function fillDeskRow(fill: Fill, fuseOn: boolean, recipes: readonly Recip
   const time = bookedClock(fill.ts, fill.t);
   const oddsStr = fmtOdds(fill.odds);
   const stakeStr = fmtStake(fill.stake);
-  const market = deskMarketFromParts(fill.recipeId, fill.recipe);
   const rawSide = (fill.side ?? "").toUpperCase();
   const sideStr =
     rawSide === "BACK" || rawSide === "LAY" ? rawSide : deskStampedSide(fill.recipeId, fill.recipe);
   const pending = (value: string) => (value && value !== EMPTY ? value : isOpen ? WAITING : EMPTY);
   const recipe = recipes.find((r) => r.id === fill.recipeId.split("|")[0]);
-  const nameTag =
-    /^H-ehole-/i.test(fill.recipeId)
-      ? eholeRunSuffix(fill.recipeId.split("|")[0] ?? fill.recipeId) ??
-        (fill.recipeId.split("|")[0] ?? "").replace(/^H-ehole-/, "")
-      : null;
-  const course = fill.spice?.course ?? null;
-  const spiceLine = fill.spice ? fillSpiceLine(fill.spice) : null;
+  const band = nuggetOddsBand(fill.odds);
+  const oddsCell =
+    oddsStr !== EMPTY ? oddsStr : band ? oddsBandShort(band) : isOpen ? WAITING : EMPTY;
   return {
     id: fill.id,
     time: pending(time),
-    name: tradeName(fill, recipe),
-    nameTag,
-    course,
-    spiceLine,
-    market: market !== EMPTY ? market : isOpen ? WAITING : EMPTY,
+    horse: deskHorseName(fill.horse),
+    hole: compactHoleFromParts(fill.recipeId, fill.recipe, recipe?.region),
+    odds: pending(oddsCell),
+    course: truncateCourse(fill.spice?.course),
+    card: cardSliceFromSpice(fill.spice),
     side: sideStr !== EMPTY ? sideStr : EMPTY,
-    odds: pending(oddsStr === EMPTY ? "" : oddsStr),
     stake: pending(stakeStr === EMPTY ? "" : stakeStr),
-    book: bookWord(fill.book),
     result: fillResultWord(fill),
     pnl: isOpen ? null : tape.pnl,
+    holdingId: fill.recipeId.split("|")[0],
   };
 }
 
 /** Recipe armed with no fill. Market from hole; Side only when stamped (LAY recipe, etc.). */
 export function waitDeskRow(chip: WaitOpen): DeskRow {
-  const market = deskMarketFromParts(chip.id, chip.title);
   const stamped = deskStampedSide(chip.id, chip.title);
   return {
     id: chip.id,
     time: WAITING,
-    name: strategyMark(chip.title, chip.id),
-    market: market !== EMPTY ? market : WAITING,
-    side: stamped !== EMPTY ? stamped : EMPTY,
+    horse: EMPTY,
+    hole: compactHoleFromParts(chip.id, chip.title),
     odds: WAITING,
+    course: EMPTY,
+    card: EMPTY,
+    side: stamped !== EMPTY ? stamped : EMPTY,
     stake: WAITING,
-    book: "paper",
     result: "Waiting for races",
     pnl: null,
   };

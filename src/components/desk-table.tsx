@@ -5,26 +5,35 @@ import { DESK_HEADERS, EMPTY, type DeskGroup, type DeskRow } from "@/lib/lab/des
 import { cn, fmtU } from "@/lib/utils";
 
 const RIGHT = new Set(["Odds", "Stake", "P&L"]);
-const MONO = new Set(["Time", "Market", "Side", "Odds", "Stake", "P&L"]);
+const MONO = new Set(["Time", "Odds", "Stake", "P&L"]);
 
-/** Aligned desk board. Quiet headers. Colour only on P&L. No pills. */
+function cellText(value: string, className?: string) {
+  return (
+    <span className={cn("block truncate", value === EMPTY && "text-muted", className)}>
+      {value}
+    </span>
+  );
+}
+
+/** Aligned desk board — compact columns matching Office Strategies. */
 export function DeskTable({ groups, empty }: { groups: DeskGroup[]; empty: string }) {
   const rows = groups.flatMap((g) => g.rows);
   if (rows.length === 0) return <EmptyState copy={empty} />;
 
   return (
     <DeskScroll className="min-w-0">
-      <table className="w-full min-w-[36rem] table-fixed border-collapse text-left">
+      <table className="w-full min-w-[44rem] table-fixed border-collapse text-left">
         <colgroup>
-          <col className="w-[4.5rem]" />
-          <col />
-          <col className="w-[3.25rem]" />
-          <col className="w-[3.25rem]" />
-          <col className="w-[3.25rem]" />
-          <col className="w-12" />
           <col className="w-[3.5rem]" />
-          <col className="w-[7.25rem]" />
-          <col className="w-[3.75rem]" />
+          <col className="w-[5.5rem]" />
+          <col className="w-[6.5rem]" />
+          <col className="w-10" />
+          <col className="w-16" />
+          <col className="w-14" />
+          <col className="w-10" />
+          <col className="w-10" />
+          <col className="w-12" />
+          <col className="w-12" />
         </colgroup>
         <thead>
           <tr className="border-b border-border">
@@ -33,9 +42,8 @@ export function DeskTable({ groups, empty }: { groups: DeskGroup[]; empty: strin
                 key={h}
                 scope="col"
                 className={cn(
-                  "px-2 py-2 text-[10px] font-normal tracking-wide text-subtle",
+                  "px-1.5 py-1.5 text-[9px] font-normal tracking-wide text-subtle",
                   RIGHT.has(h) && "text-right",
-                  h === "Name" && "w-[28%]",
                 )}
               >
                 {h}
@@ -95,37 +103,24 @@ function DataRow({ row }: { row: DeskRow }) {
       onClick={clickable ? pick : undefined}
     >
       <Cell k="Time" v={row.time} />
-      <NameCell row={row} />
-      <Cell k="Market" v={row.market} />
-      <Cell k="Side" v={row.side} />
+      <td className="max-w-[5.5rem] px-1.5 py-2 align-middle text-[11px]">
+        {cellText(row.horse, "text-fg")}
+      </td>
+      <td className="max-w-[6.5rem] px-1.5 py-2 align-middle text-[11px]" title={row.hole}>
+        {cellText(row.hole)}
+      </td>
       <Cell k="Odds" v={row.odds} />
+      <td className="max-w-[4rem] px-1.5 py-2 align-middle text-[11px]">
+        {cellText(row.course, "text-subtle")}
+      </td>
+      <td className="max-w-[3.5rem] px-1.5 py-2 align-middle text-[11px]">
+        {cellText(row.card, "text-muted")}
+      </td>
+      <Cell k="Side" v={row.side} />
       <Cell k="Stake" v={row.stake} />
-      <Cell k="Book" v={row.book} />
       <Cell k="Result" v={row.result} />
       <PnlCell v={row.pnl} />
     </tr>
-  );
-}
-
-function NameCell({ row }: { row: DeskRow }) {
-  const shown = row.name && row.name !== EMPTY ? row.name : EMPTY;
-  const course = row.course && row.course !== EMPTY ? row.course : null;
-  const spice = row.spiceLine && row.spiceLine !== EMPTY ? row.spiceLine : null;
-  return (
-    <td className="px-2 py-2 align-middle text-sm break-words text-fg">
-      {shown === EMPTY ? (
-        <span className="text-subtle">{EMPTY}</span>
-      ) : (
-        <span>
-          {shown}
-          {row.nameTag ? (
-            <span className="ml-1.5 font-mono text-[10px] text-subtle">{row.nameTag}</span>
-          ) : null}
-        </span>
-      )}
-      {course ? <p className="mt-0.5 text-xs text-muted">{course}</p> : null}
-      {spice ? <p className="mt-0.5 font-mono text-[10px] text-subtle">{spice}</p> : null}
-    </td>
   );
 }
 
@@ -134,11 +129,10 @@ function Cell({ k, v }: { k: (typeof DESK_HEADERS)[number]; v: string }) {
   return (
     <td
       className={cn(
-        "px-2 py-2 align-middle text-sm",
-        MONO.has(k) && "font-mono text-xs tabular-nums",
+        "px-1.5 py-2 align-middle text-[11px]",
+        MONO.has(k) && "font-mono text-[10px] tabular-nums",
         RIGHT.has(k) && "text-right",
-        shown === EMPTY ? "text-subtle" : k === "Name" ? "text-fg" : "text-muted",
-        k === "Name" && "break-words",
+        shown === EMPTY ? "text-muted" : "text-subtle",
       )}
     >
       {shown}
@@ -149,7 +143,7 @@ function Cell({ k, v }: { k: (typeof DESK_HEADERS)[number]; v: string }) {
 function PnlCell({ v }: { v: number | null }) {
   if (v == null) {
     return (
-      <td className="px-2 py-2 text-right font-mono text-xs tabular-nums text-muted" aria-label="Pending">
+      <td className="px-1.5 py-2 text-right font-mono text-[10px] tabular-nums text-muted" aria-label="Pending">
         —
       </td>
     );
@@ -157,7 +151,7 @@ function PnlCell({ v }: { v: number | null }) {
   return (
     <td
       className={cn(
-        "px-2 py-2 text-right font-mono text-xs tabular-nums",
+        "px-1.5 py-2 text-right font-mono text-[10px] tabular-nums",
         v > 0 && "text-up",
         v < 0 && "text-bad",
         v === 0 && "text-muted",

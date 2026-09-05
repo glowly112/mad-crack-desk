@@ -211,7 +211,7 @@ test("paper P&L is not income; live is 0 while fuse off", () => {
   assert.deepEqual(tapePnl(liveFill, true), { pnl: 4, caption: null });
 });
 
-test("trades tape name is strategy hole; odds and side stay in columns", () => {
+test("trades tape uses compact hole column; odds and side stay separate", () => {
   const opens = [3.2, 25, 10, 9.4].map((odds) => fillFromRow({ ...gbOpen, odds, pick_id: `${gbOpen.pick_id}:${odds}` }));
   const rows = opens.map((f) => {
     assert.ok(f);
@@ -219,30 +219,29 @@ test("trades tape name is strategy hole; odds and side stay in columns", () => {
   });
   assert.deepEqual(rows.map((r) => r.odds), ["3.2", "25", "10", "9.4"]);
   assert.deepEqual(
-    rows.map((r) => r.name),
+    rows.map((r) => r.hole),
     [
-      "Britain · near-off · winner",
-      "Britain · near-off · winner",
-      "Britain · near-off · winner",
-      "Britain · near-off · winner",
+      "GB · near-off · win",
+      "GB · near-off · win",
+      "GB · near-off · win",
+      "GB · near-off · win",
     ],
   );
-  assert.equal(new Set(rows.map((r) => r.name)).size, 1);
-  assert.ok(rows.every((r) => r.book === "paper"));
+  assert.equal(new Set(rows.map((r) => r.hole)).size, 1);
   assert.ok(rows.every((r) => r.side === "BACK"));
-  assert.ok(rows.every((r) => r.market === "WIN"));
   assert.ok(rows.every((r) => r.stake === "1u"));
   assert.ok(rows.every((r) => r.result === "Open"));
   assert.ok(rows.every((r) => r.pnl == null));
-  assert.ok(rows.every((r) => !`${r.name} ${r.book} ${r.result}`.includes("not income")));
+  assert.ok(rows.every((r) => !`${r.hole} ${r.result}`.includes("not income")));
   assert.equal(new Set(rows.map((r) => r.odds)).size, 4);
   const named = fillFromRow({ ...gbOpen, horse: "Desert Crown", odds: 3.2 });
   assert.ok(named);
-  assert.equal(tradeName(named), "Britain · near-off · winner · Desert Crown");
+  assert.equal(fillDeskRow(named, false).horse, "Desert Crown");
+  assert.equal(fillDeskRow(named, false).hole, "GB · near-off · win");
   assert.equal(fillDeskRow(named, false).odds, "3.2");
   const blank = fillFromRow({ ...gbOpen, horse: "H-fast-gb-nearoff-win-83959Z", runner: "67117187" });
   assert.equal(blank?.horse, null);
-  assert.equal(tradeName(blank!), "Britain · near-off · winner · 3.2 BACK");
+  assert.equal(fillDeskRow(blank!, false).horse, EMPTY);
   assert.equal(bookWord("production"), "paper");
   assert.equal(bookWord("live"), "live");
   assert.equal(fillResultWord(fillFromRow(auWon)!), "Won");
@@ -251,13 +250,11 @@ test("trades tape name is strategy hole; odds and side stay in columns", () => {
     title: "NZ morning WIN · one-pick 2.5–4.49",
     why: "no size_ok candidates",
   });
-  assert.equal(wait.name, "New Zealand · morning · winner · one-pick 2.5–4.49");
-  assert.equal(wait.market, "WIN");
+  assert.match(wait.hole, /NZ · morning · win/);
   assert.equal(wait.side, EMPTY);
   assert.equal(wait.time, "Waiting");
   assert.equal(wait.odds, "Waiting");
   assert.equal(wait.stake, "Waiting");
-  assert.equal(wait.book, "paper");
   assert.equal(wait.result, "Waiting for races");
 });
 
@@ -313,16 +310,14 @@ test("tradesWaitChips lists post-epoch ehole recipes and hides legacy KEEP steam
   assert.ok(!chips.some((c) => /steam|fade|H-fast/i.test(`${c.id} ${c.title}`)));
   const rows = chips.map((c) => waitDeskRow(c));
   assert.ok(rows.every((r) => r.result === "Waiting for races"));
-  assert.ok(rows.every((r) => r.book === "paper"));
   assert.ok(rows.every((r) => r.pnl == null));
   assert.ok(rows.every((r) => r.odds === "Waiting" && r.stake === "Waiting" && r.time === "Waiting"));
   assert.ok(rows.every((r) => r.side === EMPTY));
-  assert.ok(rows.every((r) => r.market === "WIN" || r.market === "PLACE"));
   assert.ok(rows.every((r) => !/^(WIN|PLACE|LAY)$/.test(r.side)));
-  assert.match(rows.find((r) => r.id === eholeAu.id)?.name ?? "", /Australia · morning · winner/);
+  assert.match(rows.find((r) => r.id === eholeAu.id)?.hole ?? "", /AU · morning · win/);
 });
 
-test("measuring recipe desk row names hunter and run, not hole alone", () => {
+test("measuring recipe desk row uses compact hole and hunter in course column", () => {
   const row = recipeDeskRow({
     id: "H-ehole-nz-latepre-place-01741Z",
     title: "ehole_nz_late_pre_place_01741Z",
@@ -336,10 +331,12 @@ test("measuring recipe desk row names hunter and run, not hole alone", () => {
     why: "Still proving",
     hunterName: "Geo",
   });
-  assert.match(row.name, /New Zealand · late-pre · place · Geo · 01741Z/);
+  assert.equal(row.hole, "NZ · late-pre · plc");
+  assert.equal(row.course, "Geo");
+  assert.equal(row.card, "01741Z");
 });
 
-test("fillDeskRow shows strategy hole and ehole run tag", () => {
+test("fillDeskRow splits horse, hole, and spice columns", () => {
   const settled = fillFromRow({
     pick_id: "harb-34829",
     date: "2026-09-03",
@@ -354,10 +351,10 @@ test("fillDeskRow shows strategy hole and ehole run tag", () => {
     ts: "2026-09-03T14:00:00Z",
   })!;
   const row = fillDeskRow(settled, false);
-  assert.match(row.name, /Britain · late-pre · winner · Harb/);
-  assert.equal(row.market, "WIN");
+  assert.equal(row.horse, "Harb");
+  assert.equal(row.hole, "GB · late-pre · win");
   assert.equal(row.side, "BACK");
-  assert.equal(row.nameTag, "34829Z");
+  assert.equal(row.card, EMPTY);
 });
 
 test("open ticket shows real side/odds/stake; unsettled P&L stays Empty", () => {
@@ -376,14 +373,13 @@ test("open ticket shows real side/odds/stake; unsettled P&L stays Empty", () => 
   });
   assert.ok(nzOpen);
   const row = fillDeskRow(nzOpen, false);
-  assert.equal(row.market, "WIN");
+  assert.match(row.hole, /NZ · morning · win/);
   assert.equal(row.side, "BACK");
   assert.equal(row.odds, "3.55");
   assert.equal(row.stake, "1u");
   assert.equal(row.time, "09:14:03");
   assert.equal(row.result, "Open");
-  assert.match(row.name, /New Zealand · morning · winner/);
-  assert.ok(!/3\.55 BACK/.test(row.name));
+  assert.equal(row.horse, EMPTY);
   assert.equal(row.pnl, null);
 });
 
@@ -1130,8 +1126,7 @@ test("book row spices survive fillFromRow into stamp.trades shape", () => {
 
   const desk = fillDeskRow(stamped[0]!, false, []);
   assert.equal(desk.course, "Ascot");
-  assert.match(desk.spiceLine ?? "", /Handicap/);
-  assert.match(desk.spiceLine ?? "", /fld 12/);
+  assert.match(desk.card, /Handicap/);
 });
 
 test("book spices null-safe when plant has not stamped them yet", () => {
@@ -1149,8 +1144,8 @@ test("book spices null-safe when plant has not stamped them yet", () => {
   assert.equal(fill.spice.course, null);
   assert.equal(fill.spice.field_size, null);
   const desk = fillDeskRow(fill, false, []);
-  assert.equal(desk.course, null);
-  assert.equal(desk.spiceLine, null);
+  assert.equal(desk.course, EMPTY);
+  assert.equal(desk.card, EMPTY);
 });
 
 test("seedTapeFromBook keeps spices on merged tape", () => {

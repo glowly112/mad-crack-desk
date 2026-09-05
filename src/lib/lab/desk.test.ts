@@ -133,28 +133,27 @@ test("recipe book name adds hunter and run — never hole title alone", () => {
 test("recipe board row uses Market and Side columns; missing facts are Empty", () => {
   assert.deepEqual([...DESK_HEADERS], [
     "Time",
-    "Name",
-    "Market",
-    "Side",
+    "Horse",
+    "Hole",
     "Odds",
+    "Course",
+    "Card",
+    "Side",
     "Stake",
-    "Book",
     "Result",
     "P&L",
   ]);
   const solid = recipeDeskRow(STAMP.recipes[0]);
-  assert.equal(solid.name, "Britain · near-off · winner");
+  assert.equal(solid.hole, "GB · near-off · win");
   assert.equal(solid.time, "Waiting");
-  assert.equal(solid.market, "WIN");
   assert.equal(solid.side, EMPTY);
   assert.equal(solid.odds, "Waiting");
-  assert.equal(solid.book, "paper");
   assert.equal(solid.pnl, null);
   assert.equal(solid.result, "Waiting for races");
   const parked = STAMP.recipes.find((r) => r.badge === "Parked");
   assert.ok(parked);
   assert.equal(recipeResult(parked), "Parked");
-  assert.equal(recipeDeskRow(parked).name, "New Zealand · morning · winner · one-pick 2.5–4.49");
+  assert.match(recipeDeskRow(parked).hole, /NZ · morning · win/);
 });
 
 test("daily window and domain keep Empty days off the scale", () => {

@@ -2,6 +2,7 @@
 
 import type { Move, Recipe, TrendPoint } from "./stamp.ts";
 import { BOARD_RESET_DAY } from "./board-reset.ts";
+import { compactHoleLabel, truncateCourse } from "./strategy-columns.ts";
 import { deskSettledTapeRollup } from "./trades.ts";
 
 export const EMPTY = "Empty";
@@ -489,15 +490,16 @@ export function prettyTitle(title: string): string {
   return cellName(title);
 }
 
-/** One board: Time · Name · Market · Side · Odds · Stake · Book · Result · P&L */
+/** One board: Time · Horse · Hole · Odds · Course · Card · Side · Stake · Result · P&L */
 export const DESK_HEADERS = [
   "Time",
-  "Name",
-  "Market",
-  "Side",
+  "Horse",
+  "Hole",
   "Odds",
+  "Course",
+  "Card",
+  "Side",
   "Stake",
-  "Book",
   "Result",
   "P&L",
 ] as const;
@@ -505,22 +507,15 @@ export const DESK_HEADERS = [
 export type DeskRow = {
   id: string;
   time: string;
-  name: string;
-  /** H-ehole skin id — secondary under strategy on Trades tape. */
-  nameSub?: string;
-  market: string;
-  side: string;
+  horse: string;
+  hole: string;
   odds: string;
+  course: string;
+  card: string;
+  side: string;
   stake: string;
-  book: string;
   result: string;
   pnl: number | null;
-  /** Muted ehole run tag beside strategy name on Trades. */
-  nameTag?: string | null;
-  /** Plant book course — under name on Trades when stamped. */
-  course?: string | null;
-  /** Muted plant book context (going, field size, etc.). */
-  spiceLine?: string | null;
   holdingId?: string;
   selected?: boolean;
   onPick?: () => void;
@@ -575,17 +570,18 @@ export function recipeDeskRow(recipe: Recipe): DeskRow {
     recipe.chip === "Waiting for races" ||
     recipe.status === "MEASURING" ||
     recipe.badge === "Research";
-  const market = deskMarketFromParts(recipe.id, recipe.title, recipe.region);
   const stamped = deskStampedSide(recipe.id, recipe.title);
+  const run = eholeRunSuffix(recipe.id);
   return {
     id: recipe.id,
     time: open ? WAITING : EMPTY,
-    name: recipeBookName(recipe),
-    market: market !== EMPTY ? market : open ? WAITING : EMPTY,
-    side: stamped !== EMPTY ? stamped : EMPTY,
+    horse: EMPTY,
+    hole: compactHoleLabel(recipe),
     odds: open ? WAITING : EMPTY,
+    course: recipe.hunterName?.trim() ? truncateCourse(recipe.hunterName) : EMPTY,
+    card: run ?? EMPTY,
+    side: stamped !== EMPTY ? stamped : EMPTY,
     stake: open ? WAITING : EMPTY,
-    book: open ? "paper" : EMPTY,
     result: recipeResult(recipe),
     pnl: null,
     holdingId: recipe.id,

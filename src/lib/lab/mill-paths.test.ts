@@ -38,26 +38,25 @@ test("mergeMillPathRuns adds cells and fills from path_runs same turn", () => {
   assert.equal(pathRunsOf(snap).length, 2);
 });
 
-test("waiting chips show Market WIN/PLACE and Side Empty unless stamped LAY", () => {
+test("waiting chips show compact hole and stamped LAY side", () => {
   const row = waitDeskRow({
     id: "H-ehole-nz-latepre-place-00206Z",
     title: "ehole_nz_late_pre_place_00206Z",
     why: null,
   });
-  assert.equal(row.market, "PLACE");
+  assert.equal(row.hole, "NZ · late-pre · plc");
   assert.equal(row.side, EMPTY);
-  assert.match(row.name, /place/i);
 
   const lay = waitDeskRow({
     id: "H-ehole-au-morning-lay-73508Z",
     title: "ehole_au_morning_lay",
     why: null,
   });
-  assert.equal(lay.market, "WIN");
+  assert.equal(lay.hole, "AU · morning · win");
   assert.equal(lay.side, "LAY");
 });
 
-test("open BACK ticket shows Market and Side separately", () => {
+test("open BACK ticket shows hole and side separately", () => {
   const fill = fillFromRow({
     pick_id: "za-near|1|1|BACK|2026-09-03",
     cell_id: "H-ehole-za-nearoff-win-73508Z",
@@ -68,6 +67,6 @@ test("open BACK ticket shows Market and Side separately", () => {
     ts: "2026-09-03T12:00:00Z",
   })!;
   const row = fillDeskRow(fill, false);
-  assert.equal(row.market, "WIN");
+  assert.equal(row.hole, "ZA · near-off · win");
   assert.equal(row.side, "BACK");
 });

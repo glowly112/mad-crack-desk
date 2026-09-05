@@ -9,6 +9,12 @@ import {
 } from "./boards.ts";
 import { EMPTY, deskMarketFromParts, deskStampedSide, eholeRunSuffix, strategyMark } from "./desk.ts";
 import { isPostEpochEholeRecipe, recipeIsPostEpoch } from "./board-reset.ts";
+import {
+  cardSlice as officeCardSliceImpl,
+  compactHoleFromKey,
+  compactHoleLabel,
+  oddsBandShort,
+} from "./strategy-columns.ts";
 import type { Fill, SettledTradeCounts } from "./trades.ts";
 import {
   fmtSettledWlN,
@@ -152,44 +158,17 @@ export function officeHoleLabel(recipe: Recipe): string {
 
 /** Tight hole label for the Strategies table — region code · window · win/plc. */
 export function officeCompactHoleLabel(recipe: Recipe): string {
-  const parsed = squareHoleKeyAndSide(recipe.id, recipe.title, recipe.region);
-  if (!parsed) return EMPTY;
-  const [region, window] = parsed.id.split("|");
-  const wlabel = SQUARE_WINDOW_LABEL[window as SquareWindow] ?? window;
-  const mlabel =
-    parsed.market === "WIN" ? "win" : parsed.market === "PLACE" ? "plc" : String(parsed.market).toLowerCase();
-  return `${region} · ${wlabel} · ${mlabel}`;
+  return compactHoleLabel(recipe);
 }
 
 /** Compact hole from a matrix key — GB|morning|WIN. */
 export function officeCompactHoleFromKey(holeKey: string): string {
-  const [region, window, market] = holeKey.split("|");
-  if (!region || !window || !market) return holeKey;
-  const wlabel = SQUARE_WINDOW_LABEL[window as SquareWindow] ?? window;
-  const mlabel = market === "WIN" ? "win" : market === "PLACE" ? "plc" : market.toLowerCase();
-  return `${region} · ${wlabel} · ${mlabel}`;
+  return compactHoleFromKey(holeKey);
 }
-
-const GOING_SHORT: Record<string, string> = {
-  Good: "Gd",
-  Soft: "Sf",
-  Heavy: "Hy",
-  Firm: "Fm",
-  Yielding: "Yld",
-};
 
 /** Abbreviated race type / going for a narrow Card column. */
 export function officeCardSlice(raceType?: string | null, going?: string | null): string {
-  const parts: string[] = [];
-  if (raceType?.trim()) {
-    const rt = raceType.trim();
-    parts.push(rt.length > 8 ? rt.slice(0, 7) + "…" : rt);
-  }
-  if (going?.trim()) {
-    const g = going.trim();
-    parts.push(GOING_SHORT[g] ?? (g.length > 4 ? g.slice(0, 3) : g));
-  }
-  return parts.length ? parts.join(" · ") : EMPTY;
+  return officeCardSliceImpl(raceType, going);
 }
 
 /** n · W–L for one compact volume column. */

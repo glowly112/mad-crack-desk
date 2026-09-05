@@ -7,8 +7,15 @@ import {
 } from "./boards.ts";
 import { EMPTY } from "./desk.ts";
 import { recipeDisplayHoleKey } from "./mill-display.ts";
+import {
+  cardSlice,
+  compactHoleFromKey,
+  nuggetOddsBand,
+  oddsBandShort,
+  truncateCourse,
+} from "./strategy-columns.ts";
 import type { OfficeBookInput, OfficeBookRow, OfficeBookState, OfficePnlTone, OfficeStrategyType } from "./office-display.ts";
-import { filterOfficeRows, officeBookRows, officeCardSlice, officeCompactHoleFromKey, officePaperScale, officeWlNColumn } from "./office-display.ts";
+import { filterOfficeRows, officeBookRows, officeCompactHoleFromKey, officePaperScale, officeWlNColumn } from "./office-display.ts";
 import type { Fill } from "./trades.ts";
 import {
   fmtSettledWlN,
@@ -35,30 +42,8 @@ export type OfficeNuggetGroup = {
   representativeRecipeId: string;
 };
 
-/** Plant-style odds bands for tape spice slices. */
-export function nuggetOddsBand(odds: number | null | undefined): string | null {
-  if (odds == null || !Number.isFinite(odds) || odds <= 0) return null;
-  if (odds < 2) return "under 2";
-  if (odds < 2.5) return "2.0–2.49";
-  if (odds < 4.5) return "2.5–4.49";
-  if (odds < 8) return "4.5–7.99";
-  if (odds < 13) return "8.0–12.99";
-  return "13+";
-}
-
-/** Short odds band for a narrow table column. */
-export function nuggetOddsBandShort(band: string | undefined): string {
-  if (!band) return EMPTY;
-  const map: Record<string, string> = {
-    "under 2": "<2",
-    "2.0–2.49": "2–2.5",
-    "2.5–4.49": "2.5–4.5",
-    "4.5–7.99": "4.5–8",
-    "8.0–12.99": "8–13",
-    "13+": "13+",
-  };
-  return map[band] ?? band;
-}
+/** Plant-style odds bands — re-export for tests. */
+export { nuggetOddsBand, oddsBandShort as nuggetOddsBandShort } from "./strategy-columns.ts";
 
 function holeLabelFromKey(holeKey: string): string {
   const [region, window, market] = holeKey.split("|");
@@ -183,9 +168,7 @@ export function officeNuggetRows(input: OfficeBookInput, minN = 1): OfficeBookRo
     const hasPnl = group.fills.length > 0 && counts != null;
     const scale = officePaperScale(hasPnl ? group.u : null, counts);
     const slice = group.slice;
-    const course = slice.course?.trim() ?? "";
-    const courseSlice =
-      course.length > 12 ? `${course.slice(0, 11)}…` : course || EMPTY;
+    const courseSlice = truncateCourse(slice.course);
     return {
       id: group.id,
       strategyType: "nugget",
@@ -194,9 +177,9 @@ export function officeNuggetRows(input: OfficeBookInput, minN = 1): OfficeBookRo
       strategy: group.label,
       side: EMPTY,
       market: EMPTY,
-      oddsSlice: nuggetOddsBandShort(slice.oddsBand),
+      oddsSlice: oddsBandShort(slice.oddsBand),
       courseSlice,
-      cardSlice: officeCardSlice(slice.raceType, slice.going),
+      cardSlice: cardSlice(slice.raceType, slice.going),
       state,
       stateLabel,
       paperPnl: hasPnl ? fmtPnlU(group.u) : EMPTY,

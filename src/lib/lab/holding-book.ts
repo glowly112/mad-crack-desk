@@ -2,12 +2,8 @@
 
 import { bookStages, type BookStage } from "./boards.ts";
 import { EMPTY } from "./desk.ts";
-import {
-  officeHoleLabel,
-  officePaperCounts,
-  officePaperTotals,
-  type OfficeBookInput,
-} from "./office-display.ts";
+import { officeHoleLabel, officePaperCounts, officePaperTotals, type OfficeBookInput } from "./office-display.ts";
+import { compactHoleLabel } from "./strategy-columns.ts";
 import { fmtWinLoseCounts } from "./trades.ts";
 import type { Recipe } from "./stamp.ts";
 
@@ -18,9 +14,10 @@ function fmtPnlU(v: number): string {
   return `${sign}${Math.abs(v).toFixed(2)}u`;
 }
 
-/** Plain hole mark for the holdings title — country × window × market. */
+/** Plain hole mark for the holdings title — compact region · window · market. */
 export function holdingHoleTitle(recipe: Recipe): string {
-  return officeHoleLabel(recipe);
+  const compact = compactHoleLabel(recipe);
+  return compact !== EMPTY ? compact : officeHoleLabel(recipe);
 }
 
 /** Today's Settled tape for this skin — same gate as Office / Trades. */
