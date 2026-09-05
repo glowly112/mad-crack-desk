@@ -512,7 +512,8 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
     rec(snap.occupancy_post_epoch) ??
     rec(rec(snap.empty_hole_hunt)?.occupancy_post_epoch) ??
     rec(rec(snap.factory_empty_hole_hunt)?.occupancy_post_epoch);
-  const square_occupied_n = plantOracle ? undefined : int(occRec?.n_occupied_cells);
+  const occHoles = holesFromOccupancyPostEpoch(snap, cellList);
+  const square_occupied_n = int(occRec?.n_occupied_cells);
 
   const trendsBase = base.trends.some((t) => t.day === date)
     ? base.trends
@@ -585,10 +586,8 @@ export function applySnapshot(raw: unknown, base: LiveStamp): LiveStamp {
     trades: tradesParsed,
     wait_open: Array.isArray(snap.wait_open) ? parseWaitOpen(snap.wait_open) : (base.wait_open ?? []),
     holes: plantOracle
-      ? namedHolesFromCells.length
-        ? namedHolesFromCells
-        : holesFromSnap(snap) ?? []
-      : holesFromSnap(snap) ?? (namedHolesFromCells.length ? namedHolesFromCells : base.holes),
+      ? occHoles ?? (namedHolesFromCells.length ? namedHolesFromCells : holesFromSnap(snap) ?? [])
+      : occHoles ?? holesFromSnap(snap) ?? (namedHolesFromCells.length ? namedHolesFromCells : base.holes),
     office: {
       ...base.office,
       invent: inventOn,

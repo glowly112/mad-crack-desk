@@ -67,17 +67,18 @@ export function sealFloorPaperFromTape(stamp: LiveStamp): LiveStamp {
   const trades = ingestMillFills(stamp.trades ?? [], day, recipes);
   const rollup = deskSettledTapeRollup(trades, day, recipes);
   const trends = ensurePostResetTrendDays(stamp.trends, trades, recipes, day);
-  const sealed: LiveStamp = {
+  const sealed = {
     ...stamp,
     trades,
     trends,
+    square_occupied_n: (stamp as LiveStamp & { square_occupied_n?: number }).square_occupied_n,
     hero: {
       ...stamp.hero,
       day_u: day >= BOARD_RESET_DAY ? rollup.u : stamp.hero.day_u,
     },
     fuse_on: false,
     fuse: "Real betting: OFF",
-  };
+  } as LiveStamp;
   if (day >= BOARD_RESET_DAY) {
     assertDeskTapeFloorAligns(trades, day, recipes, rollup.u, rollup.counts);
   }
@@ -132,7 +133,7 @@ export function scrubDeskStampArchive(stamp: LiveStamp): LiveStamp {
       ...stamp.office,
       inventWhy: scrubMillWatchingLine(stamp.office.inventWhy ?? ""),
     },
-    square_occupied_n: undefined,
+    square_occupied_n: (stamp as LiveStamp & { square_occupied_n?: number }).square_occupied_n,
     researchKeepGbp: 0,
     hero: {
       ...stamp.hero,

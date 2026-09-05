@@ -14,6 +14,7 @@ import {
   racingSquare,
   squareGlanceLine,
   squareGridMarkets,
+  squareOccupancyCounts,
 } from "@/lib/lab/boards";
 import {
   scrubMillVoidNamedHoles,
@@ -56,11 +57,14 @@ export function FloorSquare() {
     })),
   });
   const markets = squareGridMarkets();
-  const authOccupied = undefined;
   const paintedOccupied = holes.filter((h) => holeSideOccupied(h)).length;
-  const occupiedN = paintedOccupied;
-  const emptyN = holes.length - occupiedN;
-  const glance = `${emptyN} empty of ${holes.length} holes on the square`;
+  const stampOcc = (stamp as { square_occupied_n?: number }).square_occupied_n;
+  const { emptyN, total } = squareOccupancyCounts({
+    squareOccupiedN: stampOcc,
+    paintedOccupied,
+    total: holes.length,
+  });
+  const glance = `${emptyN} empty of ${total} holes on the square`;
 
   return (
     <section>
