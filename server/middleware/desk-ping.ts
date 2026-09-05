@@ -5,8 +5,9 @@ interface PingEvent {
 }
 
 export default function deskPing(event: PingEvent, next: () => unknown) {
-  const path = event.url.pathname.replace(/\/$/, "");
-  if (path === "/ping" || path === "/desk/ping") {
+  const raw = event.url.pathname.replace(/\/$/, "");
+  const path = raw.startsWith("/desk/") ? raw.slice("/desk".length) || "/" : raw;
+  if (path === "/ping" || raw === "/desk/ping" || raw === "/ping") {
     return new Response("ok", {
       status: 200,
       headers: {

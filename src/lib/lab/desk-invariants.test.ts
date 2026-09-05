@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { applyBoardResetView } from "./board-reset.ts";
 import { applySnapshot } from "./from-snapshot.ts";
 import { applyDigest, type Digest, type LiveStamp } from "./from-digest.ts";
 import { millHuntCaption } from "./boards.ts";
@@ -162,4 +163,35 @@ test("law 5: plantLine keeps mill parked when mill_mode is parked", () => {
   );
   assert.match(live.plantLine, /mill parked/);
   assert.equal(stampSquareOccupiedN(live), 44);
+});
+
+test("law 5: oracle snapshot + board reset scrub keeps stamp N for empty-of-64 caption", () => {
+  const keys = Array.from({ length: 24 }, (_, i) => `GB|morning|WIN-${i}`);
+  const live = applySnapshot(
+    {
+      mill_mode: "parked",
+      mill_n_armed: 36,
+      n_armed: 36,
+      empty_hole_hunt: {
+        occupancy_post_epoch: { n_occupied_cells: 47, occupied_cells: keys },
+      },
+      cells: keys.slice(0, 3).map((k, i) => ({
+        id: `H-ehole-${i}`,
+        title: k,
+        status: "MEASURING",
+        country_scope: [k.split("|")[0]],
+        window_scope: [k.split("|")[1]],
+        market_type: "WIN",
+      })),
+    },
+    base(),
+  );
+  assert.equal(stampSquareOccupiedN(live), 47);
+  const view = applyBoardResetView(live);
+  assert.equal(stampSquareOccupiedN(view), 47);
+  assert.equal(floorEmptyFromStamp(view, 44), 17);
+  const holesFact = floorFacts(view, { day: view.day, lookingBack: false }, floorEmptyFromStamp(view, 44)).find(
+    (f) => f.id === "holes",
+  );
+  assert.equal(holesFact?.value, 17);
 });

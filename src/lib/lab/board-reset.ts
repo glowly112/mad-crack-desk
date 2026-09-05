@@ -165,6 +165,7 @@ export function filterPreEpochLeftovers(stamp: LiveStamp): LiveStamp {
 
   return {
     ...stamp,
+    square_occupied_n: (stamp as LiveStamp & { square_occupied_n?: number }).square_occupied_n,
     recipes,
     solids,
     trades,
@@ -181,7 +182,7 @@ export function filterPreEpochLeftovers(stamp: LiveStamp): LiveStamp {
       const e = compactEpoch(row.line);
       return e ? isPostEpochCompact(e) : false;
     }) as unknown as LiveStamp["floorLog"],
-  };
+  } as LiveStamp;
 }
 
 export function isBoardResetView(stamp: {
@@ -218,6 +219,7 @@ function applyEmptyBoardOverlay(stamp: LiveStamp): LiveStamp {
   const day = stamp.day;
   return {
     ...stamp,
+    square_occupied_n: (stamp as LiveStamp & { square_occupied_n?: number }).square_occupied_n,
     n_solid: 0,
     fuse_on: false,
     fuse: "Real betting: OFF",
