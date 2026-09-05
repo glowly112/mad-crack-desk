@@ -240,5 +240,6 @@ test("scoreboard ehole cells paint holes including KILL and ignore Hyde", () => 
   assert.equal(holes.find((h) => h.id === "GB|late_pre|PLACE")?.tone, "hunt");
   assert.equal(holes.find((h) => h.id === "NZ|late_pre|PLACE")?.tone, "idea");
   assert.equal(holes.find((h) => h.id === "AU|near_off|WIN")?.tone, "loss");
-  assert.equal(snap.recipes.length, 2);
+  assert.equal(snap.recipes.length, 3);
+  assert.equal(snap.recipes.filter((r) => r.status === "KILL").length, 1);
 });

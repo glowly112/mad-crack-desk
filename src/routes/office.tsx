@@ -14,7 +14,9 @@ export function Office() {
     <div className="space-y-8">
       <header>
         <h1 className="text-2xl">Office</h1>
-        <p className="mt-1 text-sm text-muted">Strategies, KEEP, and later-race same-bets P&L.</p>
+        <p className="mt-1 text-sm text-muted">
+          Strategies / Lab — every armed skin, KEEP, and killed book. Paper P&L from settled tape.
+        </p>
         <div className="mt-3">
           <OracleStampLine
             generated={stamp.generated}

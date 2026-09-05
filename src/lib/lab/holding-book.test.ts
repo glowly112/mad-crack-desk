@@ -88,7 +88,7 @@ test("holdings paper matches Office Settled for the skin", () => {
   const settled = holdingPaperSettled(recipe, ctx);
   assert.ok(settled);
   assert.equal(office?.paperPnl, "+1.21u");
-  assert.equal(office?.paperCounts, "1 win · 1 lose");
+  assert.equal(office?.paperCounts, "1–1 · n=2 · since armed");
   assert.match(settled.line, /1 win · 1 lose/);
   assert.match(settled.line, /\+1\.21u/);
   const paper = bookStagesForHolding(recipe, ctx).find((s) => s.key === "paper");

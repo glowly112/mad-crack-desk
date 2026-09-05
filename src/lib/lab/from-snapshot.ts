@@ -119,10 +119,10 @@ function recipesFromCells(cells: Record<string, unknown>[]): Recipe[] {
     const status = statusOf(c);
     const id = String(c.id || c.title || "").trim();
     if (/^H-hyde-/i.test(id) || /^H-fast-/i.test(id)) continue;
-    if (status === "KILL") continue;
+    if (status === "KILL" && !cellIsPostEpochEhole(c)) continue;
     if (status === "KEEP" && !cellIsPostEpochParkedKeep(c) && !cellIsPostEpochEhole(c)) continue;
     if ((status === "MEASURING" || status === "HUNTING") && !cellIsPostEpochEhole(c)) continue;
-    if (status !== "MEASURING" && status !== "HUNTING" && status !== "KEEP") continue;
+    if (status !== "MEASURING" && status !== "HUNTING" && status !== "KEEP" && status !== "KILL") continue;
     if (!id) continue;
     const score = rec(c.score) ?? {};
     const stats = rec(c.stats) ?? {};
@@ -137,7 +137,9 @@ function recipesFromCells(cells: Record<string, unknown>[]): Recipe[] {
           ? "Looking for the next book."
           : status === "KEEP"
             ? "Research keep."
-            : "Still proving. Not the score.";
+            : status === "KILL"
+              ? "Killed on the mill."
+              : "Still proving. Not the score.";
     const hunterName =
       typeof c.hunter_name === "string" && c.hunter_name.trim() ? c.hunter_name.trim() : null;
     const recipe: Recipe = {

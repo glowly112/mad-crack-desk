@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Recipe } from "./stamp.ts";
-import { officeBookCounts, officeBookRows, officeBookRecipes, officePaperTotals, officeProductionHeroValue } from "./office-display.ts";
+import { officeBookCounts, officeBookRows, officeBookRecipes, officePaperTotals, officeProductionHeroValue, filterOfficeRows } from "./office-display.ts";
 import { settledPaperDayU } from "./trades.ts";
 import { EMPTY } from "./desk.ts";
 import { STAMP } from "./stamp.ts";
@@ -219,26 +219,59 @@ test("KEEP with holdout shows later-race P&L as neutral", () => {
 });
 
 test("production P&L Empty while KEEP is 0", () => {
-  const solid = STAMP.recipes.find((r) => r.badge === "Solid");
-  assert.ok(solid);
-  const rows = officeBookRows({ recipes: [solid!], day: STAMP.day, n_keep: 0 });
+  const solid = ehole("H-ehole-gb-nearoff-win-83959Z", {
+    region: "GB",
+    status: "KEEP",
+    badge: "Solid",
+    freezePnl: 119.97,
+    why: "Certified keep",
+  });
+  const rows = officeBookRows({ recipes: [solid], day, n_keep: 0 });
   assert.equal(rows[0]?.state, "production");
+  assert.equal(rows[0]?.stateLabel, "Doing well");
   assert.equal(rows[0]?.productionPnl, "Empty");
 });
 
 test("production book shows production P&L when KEEP > 0", () => {
-  const solid = STAMP.recipes.find((r) => r.badge === "Solid");
-  assert.ok(solid);
-  const rows = officeBookRows({ recipes: [solid!], day: STAMP.day, n_keep: 3 });
+  const solid = ehole("H-ehole-gb-nearoff-win-83959Z", {
+    region: "GB",
+    status: "KEEP",
+    badge: "Solid",
+    freezePnl: 119.97,
+    why: "Certified keep",
+  });
+  const rows = officeBookRows({ recipes: [solid], day, n_keep: 3 });
   assert.ok(rows[0]?.productionPnlTone === "up" || rows[0]?.productionPnlTone === "down");
 });
 
 test("office counts strategies, KEEP, production; live Empty when fuse off", () => {
-  const rows = officeBookRows({ recipes: STAMP.recipes, day: STAMP.day });
+  const recipes = [
+    ehole("H-ehole-nz-morning-win-73508Z", { region: "NZ" }),
+    ehole("H-ehole-gb-nearoff-win-83959Z", {
+      region: "GB",
+      status: "KEEP",
+      badge: "Solid",
+      freezePnl: 50,
+    }),
+    {
+      id: "H-20260828T020000Z-gb-nearoff-win-one-pick",
+      title: "GB near-off WIN · one-pick",
+      region: "GB" as const,
+      status: "KEEP" as const,
+      badge: "Parked" as const,
+      chip: null,
+      n: 58,
+      roi: 0,
+      freezePnl: 44.02,
+      why: "Firm lab KEEP",
+      hunterName: "Geo",
+    },
+  ];
+  const rows = officeBookRows({ recipes, day: STAMP.day });
   const counts = officeBookCounts(rows, false, 1);
-  assert.ok(counts.strategies > 0);
-  assert.ok(counts.keep > 0);
-  assert.equal(counts.production, rows.filter((r) => r.state === "production").length);
+  assert.equal(counts.strategies, 1);
+  assert.equal(counts.keep, 1);
+  assert.equal(counts.production, 1);
   assert.equal(counts.live, "Empty");
 });
 
@@ -303,21 +336,59 @@ test("office strategy is plain hole without Geo Card Steam twin tags", () => {
   const geo = ehole("H-ehole-au-latepre-place-82406Z", { region: "AU", hunterName: "Geo" });
   const card = ehole("H-ehole-au-latepre-place-35151Z", { region: "AU", hunterName: "Card" });
   const rows = officeBookRows({ recipes: [geo, card], day });
-  assert.equal(rows.length, 1);
+  assert.equal(rows.length, 2);
   assert.match(rows[0]!.strategy, /Australia · late-pre · place/);
   assert.ok(!/Geo|Card|Steam/i.test(rows[0]!.strategy));
-  assert.equal(rows[0]!.strategySub, "ehole · 35151Z");
 });
 
-test("twins collapse to one measuring row per hole", () => {
+test("twins stay as separate measuring rows — no hole rollup", () => {
   const recipes = [
     ehole("H-ehole-nz-latepre-place-35151Z", { region: "NZ" }),
     ehole("H-ehole-nz-latepre-place-00206Z", { region: "NZ" }),
   ];
+  assert.equal(officeBookRecipes(recipes).length, 2);
+  const rows = officeBookRows({ recipes, day });
+  assert.equal(rows.length, 2);
+});
+
+test("in-play ehole first books appear on Strategies board", () => {
+  const recipes = [ehole("H-ehole-fr-inplay-win-73339Z", { region: "FR" })];
   assert.equal(officeBookRecipes(recipes).length, 1);
 });
 
-test("in-play spray-class first books stay off Office", () => {
-  const recipes = [ehole("H-ehole-fr-inplay-win-73339Z", { region: "FR" })];
-  assert.equal(officeBookRecipes(recipes).length, 0);
+test("killed post-epoch ehole shows on Strategies board", () => {
+  const killed = ehole("H-ehole-gb-morning-win-11111Z", {
+    region: "GB",
+    status: "KILL",
+    badge: "Dead",
+    why: "holdout below floor",
+  });
+  const rows = officeBookRows({ recipes: [killed], day });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0]?.stateLabel, "Killed");
+});
+
+test("filter tabs slice measuring, KEEP, and killed", () => {
+  const recipes = [
+    ehole("H-ehole-nz-morning-win-73508Z", { region: "NZ" }),
+    ehole("H-ehole-gb-morning-win-83959Z", { region: "GB", status: "KILL", badge: "Dead" }),
+    {
+      id: "H-20260828T020000Z-gb-nearoff-win-one-pick",
+      title: "GB near-off WIN · one-pick",
+      region: "GB" as const,
+      status: "KEEP" as const,
+      badge: "Parked" as const,
+      chip: null,
+      n: 58,
+      roi: 0,
+      freezePnl: 44.02,
+      why: "Firm lab KEEP",
+      hunterName: "Geo",
+    },
+  ];
+  const rows = officeBookRows({ recipes, day, n_keep: 3 });
+  assert.equal(filterOfficeRows(rows, "all").length, 3);
+  assert.equal(filterOfficeRows(rows, "measuring").length, 1);
+  assert.equal(filterOfficeRows(rows, "keep").length, 1);
+  assert.equal(filterOfficeRows(rows, "killed").length, 1);
 });

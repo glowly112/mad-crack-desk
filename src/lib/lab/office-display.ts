@@ -8,12 +8,7 @@ import {
   type SquareWindow,
 } from "./boards.ts";
 import { EMPTY, deskMarketFromParts, deskStampedSide, eholeRunSuffix, strategyMark } from "./desk.ts";
-import {
-  isSprayClassInPlayEholeFirstBook,
-  recipeDisplayHoleKey,
-  eholeChipRunOrder,
-} from "./mill-display.ts";
-import { isPostEpochEholeRecipe } from "./board-reset.ts";
+import { isPostEpochEholeRecipe, recipeIsPostEpoch } from "./board-reset.ts";
 import type { Fill, SettledTradeCounts } from "./trades.ts";
 import {
   fmtSettledWlN,
@@ -28,6 +23,8 @@ export type OfficeBookState = "measuring" | "KEEP" | "production" | "killed";
 
 export type OfficePnlTone = "empty" | "neutral" | "up" | "down";
 
+export type OfficeFilter = "all" | "measuring" | "keep" | "killed";
+
 export type OfficeBookRow = {
   id: string;
   hole: string;
@@ -36,10 +33,13 @@ export type OfficeBookRow = {
   side: string;
   market: string;
   state: OfficeBookState;
+  stateLabel: string;
   paperPnl: string;
   paperPnlTone: OfficePnlTone;
   paperCounts: string;
   paperTodayCounts: string;
+  wlN: string;
+  spices?: string;
   productionPnl: string;
   productionPnlTone: OfficePnlTone;
   productionCounts: string;
@@ -66,13 +66,10 @@ export type OfficeBookInput = {
   productionCounts?: ReadonlyMap<string, SettledTradeCounts | null>;
 };
 
-/** Recipe id → Office row id — twin skins on one hole roll to the first-book row. */
+/** Recipe id → Office row id — one row per armed skin; no hole rollup. */
 function officeRowByRecipeId(recipes: readonly Recipe[]): Map<string, string> {
-  const rows = officeBookRecipes(recipes);
   const out = new Map<string, string>();
-  for (const row of rows) {
-    for (const id of officeHoleRecipeIds(row, recipes)) out.set(id, row.id);
-  }
+  for (const r of officeBookRecipes(recipes)) out.set(r.id, r.id);
   return out;
 }
 
@@ -84,6 +81,26 @@ function officeBookState(recipe: Recipe): OfficeBookState | null {
     return "measuring";
   }
   return null;
+}
+
+/** Plain English state for the Strategies / Lab board. */
+export function officeStateLabel(recipe: Recipe, state: OfficeBookState): string {
+  if (state === "killed") return recipe.badge === "Dead" ? "Killed" : "Killed";
+  if (state === "production") return "Doing well";
+  if (state === "KEEP") return "KEEP";
+  if (recipe.status === "HUNTING") return "Hunting";
+  return "Measuring";
+}
+
+export function filterOfficeRows(rows: readonly OfficeBookRow[], filter: OfficeFilter): OfficeBookRow[] {
+  if (filter === "all") return [...rows];
+  if (filter === "measuring") {
+    return rows.filter((r) => r.state === "measuring");
+  }
+  if (filter === "keep") {
+    return rows.filter((r) => r.state === "KEEP" || r.state === "production");
+  }
+  return rows.filter((r) => r.state === "killed");
 }
 
 export function officeHoleLabel(recipe: Recipe): string {
@@ -111,39 +128,25 @@ export function officeStrategySub(recipe: Recipe): string | undefined {
   return `ehole · ${run}`;
 }
 
-/** All recipe ids whose paper settles onto this Office row (one first-book skin per hole). */
-export function officeHoleRecipeIds(recipe: Recipe, recipes: readonly Recipe[]): Set<string> {
-  const ids = new Set<string>([recipe.id]);
-  if (!isPostEpochEholeRecipe(recipe)) return ids;
-  const holeKey = recipeDisplayHoleKey(recipe);
-  if (!holeKey) return ids;
-  for (const r of recipes) {
-    if (!isPostEpochEholeRecipe(r)) continue;
-    if (recipeDisplayHoleKey(r) === holeKey) ids.add(r.id);
+/** Muted hunter / course line when the skin is on tape today. */
+function officeSpices(recipe: Recipe, onTape: boolean): string | undefined {
+  if (!onTape) return undefined;
+  const parts: string[] = [];
+  if (recipe.hunterName?.trim()) parts.push(recipe.hunterName.trim());
+  if (recipe.chip === "On tape today" && recipe.why && !/^Still proving/i.test(recipe.why)) {
+    parts.push(recipe.why);
   }
-  return ids;
+  return parts.length ? parts.join(" · ") : undefined;
 }
 
-/** One measuring row per hole — earliest ehole skin; densify twins stay off the grid. */
-function collapseOfficeHoleSkins(recipes: readonly Recipe[]): Recipe[] {
-  const groups = new Map<string, Recipe[]>();
-  for (const r of recipes) {
-    if (!isPostEpochEholeRecipe(r)) continue;
-    const holeKey = recipeDisplayHoleKey(r);
-    if (!holeKey) continue;
-    const list = groups.get(holeKey) ?? [];
-    list.push(r);
-    groups.set(holeKey, list);
-  }
-  const drop = new Set<string>();
-  for (const group of groups.values()) {
-    if (group.length <= 1) continue;
-    const sorted = [...group].sort((a, b) =>
-      eholeChipRunOrder(a.id).localeCompare(eholeChipRunOrder(b.id)),
-    );
-    for (const r of sorted.slice(1)) drop.add(r.id);
-  }
-  return recipes.filter((r) => !drop.has(r.id));
+function fmtWlN(counts: SettledTradeCounts | null): string {
+  if (!counts) return EMPTY;
+  return fmtSettledWlN(counts);
+}
+
+/** All recipe ids whose paper settles onto this Office row — per skin, no hole rollup. */
+export function officeHoleRecipeIds(recipe: Recipe, _recipes?: readonly Recipe[]): Set<string> {
+  return new Set<string>([recipe.id]);
 }
 
 function officeSide(recipe: Recipe): string {
@@ -330,23 +333,16 @@ function officePnlCells(
   };
 }
 
-/** Recipes that belong on Office — one row per first-book skin, not every ticket. */
+/** Every armed skin on the stamp — one row each, no hole rollup. */
 export function officeBookRecipes(recipes: readonly Recipe[]): Recipe[] {
-  const measuringPool = recipes.filter((r) => r.status === "MEASURING" || r.status === "HUNTING");
-  const measuringDisplay = collapseOfficeHoleSkins(
-    measuringPool.filter((r) => !isSprayClassInPlayEholeFirstBook(r)),
-  );
-  const measuringIds = new Set(measuringDisplay.map((r) => r.id));
   const out: Recipe[] = [];
   const seen = new Set<string>();
 
   for (const r of recipes) {
+    if (/^H-hyde-/i.test(r.id) || /^H-fast-/i.test(r.id)) continue;
     const state = officeBookState(r);
     if (!state) continue;
-    if (state === "measuring") {
-      if (isSprayClassInPlayEholeFirstBook(r)) continue;
-      if (!measuringIds.has(r.id)) continue;
-    }
+    if (state === "measuring" && !isPostEpochEholeRecipe(r) && !recipeIsPostEpoch(r)) continue;
     if (seen.has(r.id)) continue;
     seen.add(r.id);
     out.push(r);
@@ -359,7 +355,8 @@ export function officeBookRecipes(recipes: readonly Recipe[]): Recipe[] {
     const order: Record<OfficeBookState, number> = { production: 0, KEEP: 1, measuring: 2, killed: 3 };
     const sa = officeBookState(a)!;
     const sb = officeBookState(b)!;
-    return order[sa] - order[sb];
+    if (order[sa] !== order[sb]) return order[sa] - order[sb];
+    return a.id.localeCompare(b.id);
   });
 }
 
@@ -387,6 +384,8 @@ export function officeBookRows(input: OfficeBookInput): OfficeBookRow[] {
   return officeBookRecipes(recipes).map((recipe) => {
     const state = officeBookState(recipe)!;
     const pnl = officePnlCells(recipe, state, withRollups);
+    const cumulative = paperCounts.get(recipe.id) ?? null;
+    const onTape = recipe.chip === "On tape today" || Boolean(todayCounts.get(recipe.id));
     return {
       id: recipe.id,
       hole: officeHoleLabel(recipe),
@@ -395,7 +394,10 @@ export function officeBookRows(input: OfficeBookInput): OfficeBookRow[] {
       side: officeSide(recipe),
       market: officeMarket(recipe),
       state,
+      stateLabel: officeStateLabel(recipe, state),
       ...pnl,
+      wlN: fmtWlN(cumulative),
+      spices: officeSpices(recipe, onTape),
       holdingId: recipe.id,
     };
   });
