@@ -1,0 +1,24 @@
+{
+  "repository": "glowly112/works",
+  "commit": "f7ae0aad97125cdbcead62268f37f284ceb95bc9",
+  "files": {
+    ".agents/skills/aso-hammer/SKILL.md": "cb1c999f653b9737a1f45ab740dac126c2bdaa7ba8dc1e197fd8a958cc1d2b91",
+    ".agents/skills/brief-to-references/SKILL.md": "d5d15657e7c2ba9ae2d4c9251f0c216edd7fc13a824b9ba57471d669c74984dd",
+    ".agents/skills/grok-bot-efficiency/SKILL.md": "a70e4d10c3ef60e66d868cba8eda7787bdbb0660045a47497c74050e34dc8a89",
+    ".agents/skills/hammer/SKILL.md": "43c27fba0f4401f9d9d6ab4f0307b0cc6f68eea2a4dd17b394031cc7c789772d",
+    ".agents/skills/ios-26/SKILL.md": "77416001c1813845b2a75139995c4ffe7768321285c3c18924514d0559774b30",
+    ".agents/skills/ios-swift-ref/SKILL.md": "1f2f6babf79d4d1b5392ae87ab720c5d6404904ec0b905e4f892c8dfede10acd",
+    ".agents/skills/just-works/SKILL.md": "24c37af3c70f58639ae8ceb002b9595195853cf7fa3ac1a57327f36a0ea378cd",
+    ".agents/skills/offset-repo-to-cursor/SKILL.md": "1cf2f30ea1cc25c1cfe143b7dc1978176153bd3f36cc6fe8caa171bf3f9587b9",
+    ".agents/skills/one-ui-factory/SKILL.md": "e2e6c71a4e8481ed3ea4ae8b4edd1b21e94adc09c140f06716c53ecb10e116ab",
+    ".agents/skills/prototype-to-testflight/SKILL.md": "6d69882449bdd65790d918576090323078ba95645968f0e32fe06d9c5f0572ca",
+    ".agents/skills/ship-motion/SKILL.md": "5b5bd52ddc31725482c59d849f6abc1744ae759058d586f2415db4c258e604ec",
+    ".agents/skills/sim-confirm/SKILL.md": "973bb5ab7fdf8a3c37f450a85c26a91e68e025ff4fd1e7b62d6e46c7719b42e4",
+    ".agents/skills/skill-sync/SKILL.md": "b86d9e211f383eab5b04c367ea508a403951941ab0f6f71430631801e140fc9e",
+    ".agents/skills/store-list/SKILL.md": "4db8fe70a96a86926fcf47161e9e415d9bddb4ceac9d169f850c1d11cc7a3681",
+    ".agents/skills/tdd-one/SKILL.md": "fa3a5315c36c2a1854c7abf541ce0572be0f351f3a9db4af65aebf50dc10da51",
+    ".agents/skills/ui-thrift/SKILL.md": "e14c3d56d351670deefe07d8e8e21d8e7b9d890964d7287ff9fb9310d5e50993",
+    ".agents/skills/unlazy/SKILL.md": "01bb0fdef7c3152ae486e5da001680dd219f7ef0b08c2bed4572b5ea0b9db32f",
+    ".agents/skills/verify-done/SKILL.md": "85216aef819eb279d9a621eb3a3554717558c396d4979dd424d5fb9f440ba781"
+  }
+}
