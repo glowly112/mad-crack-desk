@@ -80,6 +80,7 @@ export const BOOK_SPICE_KEYS = [
   "window",
   "market_type",
   "race_id",
+  "invent_scale",
 ] as const;
 
 export const BOOK_CORE_FILL_KEYS = [
@@ -143,6 +144,8 @@ export type Fill = {
   horse: string | null;
   /** Plant book race context — present when ingested from book.jsonl. */
   spice?: FillSpice;
+  /** Plant invent scale on this fill — wide | mid | nugget when stamped on book. */
+  inventScale?: import("./stamp.ts").InventScale | null;
 };
 
 function rec(v: unknown): Record<string, unknown> | null {
@@ -253,6 +256,14 @@ function intOrNull(v: unknown): number | null {
   return n == null ? null : Math.trunc(n);
 }
 
+function inventScaleOfRow(row: Record<string, unknown>): import("./stamp.ts").InventScale | null {
+  const raw = row.invent_scale ?? row.inventScale;
+  if (typeof raw !== "string") return null;
+  const s = raw.trim().toLowerCase();
+  if (s === "wide" || s === "mid" || s === "nugget") return s;
+  return null;
+}
+
 /** Pull plant book spices from a raw row — never invents; all-null when absent. */
 export function spiceFromRow(row: Record<string, unknown>): FillSpice {
   return {
@@ -324,6 +335,7 @@ export function fillFromRow(raw: unknown): Fill | null {
     pnl,
     horse: horseOf(row),
     spice: spiceFromRow(row),
+    inventScale: inventScaleOfRow(row),
   };
 }
 

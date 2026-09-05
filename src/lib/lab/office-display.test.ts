@@ -395,8 +395,22 @@ test("officeSliceStrategyType classifies odds-only tape as mid", () => {
   assert.equal(officeSliceStrategyType({ oddsBand: "2.5–4.49" }), "mid");
   assert.equal(
     officeSliceStrategyType({ oddsBand: "2.5–4.49", course: "Ascot" }),
+    "mid",
+  );
+});
+
+test("officeSliceStrategyType prefers plant invent_scale on fills", () => {
+  assert.equal(officeSliceStrategyType({ inventScale: "mid", course: "Ascot" }), "mid");
+  assert.equal(
+    officeSliceStrategyType({ inventScale: "nugget", oddsBand: "2.5–4.49" }),
     "nugget",
   );
+});
+
+test("officeSliceStrategyType marks rare minorities as nugget", () => {
+  assert.equal(officeSliceStrategyType({ going: "Soft", oddsBand: "2.5–4.49" }), "nugget");
+  assert.equal(officeSliceStrategyType({ fieldSize: 6, course: "Ascot" }), "nugget");
+  assert.equal(officeSliceStrategyType({ raceType: "Hurdle", course: "Cheltenham" }), "nugget");
 });
 
 test("filter tabs slice measuring, KEEP, and killed", () => {

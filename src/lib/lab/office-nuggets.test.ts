@@ -130,7 +130,34 @@ test("nugget rows include rare slices with n=1", () => {
   assert.equal(rare?.laterRacePnl, "Empty");
 });
 
-test("many spice combinations yield far more nugget rows than hole-only wide skins", () => {
+test("tape row prefers plant invent_scale on fill when present", () => {
+  const trades = [
+    fill({
+      id: "tagged-mid",
+      recipeId: "H-mid-fr-morning-place-odds_band_low_mid-22706Z",
+      odds: 3,
+      inventScale: "mid",
+      spice: {
+        course: "Ascot",
+        race_type: "Handicap",
+        going: "Soft",
+        surface: null,
+        distance_m: null,
+        field_size: 6,
+        card_join: null,
+        country: null,
+        window: null,
+        market_type: null,
+        race_id: null,
+      },
+    }),
+  ];
+  const rows = officeNuggetRows({ recipes: [], day: "2026-09-03", trades });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0]?.strategyType, "mid");
+});
+
+test("many spice combinations yield far more tape slice rows than hole-only wide skins", () => {
   const regions = ["GB", "NZ", "AU", "US", "ZA", "FR"];
   const windows = ["morning", "nearoff", "latepre"];
   const courses = ["Ascot", "York", "Newmarket", "Epsom", "Sandown", "Cheltenham"];
@@ -143,11 +170,15 @@ test("many spice combinations yield far more nugget rows than hole-only wide ski
       for (const course of courses) {
         for (const raceType of raceTypes) {
           for (const odds of oddsList) {
+            const minute = 10 + Math.floor(i / 60);
+            const second = i % 60;
             trades.push(
               fill({
                 id: `n-${i++}`,
                 recipeId: `H-ehole-${region.toLowerCase()}-${window}-win-73508Z`,
                 odds,
+                ts: `2026-09-03T${String(minute).padStart(2, "0")}:${String(second).padStart(2, "0")}:00Z`,
+                t: `${String(minute).padStart(2, "0")}:${String(second).padStart(2, "0")}`,
                 pnl: i % 3 === 0 ? 1.2 : -1,
                 result: i % 3 === 0 ? "won" : "lost",
                 spice: {
@@ -171,9 +202,11 @@ test("many spice combinations yield far more nugget rows than hole-only wide ski
     }
   }
   const groups = officeNuggetGroups({ recipes: [], day: "2026-09-03", trades });
-  assert.ok(groups.length > 42, `expected >42 nuggets, got ${groups.length}`);
+  assert.ok(groups.length > 42, `expected >42 tape slices, got ${groups.length}`);
   const rows = officeNuggetRows({ recipes: [], day: "2026-09-03", trades });
   assert.ok(rows.length > 42);
+  const counts = officeStrategyTypeCounts(rows);
+  assert.ok(counts.mid > 0, "common spice axes should produce mid rows");
   assert.equal(filterOfficeRows(rows, "measuring").length, rows.length);
   assert.equal(filterOfficeRows(rows, "keep").length, 0);
 });

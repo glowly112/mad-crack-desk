@@ -35,13 +35,26 @@ export function cellIsPostEpochEhole(cell: { id?: unknown; title?: unknown }): b
   const id = String(cell.id ?? "");
   const title = String(cell.title ?? "");
   if (/^H-hyde-/i.test(id) || /^H-fast-/i.test(id)) return false;
-  return /^H-ehole-/i.test(id) || /^ehole_/i.test(title) || /^ehole_/i.test(id);
+  return (
+    /^H-ehole-/i.test(id) ||
+    /^H-mid-/i.test(id) ||
+    /^H-nugget-/i.test(id) ||
+    /^ehole_/i.test(title) ||
+    /^ehole_/i.test(id)
+  );
+}
+
+/** Post-epoch invent inner slice — mid/nugget measure books armed inside occupied holes. */
+export function isPostEpochInventInnerRecipe(recipe: Pick<Recipe, "id" | "title">): boolean {
+  if (/^H-hyde-/i.test(recipe.id) || /^H-fast-/i.test(recipe.id)) return false;
+  return /^H-mid-/i.test(recipe.id) || /^H-nugget-/i.test(recipe.id);
 }
 
 /** Recipe armed on the board after reset — run stamp in id, ehole invent, or live poll. */
 export function recipeIsPostEpoch(recipe: Recipe): boolean {
   if (/^H-hyde-/i.test(recipe.id) || /^H-fast-/i.test(recipe.id)) return false;
   if (/^H-ehole-/i.test(recipe.id) || /^ehole_/i.test(recipe.title)) return true;
+  if (isPostEpochInventInnerRecipe(recipe)) return true;
   const fromId = compactEpoch(recipe.id);
   if (fromId) return isPostEpochCompact(fromId);
   if (/H-20260902T/i.test(recipe.id)) return true;
@@ -57,6 +70,7 @@ export function hasPostEpochEholeRecipes(recipes: readonly Recipe[]): boolean {
 /** Post-epoch invent ehole — never legacy H-fast KEEP or Hyde cousins. */
 export function isPostEpochEholeRecipe(recipe: Pick<Recipe, "id" | "title">): boolean {
   if (/^H-hyde-/i.test(recipe.id) || /^H-fast-/i.test(recipe.id)) return false;
+  if (isPostEpochInventInnerRecipe(recipe)) return true;
   if (!/^H-ehole-/i.test(recipe.id) && !/^ehole_/i.test(recipe.title)) return false;
   return recipeIsPostEpoch(recipe as Recipe);
 }

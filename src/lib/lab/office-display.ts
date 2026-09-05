@@ -23,7 +23,7 @@ import {
   fillsOnDay,
   settledTradeCountsFromFills,
 } from "./trades.ts";
-import type { Recipe } from "./stamp.ts";
+import type { InventScale, Recipe } from "./stamp.ts";
 
 export type OfficeBookState = "measuring" | "KEEP" | "production" | "killed";
 
@@ -159,22 +159,49 @@ export function officeStrategyTypeCounts(
   return { wide, mid, nugget };
 }
 
+/** Normalise plant invent_scale — wide | mid | nugget. */
+export function parseInventScale(raw: unknown): InventScale | null {
+  if (typeof raw !== "string") return null;
+  const s = raw.trim().toLowerCase();
+  if (s === "wide" || s === "mid" || s === "nugget") return s;
+  return null;
+}
+
 /** Armed skin type from plant invent_scale — defaults to wide. */
 export function officeArmedStrategyType(recipe: Recipe): OfficeStrategyType {
-  const scale = recipe.inventScale;
+  const scale = parseInventScale(recipe.inventScale);
   if (scale === "mid" || scale === "nugget") return scale;
   return "wide";
 }
 
-/** Tape spice slice — mid when only odds band; nugget when course / card / going axes exist. */
+/** Tape spice slice — prefer plant invent_scale; else mirror filter_synth mid/nugget law. */
 export function officeSliceStrategyType(slice: {
   oddsBand?: string;
   course?: string;
   raceType?: string;
   going?: string;
+  surface?: string | null;
+  fieldSize?: number | null;
+  inventScale?: InventScale | null;
 }): OfficeStrategyType {
-  if (slice.course?.trim() || slice.raceType?.trim() || slice.going?.trim()) return "nugget";
+  const tagged = parseInventScale(slice.inventScale);
+  if (tagged === "mid" || tagged === "nugget") return tagged;
+
+  const going = slice.going?.trim().toLowerCase() ?? "";
+  const raceType = slice.raceType?.trim().toLowerCase() ?? "";
+  const surface = slice.surface?.trim().toLowerCase() ?? "";
+  const fieldSize = slice.fieldSize;
+
+  // Nugget — rarer minority slices (plant _INVENT_SCALE_NUGGET_NAMES + going soft/heavy).
+  if (/soft|heavy|yield/.test(going)) return "nugget";
+  if (fieldSize != null && fieldSize <= 7) return "nugget";
+  if (/all.?weather|^aw$/.test(surface)) return "nugget";
+  if (/jump|hurdle|chase|steeple|\bnh\b/.test(raceType)) return "nugget";
+
+  // Mid — odds band and/or common card axes (dominant going/field).
   if (slice.oddsBand) return "mid";
+  if (slice.course?.trim() || raceType || going) return "mid";
+
   return "nugget";
 }
 
