@@ -21,11 +21,12 @@ import {
   officeCompactHoleFromKey,
   officePaperScale,
   officeSliceStrategyType,
-  officeWlNColumn,
+  officeTodayColumns,
+  officeTodayUColumn,
+  officeWlColumns,
 } from "./office-display.ts";
 import type { Fill } from "./trades.ts";
 import {
-  fmtSettledWlN,
   officeCumulativeTapeFills,
   settledTradeCountsFromFills,
 } from "./trades.ts";
@@ -180,12 +181,9 @@ export function officeNuggetRows(input: OfficeBookInput, minN = 1): OfficeBookRo
     const strategyType = officeSliceStrategyType(slice);
     const todayFills = group.fills.filter((f) => f.day === day);
     const todayCounts = todayFills.length ? settledTradeCountsFromFills(todayFills) : null;
-    const todayU = todayFills.length ? todayFills.reduce((acc, f) => acc + (f.pnl ?? 0), 0) : null;
-    const todayLine = todayCounts ? `today ${fmtSettledWlN(todayCounts)}` : EMPTY;
-    const todayPnl =
-      todayU != null && todayCounts != null ? fmtPnlU(todayU) : EMPTY;
-    const todayPnlTone: OfficePnlTone =
-      todayU != null ? scoreTone(todayU) : todayCounts ? "neutral" : "empty";
+    const todayTotal = todayFills.length ? todayFills.reduce((acc, f) => acc + (f.pnl ?? 0), 0) : null;
+    const todayTotals = new Map<string, number>();
+    if (todayTotal != null) todayTotals.set(group.id, todayTotal);
     return {
       id: group.id,
       strategyType,
@@ -202,12 +200,9 @@ export function officeNuggetRows(input: OfficeBookInput, minN = 1): OfficeBookRo
       paperPnl: hasPnl ? fmtPnlU(group.u) : EMPTY,
       paperPnlTone: hasPnl ? scoreTone(group.u) : "empty",
       paperCounts: counts ? "since first seen" : EMPTY,
-      paperTodayCounts: todayLine,
-      todayWlN: todayCounts ? fmtSettledWlN(todayCounts) : EMPTY,
-      todayPnl,
-      todayPnlTone,
       ...scale,
-      wlN: officeWlNColumn(scale.paperN, counts),
+      ...officeWlColumns(counts),
+      ...officeTodayColumns(todayCounts, officeTodayUColumn(todayTotals, group.id)),
       spices: undefined,
       productionPnl: EMPTY,
       productionPnlTone: "empty",

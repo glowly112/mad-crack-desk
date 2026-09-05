@@ -38,13 +38,32 @@ const HEADERS = [
   { key: "course", label: "Course", align: "left" },
   { key: "card", label: "Card", align: "left" },
   { key: "state", label: "State", align: "left" },
-  { key: "n", label: "n / W–L", align: "right" },
-  { key: "today", label: "Today", align: "right" },
+  { key: "w", label: "W", align: "right" },
+  { key: "l", label: "L", align: "right" },
+  { key: "n", label: "n", align: "right" },
+  { key: "todayW", label: "Td W", align: "right" },
+  { key: "todayL", label: "Td L", align: "right" },
+  { key: "todayU", label: "Td u", align: "right" },
   { key: "pnl", label: "Paper P&L", align: "right" },
   { key: "unit", label: "u/n", align: "right" },
   { key: "prod", label: "Prd", align: "right" },
   { key: "later", label: "Later", align: "right" },
 ] as const;
+
+function countCell(value: string) {
+  return (
+    <td className={pnlClass("empty")}>
+      {cellText(value, "text-right font-mono tabular-nums text-subtle")}
+    </td>
+  );
+}
+
+function todayUClass(value: string): OfficePnlTone {
+  if (value === EMPTY) return "empty";
+  if (value.startsWith("+")) return "up";
+  if (value.startsWith("−")) return "down";
+  return "neutral";
+}
 
 function officeInput(stamp: ReturnType<typeof useStamp>) {
   const trend = stamp.trends.find((t) => t.day === stamp.day);
@@ -165,19 +184,15 @@ const OfficeStrategyTableRow = memo(function OfficeStrategyTableRow({ row }: { r
       <td className="max-w-[5rem] px-1.5 py-2">{cellText(row.courseSlice, "text-subtle")}</td>
       <td className="max-w-[4.5rem] px-1.5 py-2">{cellText(row.cardSlice, "text-muted")}</td>
       <td className="px-1.5 py-2 text-[10px] text-muted">{row.stateLabel}</td>
-      <td className={pnlClass("empty")}>{cellText(row.wlN, "text-right font-mono tabular-nums text-subtle")}</td>
-      <td className={pnlClass(row.todayPnlTone, row.todayWlN === EMPTY && row.todayPnl === EMPTY)}>
-        {row.todayWlN !== EMPTY ? (
-          <div className="text-[10px] text-subtle">{row.todayWlN}</div>
-        ) : null}
-        {row.todayPnl !== EMPTY ? <div>{row.todayPnl}</div> : null}
+      {countCell(row.cumW)}
+      {countCell(row.cumL)}
+      {countCell(row.cumN)}
+      {countCell(row.todayW)}
+      {countCell(row.todayL)}
+      <td className={pnlClass(todayUClass(row.todayU))}>
+        {cellText(row.todayU, "text-right font-mono tabular-nums")}
       </td>
-      <td className={pnlClass(row.paperPnlTone)}>
-        <div>{row.paperPnl}</div>
-        {row.paperCounts && row.paperCounts !== EMPTY ? (
-          <div className="mt-0.5 truncate text-[9px] text-muted">{row.paperCounts}</div>
-        ) : null}
-      </td>
+      <td className={pnlClass(row.paperPnlTone)}>{row.paperPnl}</td>
       <td className={pnlClass(row.paperUnitTone)}>{row.paperUnit}</td>
       <td className={pnlClass(row.productionPnlTone, row.productionPnl === EMPTY)}>
         {row.productionPnl}
@@ -248,20 +263,24 @@ export function OfficeBooksTable() {
         <EmptyState copy={EMPTY} />
       ) : (
         <DeskScroll axis="y" className="min-w-0 max-h-[min(70vh,42rem)]">
-          <table className="w-full min-w-[48rem] table-fixed border-collapse text-left">
+          <table className="w-full min-w-[52rem] table-fixed border-collapse text-left">
             <colgroup>
               <col className="w-11" />
-              <col className="w-[7.5rem]" />
-              <col className="w-12" />
-              <col className="w-16" />
-              <col className="w-14" />
-              <col className="w-16" />
-              <col className="w-14" />
-              <col className="w-12" />
-              <col className="w-14" />
-              <col className="w-12" />
+              <col className="w-[7rem]" />
               <col className="w-11" />
-              <col className="w-11" />
+              <col className="w-14" />
+              <col className="w-12" />
+              <col className="w-14" />
+              <col className="w-7" />
+              <col className="w-7" />
+              <col className="w-7" />
+              <col className="w-8" />
+              <col className="w-8" />
+              <col className="w-10" />
+              <col className="w-12" />
+              <col className="w-10" />
+              <col className="w-10" />
+              <col className="w-10" />
             </colgroup>
             <thead className="sticky top-0 z-[1] bg-bg">
               <tr className="border-b border-border">

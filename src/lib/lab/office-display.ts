@@ -56,17 +56,19 @@ export type OfficeBookRow = {
   paperPnl: string;
   paperPnlTone: OfficePnlTone;
   paperCounts: string;
-  paperTodayCounts: string;
-  /** Today's settled W–L · n — own column beside cumulative. */
-  todayWlN: string;
-  todayPnl: string;
-  todayPnlTone: OfficePnlTone;
   /** Settled paper volume — rare vs high-volume at a glance. */
   paperN: number | null;
   /** Average paper u per settled bet — u/n. */
   paperUnit: string;
   paperUnitTone: OfficePnlTone;
-  wlN: string;
+  /** Cumulative settled W / L / n since armed. */
+  cumW: string;
+  cumL: string;
+  cumN: string;
+  /** Today's settled W / L / u. */
+  todayW: string;
+  todayL: string;
+  todayU: string;
   spices?: string;
   productionPnl: string;
   productionPnlTone: OfficePnlTone;
@@ -199,13 +201,42 @@ export function officeCardSlice(raceType?: string | null, going?: string | null)
   return officeCardSliceImpl(raceType, going);
 }
 
-/** n · W–L for one compact volume column. */
-export function officeWlNColumn(
-  paperN: number | null,
+/** One numeric W, L, or n cell — Empty when no settled tape. */
+export function officeCountColumn(
   counts: SettledTradeCounts | null,
+  kind: "w" | "l" | "n",
 ): string {
-  if (paperN == null || !counts) return EMPTY;
-  return `${paperN} · ${counts.wins}–${counts.losses}`;
+  if (!counts) return EMPTY;
+  const n = counts.wins + counts.losses;
+  if (n === 0) return EMPTY;
+  if (kind === "w") return String(counts.wins);
+  if (kind === "l") return String(counts.losses);
+  return String(n);
+}
+
+/** Today's settled u for one Office row — Empty when nothing settled today. */
+export function officeTodayUColumn(todayTotals: ReadonlyMap<string, number>, rowId: string): string {
+  if (!todayTotals.has(rowId)) return EMPTY;
+  return fmtPnlU(todayTotals.get(rowId) ?? 0);
+}
+
+export function officeWlColumns(counts: SettledTradeCounts | null): Pick<OfficeBookRow, "cumW" | "cumL" | "cumN"> {
+  return {
+    cumW: officeCountColumn(counts, "w"),
+    cumL: officeCountColumn(counts, "l"),
+    cumN: officeCountColumn(counts, "n"),
+  };
+}
+
+export function officeTodayColumns(
+  todayCounts: SettledTradeCounts | null,
+  todayU: string,
+): Pick<OfficeBookRow, "todayW" | "todayL" | "todayU"> {
+  return {
+    todayW: officeCountColumn(todayCounts, "w"),
+    todayL: officeCountColumn(todayCounts, "l"),
+    todayU,
+  };
 }
 
 /** Plain strategy/hole — country · window · winner|place. No Geo/Card/Steam twin tags. */
@@ -304,29 +335,33 @@ function emptyPnl(): Pick<
   | "paperPnl"
   | "paperPnlTone"
   | "paperCounts"
-  | "paperTodayCounts"
-  | "todayWlN"
-  | "todayPnl"
-  | "todayPnlTone"
   | "productionPnl"
   | "productionPnlTone"
   | "productionCounts"
   | "laterRacePnl"
   | "laterRacePnlTone"
+  | "cumW"
+  | "cumL"
+  | "cumN"
+  | "todayW"
+  | "todayL"
+  | "todayU"
 > {
   return {
     paperPnl: EMPTY,
     paperPnlTone: "empty",
     paperCounts: EMPTY,
-    paperTodayCounts: EMPTY,
-    todayWlN: EMPTY,
-    todayPnl: EMPTY,
-    todayPnlTone: "empty",
     productionPnl: EMPTY,
     productionPnlTone: "empty",
     productionCounts: EMPTY,
     laterRacePnl: EMPTY,
     laterRacePnlTone: "empty",
+    cumW: EMPTY,
+    cumL: EMPTY,
+    cumN: EMPTY,
+    todayW: EMPTY,
+    todayL: EMPTY,
+    todayU: EMPTY,
   };
 }
 
@@ -345,39 +380,33 @@ function paperPnlCell(
   | "paperPnl"
   | "paperPnlTone"
   | "paperCounts"
-  | "paperTodayCounts"
-  | "todayWlN"
-  | "todayPnl"
-  | "todayPnlTone"
+  | "cumW"
+  | "cumL"
+  | "cumN"
+  | "todayW"
+  | "todayL"
+  | "todayU"
 > {
+  const cumulative = counts.get(recipe.id) ?? null;
+  const today = todayCounts.get(recipe.id) ?? null;
+  const wl = officeWlColumns(cumulative);
+  const todayCols = officeTodayColumns(today, officeTodayUColumn(todayTotals, recipe.id));
   const u = totals.get(recipe.id);
   if (u == null) {
     return {
       paperPnl: EMPTY,
       paperPnlTone: "empty",
       paperCounts: EMPTY,
-      paperTodayCounts: EMPTY,
-      todayWlN: EMPTY,
-      todayPnl: EMPTY,
-      todayPnlTone: "empty",
+      ...wl,
+      ...todayCols,
     };
   }
-  const cumulative = counts.get(recipe.id) ?? null;
-  const today = todayCounts.get(recipe.id) ?? null;
-  const todayU = todayTotals.get(recipe.id);
-  const todayLine = today ? `today ${fmtSettledWlN(today)}` : EMPTY;
-  const todayPnl =
-    todayU != null && today != null ? fmtPnlU(todayU) : today ? EMPTY : EMPTY;
-  const todayPnlTone: OfficePnlTone =
-    todayU != null ? scoreTone(todayU) : today ? "neutral" : "empty";
   return {
     paperPnl: fmtPnlU(u),
     paperPnlTone: scoreTone(u),
     paperCounts: cumulative ? "since armed" : EMPTY,
-    paperTodayCounts: todayLine,
-    todayWlN: today ? fmtSettledWlN(today) : EMPTY,
-    todayPnl,
-    todayPnlTone,
+    ...wl,
+    ...todayCols,
   };
 }
 
@@ -453,10 +482,12 @@ function officePnlCells(
   | "paperPnl"
   | "paperPnlTone"
   | "paperCounts"
-  | "paperTodayCounts"
-  | "todayWlN"
-  | "todayPnl"
-  | "todayPnlTone"
+  | "cumW"
+  | "cumL"
+  | "cumN"
+  | "todayW"
+  | "todayL"
+  | "todayU"
   | "productionPnl"
   | "productionPnlTone"
   | "productionCounts"
@@ -574,7 +605,6 @@ export function officeBookRows(input: OfficeBookInput): OfficeBookRow[] {
       stateLabel: officeStateLabel(recipe, state),
       ...pnl,
       ...scale,
-      wlN: officeWlNColumn(scale.paperN, cumulative),
       holdingId: recipe.id,
     };
   });

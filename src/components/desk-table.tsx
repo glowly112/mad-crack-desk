@@ -8,9 +8,10 @@ const RIGHT = new Set(["Odds", "Stake", "P&L"]);
 const MONO = new Set(["Time", "Odds", "Stake", "P&L"]);
 
 function cellText(value: string, className?: string) {
+  const shown = value && value !== EMPTY ? value : EMPTY;
   return (
-    <span className={cn("block truncate", value === EMPTY && "text-muted", className)}>
-      {value}
+    <span className={cn("block truncate whitespace-nowrap", shown === EMPTY && "text-muted", className)}>
+      {shown}
     </span>
   );
 }
@@ -104,7 +105,7 @@ function DataRow({ row }: { row: DeskRow }) {
     >
       <Cell k="Time" v={row.time} />
       <td className="max-w-[5.5rem] px-1.5 py-2 align-middle text-[11px]">
-        {cellText(row.horse, "text-fg")}
+        {cellText(row.horse)}
       </td>
       <td className="max-w-[6.5rem] px-1.5 py-2 align-middle text-[11px]" title={row.hole}>
         {cellText(row.hole)}
@@ -129,13 +130,13 @@ function Cell({ k, v }: { k: (typeof DESK_HEADERS)[number]; v: string }) {
   return (
     <td
       className={cn(
-        "px-1.5 py-2 align-middle text-[11px]",
+        "max-w-[4rem] px-1.5 py-2 align-middle text-[11px]",
         MONO.has(k) && "font-mono text-[10px] tabular-nums",
         RIGHT.has(k) && "text-right",
-        shown === EMPTY ? "text-muted" : "text-subtle",
+        shown === EMPTY ? "text-muted" : k === "Result" ? "text-fg" : "text-subtle",
       )}
     >
-      {shown}
+      <span className="block truncate whitespace-nowrap">{shown}</span>
     </td>
   );
 }
