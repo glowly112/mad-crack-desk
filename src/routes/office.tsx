@@ -15,7 +15,7 @@ export function Office() {
       <header>
         <h1 className="text-2xl">Office</h1>
         <p className="mt-1 text-sm text-muted">
-          Strategies / Lab — every armed skin, KEEP, and killed book. Paper P&L from settled tape.
+          Wide armed skins and Nuggets spice slices from settled tape. Paper P&L since armed or first seen.
         </p>
         <div className="mt-3">
           <OracleStampLine
