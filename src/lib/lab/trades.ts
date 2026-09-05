@@ -44,6 +44,76 @@ export type WaitOpen = {
   why: string | null;
 };
 
+/** Plant book.jsonl race context — optional; null when plant has not stamped yet. */
+export type FillSpice = {
+  course: string | null;
+  race_type: string | null;
+  going: string | null;
+  surface: string | null;
+  distance_m: number | null;
+  field_size: number | null;
+  card_join: string | null;
+  country: string | null;
+  window: string | null;
+  market_type: string | null;
+  race_id: string | null;
+};
+
+/** Keys carried from plant book.jsonl into desk ingest (plus core fill keys). */
+export const BOOK_SPICE_KEYS = [
+  "course",
+  "race_type",
+  "going",
+  "surface",
+  "distance_m",
+  "field_size",
+  "card_join",
+  "country",
+  "window",
+  "market_type",
+  "race_id",
+] as const;
+
+export const BOOK_CORE_FILL_KEYS = [
+  "pick_id",
+  "id",
+  "ts",
+  "settled_ts",
+  "cell_id",
+  "recipeId",
+  "mode",
+  "status",
+  "odds",
+  "stake_gbp",
+  "paper_stake_gbp",
+  "paper_pnl_gbp",
+  "pnl_gbp",
+  "pnl",
+  "placed_result",
+  "certified_keep",
+  "certified",
+  "gate_verdict",
+  "side",
+  "lab_status",
+  "date",
+  "unmatched",
+  "unmatched_size",
+  "atb_size_gbp",
+  "phase",
+  "in_play",
+  "off_ts",
+  "off_time",
+  "horse",
+  "runner",
+  "horse_name",
+  "runner_name",
+  "selection_name",
+  "sel_name",
+  "title",
+] as const;
+
+export const BOOK_INGEST_KEYS = [...BOOK_CORE_FILL_KEYS, ...BOOK_SPICE_KEYS] as const;
+
 export type Fill = {
   id: string;
   ts: string;
@@ -63,6 +133,8 @@ export type Fill = {
   pnl: number | null;
   /** Runner if the stamp names one. Empty is Empty — never invented. */
   horse: string | null;
+  /** Plant book race context — present when ingested from book.jsonl. */
+  spice?: FillSpice;
 };
 
 function rec(v: unknown): Record<string, unknown> | null {
@@ -162,6 +234,56 @@ function horseOf(row: Record<string, unknown>): string | null {
   return null;
 }
 
+function strOrNull(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const s = v.trim();
+  return s || null;
+}
+
+function intOrNull(v: unknown): number | null {
+  const n = num(v);
+  return n == null ? null : Math.trunc(n);
+}
+
+/** Pull plant book spices from a raw row — never invents; all-null when absent. */
+export function spiceFromRow(row: Record<string, unknown>): FillSpice {
+  return {
+    course: strOrNull(row.course),
+    race_type: strOrNull(row.race_type),
+    going: strOrNull(row.going),
+    surface: strOrNull(row.surface),
+    distance_m: intOrNull(row.distance_m),
+    field_size: intOrNull(row.field_size),
+    card_join: strOrNull(row.card_join),
+    country: strOrNull(row.country),
+    window: strOrNull(row.window),
+    market_type: strOrNull(row.market_type),
+    race_id: strOrNull(row.race_id),
+  };
+}
+
+/** Muted Trades subline — course excluded (shown on its own). */
+export function fillSpiceLine(spice: FillSpice): string | null {
+  const parts: string[] = [];
+  if (spice.race_type) parts.push(spice.race_type);
+  if (spice.going) parts.push(spice.going);
+  if (spice.surface) parts.push(spice.surface);
+  if (spice.distance_m != null) parts.push(`${spice.distance_m}m`);
+  if (spice.field_size != null) parts.push(`fld ${spice.field_size}`);
+  if (spice.window) parts.push(spice.window);
+  if (spice.country) parts.push(spice.country);
+  if (spice.market_type) parts.push(spice.market_type);
+  return parts.length ? parts.join(" · ") : null;
+}
+
+export function slimBookRow(row: Record<string, unknown>): Record<string, unknown> {
+  const slim: Record<string, unknown> = {};
+  for (const k of BOOK_INGEST_KEYS) {
+    if (row[k] !== undefined) slim[k] = row[k];
+  }
+  return slim;
+}
+
 export function fillFromRow(raw: unknown): Fill | null {
   const row = rec(raw);
   if (!row) return null;
@@ -193,6 +315,7 @@ export function fillFromRow(raw: unknown): Fill | null {
     liquidity: num(row.atb_size_gbp),
     pnl,
     horse: horseOf(row),
+    spice: spiceFromRow(row),
   };
 }
 
@@ -245,11 +368,15 @@ export function fillDeskRow(fill: Fill, fuseOn: boolean, recipes: readonly Recip
       ? eholeRunSuffix(fill.recipeId.split("|")[0] ?? fill.recipeId) ??
         (fill.recipeId.split("|")[0] ?? "").replace(/^H-ehole-/, "")
       : null;
+  const course = fill.spice?.course ?? null;
+  const spiceLine = fill.spice ? fillSpiceLine(fill.spice) : null;
   return {
     id: fill.id,
     time: pending(time),
     name: tradeName(fill, recipe),
     nameTag,
+    course,
+    spiceLine,
     market: market !== EMPTY ? market : isOpen ? WAITING : EMPTY,
     side: sideStr !== EMPTY ? sideStr : EMPTY,
     odds: pending(oddsStr === EMPTY ? "" : oddsStr),

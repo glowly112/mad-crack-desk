@@ -517,6 +517,10 @@ export type DeskRow = {
   pnl: number | null;
   /** Muted ehole run tag beside strategy name on Trades. */
   nameTag?: string | null;
+  /** Plant book course — under name on Trades when stamped. */
+  course?: string | null;
+  /** Muted plant book context (going, field size, etc.). */
+  spiceLine?: string | null;
   holdingId?: string;
   selected?: boolean;
   onPick?: () => void;

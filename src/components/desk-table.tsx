@@ -109,6 +109,8 @@ function DataRow({ row }: { row: DeskRow }) {
 
 function NameCell({ row }: { row: DeskRow }) {
   const shown = row.name && row.name !== EMPTY ? row.name : EMPTY;
+  const course = row.course && row.course !== EMPTY ? row.course : null;
+  const spice = row.spiceLine && row.spiceLine !== EMPTY ? row.spiceLine : null;
   return (
     <td className="px-2 py-2 align-middle text-sm break-words text-fg">
       {shown === EMPTY ? (
@@ -121,6 +123,8 @@ function NameCell({ row }: { row: DeskRow }) {
           ) : null}
         </span>
       )}
+      {course ? <p className="mt-0.5 text-xs text-muted">{course}</p> : null}
+      {spice ? <p className="mt-0.5 font-mono text-[10px] text-subtle">{spice}</p> : null}
     </td>
   );
 }

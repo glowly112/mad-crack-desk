@@ -5,6 +5,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { computeHollowOccupiedKeys } from "./hollow-occupancy.ts";
 import { mergeMillPathRuns } from "./mill-paths.ts";
+import { slimBookRow } from "./trades.ts";
 
 function rec(v: unknown): Record<string, unknown> | null {
   return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
@@ -61,38 +62,6 @@ async function readJsonOptional(path: string): Promise<Record<string, unknown> |
   }
 }
 
-const FILL_KEYS = [
-  "pick_id",
-  "ts",
-  "settled_ts",
-  "cell_id",
-  "mode",
-  "status",
-  "odds",
-  "stake_gbp",
-  "paper_stake_gbp",
-  "paper_pnl_gbp",
-  "placed_result",
-  "certified_keep",
-  "gate_verdict",
-  "side",
-  "lab_status",
-  "date",
-  "unmatched",
-  "unmatched_size",
-  "atb_size_gbp",
-  "phase",
-  "in_play",
-  "off_ts",
-  "off_time",
-  "horse",
-  "runner",
-  "horse_name",
-  "runner_name",
-  "selection_name",
-  "sel_name",
-] as const;
-
 function recentFillDays(endDay: string, window = 14): Set<string> {
   const out = new Set<string>();
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(endDay);
@@ -139,8 +108,7 @@ async function readBookDayRows(
         const row = JSON.parse(line) as Record<string, unknown>;
         const dte = row.date;
         if (typeof dte !== "string" || !want.has(dte)) continue;
-        const slim: Record<string, unknown> = {};
-        for (const k of FILL_KEYS) slim[k] = row[k];
+        const slim = slimBookRow(row);
         const bucket = byDay.get(dte) ?? [];
         bucket.push(slim);
         byDay.set(dte, bucket);

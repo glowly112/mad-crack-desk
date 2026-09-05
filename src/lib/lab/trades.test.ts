@@ -10,6 +10,8 @@ import {
   bookedClock,
   dayTapePnl,
   fillFromRow,
+  fillDeskRow,
+  ingestMillFills,
   fillsOnDay,
   fmtStake,
   openFills,
@@ -38,7 +40,6 @@ import {
   tapePnl,
   tradeCounts,
   bookWord,
-  fillDeskRow,
   fillResultWord,
   tradeName,
   waitDeskRow,
@@ -1088,4 +1089,88 @@ test("wait chips dedupe by country window market", () => {
     { id: "c", title: "NZ morning WIN", why: null },
   ]);
   assert.equal(chips.length, 2);
+});
+
+test("book row spices survive fillFromRow into stamp.trades shape", () => {
+  const row = {
+    pick_id: "gb-spice-1",
+    ts: "2026-09-05T14:00:00Z",
+    date: "2026-09-05",
+    cell_id: "H-ehole-gb-morning-win-12001Z",
+    mode: "auto_dry",
+    status: "OPEN",
+    odds: 4.2,
+    stake_gbp: 2,
+    horse: "Desert Crown",
+    course: "Ascot",
+    race_type: "Handicap",
+    going: "Good",
+    surface: "Turf",
+    distance_m: 1609,
+    field_size: 12,
+    card_join: "gb|morning",
+    country: "GB",
+    window: "morning",
+    market_type: "WIN",
+    race_id: "R-991",
+  };
+  const fill = fillFromRow(row)!;
+  assert.ok(fill.spice);
+  assert.equal(fill.spice.course, "Ascot");
+  assert.equal(fill.spice.race_type, "Handicap");
+  assert.equal(fill.spice.field_size, 12);
+  assert.equal(fill.spice.distance_m, 1609);
+  assert.equal(fill.spice.race_id, "R-991");
+
+  const stamped = ingestMillFills([fill], "2026-09-05", []);
+  assert.equal(stamped.length, 1);
+  assert.ok(stamped[0]!.spice);
+  assert.equal(stamped[0]!.spice.field_size, 12);
+  assert.equal(stamped[0]!.spice.race_type, "Handicap");
+
+  const desk = fillDeskRow(stamped[0]!, false, []);
+  assert.equal(desk.course, "Ascot");
+  assert.match(desk.spiceLine ?? "", /Handicap/);
+  assert.match(desk.spiceLine ?? "", /fld 12/);
+});
+
+test("book spices null-safe when plant has not stamped them yet", () => {
+  const fill = fillFromRow({
+    pick_id: "gb-bare-1",
+    ts: "2026-09-05T14:00:00Z",
+    date: "2026-09-05",
+    cell_id: "H-ehole-gb-morning-win-12001Z",
+    mode: "auto_dry",
+    status: "OPEN",
+    odds: 3.5,
+    stake_gbp: 2,
+  })!;
+  assert.ok(fill.spice);
+  assert.equal(fill.spice.course, null);
+  assert.equal(fill.spice.field_size, null);
+  const desk = fillDeskRow(fill, false, []);
+  assert.equal(desk.course, null);
+  assert.equal(desk.spiceLine, null);
+});
+
+test("seedTapeFromBook keeps spices on merged tape", () => {
+  const day = "2026-09-05";
+  const bookFill = fillFromRow({
+    pick_id: "seed-spice",
+    ts: "2026-09-05T15:00:00Z",
+    date: day,
+    cell_id: "H-ehole-gb-morning-win-12001Z",
+    mode: "auto_dry",
+    status: "OPEN",
+    odds: 5,
+    stake_gbp: 2,
+    course: "Newmarket",
+    race_type: "Maiden",
+    field_size: 8,
+  })!;
+  const seeded = seedTapeFromBook([], [bookFill], day, []);
+  assert.ok(seeded[0]!.spice);
+  assert.equal(seeded[0]!.spice.course, "Newmarket");
+  assert.equal(seeded[0]!.spice.race_type, "Maiden");
+  assert.equal(seeded[0]!.spice.field_size, 8);
 });

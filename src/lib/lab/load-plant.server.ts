@@ -32,7 +32,7 @@ if day:
     d["date"] = day
     d["day"] = day
 book = pathlib.Path.home() / "bbb/data/firm/live_ledger/book.jsonl"
-keys = ("pick_id","ts","settled_ts","cell_id","mode","status","odds","stake_gbp","paper_stake_gbp","paper_pnl_gbp","placed_result","certified_keep","gate_verdict","side","lab_status","date","unmatched","unmatched_size","atb_size_gbp","phase","in_play","off_ts","off_time","horse","runner","horse_name","runner_name","selection_name","sel_name")
+keys = ("pick_id","ts","settled_ts","cell_id","mode","status","odds","stake_gbp","paper_stake_gbp","paper_pnl_gbp","placed_result","certified_keep","gate_verdict","side","lab_status","date","unmatched","unmatched_size","atb_size_gbp","phase","in_play","off_ts","off_time","horse","runner","horse_name","runner_name","selection_name","sel_name","course","race_type","going","surface","distance_m","field_size","card_join","country","window","market_type","race_id")
 tape = d.get("fills")
 if not isinstance(tape, list):
     snap = d.get("snapshot") if isinstance(d.get("snapshot"), dict) else {}
