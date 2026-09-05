@@ -111,8 +111,7 @@ if [ "$ping_code" != "200" ]; then
   tail -30 "$ROOT/logs/mcl_desk.log" >&2 || true
   exit 1
 fi
-'
-chmod +x "$APP/mcl-desk-health.sh" 2>/dev/null || chmod +x "$HOME/mcl-desk/mcl-desk-health.sh" 2>/dev/null || true
+chmod +x "$APP/mcl-desk-health.sh" 2>/dev/null || true
 chmod +x "$APP/mcl-desk-keepalive.sh" 2>/dev/null || true
 chmod +x "$HOME/bbb/deploy/mcl-desk-keepalive.sh" 2>/dev/null || true
 HEALTH_SH="$APP/mcl-desk-health.sh"
@@ -128,4 +127,5 @@ if [ -f "$KEEPALIVE_SH" ]; then
 elif [ -f "$HEALTH_SH" ]; then
   "$HEALTH_SH" || true
 fi
+'
 rm -f "$KF" 2>/dev/null || true
